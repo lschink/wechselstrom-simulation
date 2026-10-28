@@ -1201,5 +1201,43 @@ sc2p=Math.max(Math.SQRT2*M.IM, Math.SQRT2*M.I2, 0.4);
 sc3p=Math.max(Math.SQRT2*M.ICt, 0.3);
 requestAnimationFrame(loop);
 </script>
+<!-- sim-nav -->
+<style>
+.sn-bar{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
+  background:var(--panel,#141d33);border-top:1px solid var(--border,#26355a);
+  padding:.7rem 1.2rem;margin-top:2.5rem;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:.9rem;
+  color:var(--text,#e5ecf7)}
+a.sn-home{color:var(--accent,#f59e0b);font-weight:700;text-decoration:none;white-space:nowrap}
+a.sn-home:hover{text-decoration:underline}
+.sn-nums{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
+.sn-num{display:inline-flex;align-items:center;justify-content:center;min-width:1.9rem;height:1.9rem;
+  padding:0 .35rem;border-radius:999px;border:1px solid var(--border,#26355a);
+  color:var(--text,#e5ecf7);text-decoration:none;font-weight:600;font-size:.85rem}
+a.sn-num:hover{border-color:var(--accent,#f59e0b);color:var(--accent,#f59e0b)}
+span.sn-num{background:var(--accent,#f59e0b);color:#1a1206;border-color:var(--accent,#f59e0b);font-weight:800}
+.sn-sib{color:var(--muted,#93a4c3);font-size:.85rem;white-space:nowrap}
+.sn-sib a{color:var(--cyan,#22d3ee);text-decoration:none;font-weight:600}
+.sn-sib a:hover{text-decoration:underline}
+</style>
+<footer class="sn-bar">
+  <a class="sn-home" href="../index.html">← Startseite</a>
+  <nav class="sn-nums" aria-label="Simulationen 1 bis 13">
+    <a class="sn-num" href="../01_Einfuehrung_Wechselstrom/" title="Wechselstromerzeugung">1</a>
+    <a class="sn-num" href="../02_Kennwerte_Sinusschwingung/" title="Kennwerte der Sinusschwingung">2</a>
+    <a class="sn-num" href="../03_Widerstand_Wechselstrom/" title="Ohmscher Widerstand im Wechselstromkreis">3</a>
+    <a class="sn-num" href="../04_Kondensator_Wechselstrom/" title="Kondensator im Wechselstromkreis">4</a>
+    <a class="sn-num" href="../05_Spule_Wechselstrom/" title="Spule im Wechselstromkreis">5</a>
+    <a class="sn-num" href="../06_Oszilloskop/" title="Digitales Speicheroszilloskop (DSO)">6</a>
+    <a class="sn-num" href="../07_Leistung_Wechselstrom/" title="Leistung im Wechselstromkreis">7</a>
+    <a class="sn-num" href="../08_RLC_Zeigerdiagramm/" title="Zeigerdiagramm RLC-Reihenschaltung">8</a>
+    <a class="sn-num" href="../09_Impedanz_Dreieck/" title="Impedanz-Dreieck (RLC)">9</a>
+    <span class="sn-num" title="Motorkompensation (aktive Simulation)">10</span>
+    <a class="sn-num" href="../11_Schwingkreis_Resonanz/" title="RLC-Reihenschwingkreis">11</a>
+    <a class="sn-num" href="../12_Transformator/" title="Transformator">12</a>
+    <a class="sn-num" href="../13_Drehstrom/Sternschaltung/" title="Drehstrom – Sternschaltung">13</a>
+  </nav>
+</footer>
+<!-- /sim-nav -->
 </body>
 </html>
