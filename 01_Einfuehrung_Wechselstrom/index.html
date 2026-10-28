@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Wechselstromerzeugung – Simulation</title>
+<style>
+  /* ---------- Grundlayout (dunkles Labor-Design) ---------- */
+  :root{
+    --bg:#0b1220; --panel:#141d33; --panel2:#1b2745; --text:#e5ecf7; --muted:#93a4c3;
+    --accent:#f59e0b; --green:#4ade80; --cyan:#22d3ee; --red:#f87171; --blue:#60a5fa;
+    --border:#26355a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--text);
+       font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+  header{display:flex;justify-content:space-between;align-items:center;gap:1rem;
+         padding:.8rem 1.2rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  h1{font-size:1.25rem}
+  .sub{color:var(--muted);font-size:.85rem}
+  button{background:var(--accent);color:#1a1206;border:0;border-radius:8px;
+         padding:.45rem .9rem;font-weight:700;font-size:.9rem;cursor:pointer}
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  button:hover{filter:brightness(1.12)}
+  main{max-width:1280px;margin:0 auto;padding:1rem}
+
+  /* ---------- Bühne: Simulation links, Messwerte rechts ---------- */
+  .stage{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:1rem}
+  @media (max-width:920px){.stage{grid-template-columns:1fr}}
+  .canvas-wrap{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  canvas{display:block;width:100%;height:auto}
+  #scene{aspect-ratio:3/2}
+  #scope{aspect-ratio:8/3}
+  #flux{aspect-ratio:2/1}
+  .side{display:flex;flex-direction:column;gap:1rem}
+  /* Auf schmalen Screens: Fluss-Diagramm direkt unter die Szene */
+  @media (max-width:920px){.side .fluxwrap{order:-1}}
+
+  /* ---------- Messwert-Chips ---------- */
+  h2.sec{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem}
+  .readouts{display:grid;grid-template-columns:repeat(auto-fill,minmax(106px,1fr));gap:.5rem}
+  .chip{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.45rem .6rem}
+  .chip .l{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+  .chip .v{font-size:1.02rem;font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* ---------- Steuerung ---------- */
+  section h2.sec{margin:1.2rem 0 .5rem}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:.8rem}
+  .card h3{font-size:.85rem;color:var(--muted);margin-bottom:.5rem;font-weight:600}
+  .row{display:flex;justify-content:space-between;align-items:baseline;font-size:.9rem;margin-bottom:.25rem;gap:.5rem}
+  .row output{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
+  .buttons{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+  .hint{color:var(--muted);font-size:.75rem;margin-top:.4rem}
+
+  /* ---------- Formelzeile und Erklärung ---------- */
+  .formulas{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+  .formula{background:var(--panel2);border:1px solid var(--border);border-radius:10px;
+           padding:.45rem .8rem;font-family:Georgia,serif;font-style:italic;white-space:nowrap;font-size:.95rem}
+  .explain{margin-top:1.2rem;background:var(--panel);border:1px solid var(--border);
+           border-radius:12px;padding:1rem 1.2rem}
+  .explain h2{font-size:1.05rem;margin-bottom:.4rem}
+  .explain p{margin:.55rem 0;font-size:.92rem;color:#cdd8ec}
+  .explain strong{color:var(--text)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 data-i18n="title">Wechselstromerzeugung</h1>
+    <div class="sub" data-i18n="subtitle">Drehende Spule im Magnetfeld – ein einfacher Wechselstrom-Generator</div>
+  </div>
+  <button id="btnLang" class="secondary">EN</button>
+</header>
+
+<main>
+  <!-- ============ Bühne ============ -->
+  <div class="stage">
+    <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+    <div class="side">
+      <div class="canvas-wrap"><canvas id="scope"></canvas></div>
+      <div class="canvas-wrap fluxwrap"><canvas id="flux"></canvas></div>
+      <div>
+        <h2 class="sec" data-i18n="readings">Messwerte</h2>
+        <div class="readouts">
+          <div class="chip"><div class="l" data-i18n="rAlpha">Drehwinkel α</div><div class="v" id="vAlpha">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rN">Drehzahl n</div><div class="v" id="vN">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rF">Frequenz f</div><div class="v" id="vF">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rOmega">Winkelgeschw. ω</div><div class="v" id="vOmega">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rFlux">Fluss Φ</div><div class="v" id="vFlux">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rU">u(t)</div><div class="v" id="vU">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rUhat">Scheitelwert Û</div><div class="v" id="vUhat">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rUeff">Effektivwert U</div><div class="v" id="vUeff">–</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Steuerung ============ -->
+  <section>
+    <h2 class="sec" data-i18n="settings">Einstellungen</h2>
+    <div class="controls">
+      <div class="card">
+        <div class="row"><span data-i18n="wind">Windgeschwindigkeit</span><output id="oWind"></output></div>
+        <input type="range" id="rWind" min="0" max="15" step="0.1" value="6">
+        <div class="hint" data-i18n="windHint">Der Wind treibt die Windmühle an der Spulenachse: n = 30·v (U/min).</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="b">Flussdichte B</span><output id="oB"></output></div>
+        <input type="range" id="rB" min="0.05" max="1" step="0.01" value="0.4">
+        <div class="hint" data-i18n="bHint">Magnetstärke des Hufeisenmagneten.</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="n">Windungszahl N</span><output id="oN"></output></div>
+        <input type="range" id="rN" min="1" max="500" step="1" value="100">
+        <div class="hint" data-i18n="nHint">In der Skizze je Seite nur 3 Drähte sichtbar (Vereinfachung).</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="a">Spulenfläche A</span><output id="oA"></output></div>
+        <input type="range" id="rA" min="10" max="500" step="5" value="200">
+        <div class="hint" data-i18n="aHint">Von den Feldlinien durchsetzte Fläche einer Windung.</div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="operation">Betrieb</h3>
+        <div class="buttons">
+          <button id="btnRun"></button>
+          <button id="btnReset" class="secondary" data-i18n="reset">Winkel α = 0</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Formeln ============ -->
+  <h2 class="sec" data-i18n="formulas">Formeln</h2>
+  <div class="formulas">
+    <div class="formula">U<sub>ind</sub> = −N · dΦ/dt</div>
+    <div class="formula">Φ = B·A·cos(α)</div>
+    <div class="formula">u(t) = Û·sin(ω·t)</div>
+    <div class="formula">Û = N·B·A·ω</div>
+    <div class="formula">U = Û/√2</div>
+  </div>
+
+  <!-- ============ Erklärung ============ -->
+  <article class="explain">
+    <h2 data-i18n="explanation">Erklärung</h2>
+    <p data-i18n-html="exp1"></p>
+    <p data-i18n-html="exp2"></p>
+    <p data-i18n-html="exp3"></p>
+    <p data-i18n-html="exp4"></p>
+    <p data-i18n-html="exp5"></p>
+  </article>
+</main>
+
+<script>
+"use strict";
+/* ==================================================================
+   Wechselstrom-Simulation: drehende Spule im Magnetfeld
+   Reines JS + Canvas, keine externen Abhängigkeiten, offline lauffähig.
+
+   Physikmodell:
+     α(t) = ω·t                      Drehwinkel
+     ω = 2π·f,  n = 30·v_Wind        Drehzahl aus Wind (proportional)
+     Φ(t) = B·A·cos(α)               magnetischer Fluss
+     u(t) = Û·sin(α),  Û = N·B·A·ω   Induktionsspannung
+     U_eff = Û/√2
+   ================================================================== */
+
+/* ---------------- 1. Sprachdatei (DE/EN) ---------------- */
+const I18N = {
+  de: {
+    title: "Wechselstromerzeugung",
+    subtitle: "Drehende Spule im Magnetfeld – ein einfacher Wechselstrom-Generator",
+    readings: "Messwerte",
+    rAlpha: "Drehwinkel α", rN: "Drehzahl n", rF: "Frequenz f", rOmega: "Winkelgeschw. ω",
+    rFlux: "Fluss Φ", rU: "u(t)", rUhat: "Scheitelwert Û", rUeff: "Effektivwert U",
+    settings: "Einstellungen",
+    wind: "Windgeschwindigkeit", b: "Flussdichte B", n: "Windungszahl N", a: "Spulenfläche A",
+    windHint: "Der Wind treibt die Windmühle an der Spulenachse: n = 30·v (U/min).",
+    bHint: "Magnetstärke des Hufeisenmagneten.",
+    nHint: "In der Skizze je Seite nur 3 Drähte sichtbar (Vereinfachung).",
+    aHint: "Von den Feldlinien durchsetzte Fläche einer Windung.",
+    operation: "Betrieb", btnStart: "▶ Start", btnStop: "❚❚ Stopp", reset: "Winkel α = 0",
+    formulas: "Formeln", explanation: "Erklärung",
+    statusZero: "u = 0 — Leiter bewegen sich parallel zu B · dΦ/dt = 0",
+    statusMax:  "u maximal (±Û) — Leiter schneiden B senkrecht · dΦ/dt maximal",
+    fluxTitle: "Magnetischer Fluss Φ",
+    poleN: "N", poleS: "S", lblB: "B", lblV: "v", lblF: "F",
+    lblWind: "Wind", lblRings: "Schleifringe", lblBrushes: "Bürsten",
+    lblToScope: "zum Oszilloskop",
+    legElectrons: "Punkte: Elektronen",
+    legForce: "F = Kraft auf Elektronen · Stromrichtung umgekehrt",
+    scopeInfo: "u(t) = Û·sin(ω·t)",
+    exp1: `<strong>Induktionsgesetz:</strong> Ändert sich der magnetische Fluss Φ durch eine Spule, wird eine Spannung induziert: <strong>U<sub>ind</sub> = −N · dΦ/dt</strong>. Ursache ist die Lorentz-Kraft <strong>F = q·(v × B)</strong> auf die Elektronen der bewegten Leiter (UVW-Regel) – dabei stehen <strong>B, v und F immer paarweise senkrecht</strong> aufeinander. Die gelben Punkte der Animation sind Elektronen, die F-Pfeile zeigen ihre Bewegungsrichtung; der technische Strom fließt stets entgegengesetzt. Die Kräfte auf beiden Leiterseiten zeigen zwar in entgegengesetzte Richtungen – die Geschwindigkeiten v sind es auch –, treiben die Elektronen aber gemeinsam im Kreis; ihre Spannungen addieren sich wie zwei in Reihe geschaltete Batterien. Jede der N Windungen trägt dieselbe Spannung bei – die Spannung wächst proportional zur Windungszahl.`,
+    exp2: `<strong>Warum sinusförmig?</strong> Die Spule der Fläche A dreht sich mit konstanter Winkelgeschwindigkeit ω im homogenen Feld B. Der Fluss durch die Spule ist Φ(t) = B·A·cos(ωt). Die Spannung ist dessen zeitliche Ableitung: <strong>u(t) = N·B·A·ω·sin(ωt) = Û·sin(ωt)</strong> – eine reine Sinusspannung mit der Frequenz f = ω/2π, also genau der Drehfrequenz.`,
+    exp3: `<strong>Scheitel- und Effektivwert:</strong> Û = N·B·A·ω ist der Maximalwert (Scheitelwert) der Spannung. Der Effektivwert <strong>U = Û/√2 ≈ 0,707·Û</strong> erzeugt an einem Widerstand dieselbe Wärmeleistung wie eine Gleichspannung dieses Wertes. Aus dem Netz-Effektivwert 230 V folgt z.&nbsp;B. Û ≈ 325 V.`,
+    exp4: `<strong>Schleifringe:</strong> Die beiden Enden der rotierenden Spule sind mit zwei ringförmigen Schleifringen auf der Achse verbunden. Feststehende Bürsten gleiten darauf und führen den Wechselstrom zur Messleitung – der Stromkreis bleibt dauerhaft geschlossen, ohne dass sich Leitungen verdrehen.`,
+    exp5: `<strong>Null- und Maximalstellen:</strong> u = 0, wenn sich die Leiter gerade parallel zu den Feldlinien bewegen – dort ist der Fluss extremal und seine Änderung null. u = ±Û, wenn die Leiter die Feldlinien senkrecht schneiden und sich der Fluss am schnellsten ändert. Pro Umdrehung entsteht genau eine Periode.`
+  },
+  en: {
+    title: "Generating Alternating Current",
+    subtitle: "A rotating coil in a magnetic field – a simple AC generator",
+    readings: "Readings",
+    rAlpha: "Rotation angle α", rN: "Speed n", rF: "Frequency f", rOmega: "Angular velocity ω",
+    rFlux: "Flux Φ", rU: "u(t)", rUhat: "Peak value Û", rUeff: "RMS value U",
+    settings: "Settings",
+    wind: "Wind speed", b: "Flux density B", n: "Number of turns N", a: "Coil area A",
+    windHint: "Wind drives the windmill on the coil shaft: n = 30·v (rpm).",
+    bHint: "Strength of the horseshoe magnet.",
+    nHint: "Only 3 wires per side are drawn (simplification).",
+    aHint: "Area of one turn penetrated by the field lines.",
+    operation: "Operation", btnStart: "▶ Start", btnStop: "❚❚ Stop", reset: "Reset angle α = 0",
+    formulas: "Formulas", explanation: "Explanation",
+    statusZero: "u = 0 – conductors move parallel to B · dΦ/dt = 0",
+    statusMax:  "u at peak (±Û) – conductors cut B at right angles · dΦ/dt maximal",
+    fluxTitle: "Magnetic flux Φ",
+    poleN: "N", poleS: "S", lblB: "B", lblV: "v", lblF: "F",
+    lblWind: "Wind", lblRings: "slip rings", lblBrushes: "brushes",
+    lblToScope: "to the oscilloscope",
+    legElectrons: "dots: electrons",
+    legForce: "F = force on electrons · current direction reversed",
+    scopeInfo: "u(t) = Û·sin(ω·t)",
+    exp1: `<strong>Faraday's law of induction:</strong> Whenever the magnetic flux Φ through a coil changes, a voltage is induced: <strong>U<sub>ind</sub> = −N · dΦ/dt</strong>. The cause is the Lorentz force <strong>F = q·(v × B)</strong> on the electrons in the moving conductors (right-hand rule) – <strong>B, v and F are always pairwise perpendicular</strong>. Each of the N turns contributes the same voltage, so the voltage is proportional to the number of turns. The yellow dots in the animation are electrons and the F arrows point along their motion; conventional current always flows in the opposite direction. The forces on the two conductor sides point in opposite directions – as do their velocities v – but together they drive the electrons around the loop, so their voltages add like two batteries in series.`,
+    exp2: `<strong>Why a sine wave?</strong> The coil (area A) rotates at constant angular velocity ω in the uniform field B. The flux through it is Φ(t) = B·A·cos(ωt); the induced voltage is its time derivative: <strong>u(t) = N·B·A·ω·sin(ωt) = Û·sin(ωt)</strong> – a pure sine voltage with frequency f = ω/2π, i.e. the rotation frequency.`,
+    exp3: `<strong>Peak and RMS value:</strong> Û = N·B·A·ω is the peak value (amplitude) of the voltage. The RMS value <strong>U = Û/√2 ≈ 0.707·Û</strong> produces the same heating power in a resistor as a DC voltage of the same value. E.g. the mains RMS value 230 V corresponds to Û ≈ 325 V.`,
+    exp4: `<strong>Slip rings:</strong> The two ends of the rotating coil are connected to two slip rings on the shaft. Stationary brushes slide on the rings and pass the alternating current to the measurement line – the circuit stays closed without twisting any wires.`,
+    exp5: `<strong>Zero and maximum points:</strong> u = 0 when the conductors move parallel to the field lines – the flux is at an extremum and its rate of change is zero. u = ±Û when the conductors cut the field lines at right angles and the flux changes fastest. Each revolution produces exactly one period.`
+  }
+};
+let lang = "de";
+const T = k => (I18N[lang] && I18N[lang][k]) || I18N.de[k] || k;
+
+/* ---------------- 2. Zustand und Physik ---------------- */
+const state = { running: true, alpha: 0, simTime: 0, wind: 6, B: 0.4, N: 100, A: 200 }; // A in cm²
+const RPM_PER_WIND = 30;                       // n [U/min] = 30 · v_Wind [m/s]
+const omega  = () => state.wind * RPM_PER_WIND * 2 * Math.PI / 60;  // ω [rad/s]
+const freq   = () => omega() / (2 * Math.PI);                       // f [Hz]
+const A_m2   = () => state.A / 1e4;                                 // cm² → m²
+const Uhat   = () => state.N * state.B * A_m2() * omega();          // Û [V]
+const flux   = () => state.B * A_m2() * Math.cos(state.alpha);      // Φ [Wb]
+const uNow   = () => Uhat() * Math.sin(state.alpha);                // u [V]
+
+/* ---------------- 3. DOM und Canvas-Hilfen ---------------- */
+const $ = id => document.getElementById(id);
+const sceneCv = $("scene"), scopeCv = $("scope"), fluxCv = $("flux");
+const sceneCtx = sceneCv.getContext("2d"), scopeCtx = scopeCv.getContext("2d"), fluxCtx = fluxCv.getContext("2d");
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+// Canvas an CSS-Größe anpassen (Retina-scharf), gibt CSS-Größe zurück
+function fitCanvas(cv){
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (w > 0 && (cv.width !== Math.round(w * DPR) || cv.height !== Math.round(h * DPR))){
+    cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  }
+  return [w, h];
+}
+// Pfeil von (x1,y1) nach (x2,y2) mit Dreieckskopf
+function arrow2d(ctx, x1, y1, x2, y2, color, width = 2, head = 7){
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - head * Math.cos(a - 0.42), y2 - head * Math.sin(a - 0.42));
+  ctx.lineTo(x2 - head * Math.cos(a + 0.42), y2 - head * Math.sin(a + 0.42));
+  ctx.closePath(); ctx.fill();
+}
+// abgerundetes Rechteck (Status-Chip)
+function rr(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+const locale = () => lang === "de" ? "de-DE" : "en-US";
+const fmt = (x, d = 1) => x.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
+
+/* ---------------- 4. Weltgeometrie der Szene ---------------- */
+const A2 = 40;        // Spulen-Halblänge (entlang der Drehachse x)
+const B2 = 55;        // Rotationsradius der aktiven Leiter (y-z-Ebene)
+const GROUND = -112;  // Bodenlinie
+let S = 1, CX = 0, CY = 0, fs = 12;   // Kamera: Maßstab, Zentrum, Schriftgröße
+
+// Elektronen wandern als geschlossener Stromkreis um den ganzen Leiterring:
+// Vorderseite → rechter Steg → Rückseite → linker Steg (s in Welteinheiten)
+const SEG  = [2 * A2, 2 * B2, 2 * A2, 2 * B2];       // Länge der 4 Ringabschnitte
+const LOOP = 2 * (SEG[0] + SEG[1]);                  // Gesamtlänge eines Umlaufs
+const eLoop = Array.from({ length: 14 }, (_, i) => ({ s: i / 14 * LOOP }));
+
+/* ---------------- 5. Hauptszene zeichnen ----------------
+   Schiefe Parallelprojektion: +x rechts, +y oben, +z zum Betrachter. */
+function drawScene(){
+  const [w, h] = fitCanvas(sceneCv);
+  const ctx = sceneCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  // Hintergrund
+  const grd = ctx.createRadialGradient(w / 2, h * 0.42, 10, w / 2, h * 0.42, Math.max(w, h) * 0.75);
+  grd.addColorStop(0, "#17223d"); grd.addColorStop(1, "#0a1120");
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+
+  // Kamera so wählen, dass die Welt (ca. 350×280 Einheiten) immer passt
+  S = Math.min(w / 350, h / 280);
+  CX = w / 2 + 37 * S; CY = h / 2 - 5 * S;
+  fs = Math.max(11, 6 * S);
+
+  const P = (x, y, z) => [CX + (x + 0.42 * z) * S, CY - (y - 0.26 * z) * S];
+  const path3 = pts => { ctx.beginPath(); pts.forEach((p, i) => { const q = P(p[0], p[1], p[2]); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); };
+  const seg = (a, b) => { const q = P(a[0], a[1], a[2]), r = P(b[0], b[1], b[2]); ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(r[0], r[1]); ctx.stroke(); };
+  // Quader mit drei sichtbaren Flächen (vorne z+, oben y+, rechts x+)
+  const box3 = (x0, y0, z0, x1, y1, z1, c) => {
+    const faces = [
+      [[[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]], c[0]],
+      [[[x0,y1,z1],[x1,y1,z1],[x1,y1,z0],[x0,y1,z0]], c[1]],
+      [[[x1,y0,z0],[x1,y1,z0],[x1,y1,z1],[x1,y0,z1]], c[2]]
+    ];
+    for (const [f, col] of faces){
+      path3(f); ctx.closePath();
+      ctx.fillStyle = col; ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1; ctx.stroke();
+    }
+  };
+
+  const al = state.alpha, sa = Math.sin(al), ca = Math.cos(al);
+
+  /* --- Boden und Lagerständer --- */
+  ctx.strokeStyle = "#22314f"; ctx.lineWidth = 2;
+  seg([-215, GROUND, 0], [135, GROUND, 0]);
+  const stand = x => {
+    ctx.beginPath();
+    [[x-7,-6],[x+7,-6],[x+12,GROUND],[x-12,GROUND]].forEach((p, i) => {
+      const q = P(p[0], p[1], 0); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]);
+    });
+    ctx.closePath(); ctx.fillStyle = "#2b3a5c"; ctx.fill();
+    box3(x - 9, -8, -8, x + 9, 10, 8, ["#3b4c74", "#54709f", "#2b3a5c"]);
+  };
+  stand(-120); stand(78);
+
+  /* --- Hufeisenmagnet: Joch hinten, N-Pol oben, S-Pol unten --- */
+  box3(45, 82, -42, 75, 102, -30, ["#3b4c74", "#54709f", "#2b3a5c"]);    // obere Verbindung
+  box3(45, -102, -42, 75, -82, -30, ["#3b4c74", "#54709f", "#2b3a5c"]);  // untere Verbindung
+  const yoke = [];
+  for (let i = 0; i <= 16; i++){                      // Joch = dicke U-Kurve rechts
+    const tt = i / 16;
+    yoke.push([(1-tt)*(1-tt)*60 + 2*(1-tt)*tt*108 + tt*tt*60,
+               (1-tt)*(1-tt)*95 + 2*(1-tt)*tt*0   + tt*tt*(-95), -42]);
+  }
+  path3(yoke); ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = "#141d33"; ctx.lineWidth = 27 * S; ctx.stroke();
+  ctx.strokeStyle = "#5b6c93"; ctx.lineWidth = 20 * S; ctx.stroke();
+  ctx.strokeStyle = "#8fa3c8"; ctx.lineWidth =  6 * S; ctx.stroke();
+  box3(-60, 70, -30, 60, 100, 30, ["#d0342c", "#ff6b5e", "#8f1f18"]);   // N-Pol
+  box3(-60, -100, -30, 60, -70, 30, ["#2456c9", "#5b8def", "#173a86"]); // S-Pol
+  ctx.fillStyle = "#fff"; ctx.font = `bold ${fs + 7}px system-ui`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  let q = P(0, 85, 30);  ctx.fillText(T("poleN"), q[0], q[1]);
+  q = P(0, -85, 30); ctx.fillText(T("poleS"), q[0], q[1]);
+
+  /* --- Magnetfeldlinien von N nach S (zwei Tiefenlagen) --- */
+  for (const zl of [-16, 16]) for (const xl of [-48, -32, -16, 0, 16, 32, 48]){
+    ctx.strokeStyle = "rgba(96,165,250,.38)"; ctx.lineWidth = 1.4;
+    seg([xl, 66, zl], [xl, -66, zl]);
+    arrow2d(ctx, ...P(xl, -26, zl), ...P(xl, -38, zl), "rgba(96,165,250,.55)", 1.4, 6);
+  }
+  q = P(-8, 40, 16); ctx.fillStyle = "#93c5fd"; ctx.font = `italic bold ${fs}px Georgia`;
+  ctx.fillText(T("lblB"), q[0], q[1]);
+
+  /* --- Wind (animierte Strichspur) --- */
+  if (state.running && state.wind > 0.05){
+    const sp = (state.simTime * (26 + 34 * state.wind / 15)) % 24;
+    ctx.save(); ctx.setLineDash([9, 15]); ctx.lineDashOffset = -sp;
+    ctx.strokeStyle = `rgba(125,211,252,${0.2 + 0.45 * state.wind / 15})`; ctx.lineWidth = 2;
+    for (const yw of [22, 2, -18]) seg([-208, yw, 0], [-162, yw, 0]);
+    ctx.restore();
+    q = P(-212, 36, 0); ctx.fillStyle = "#7dd3fc"; ctx.font = `${fs * 0.85}px system-ui`;
+    ctx.textAlign = "left"; ctx.fillText(T("lblWind"), q[0], q[1]);
+  }
+
+  /* --- Drehachse --- */
+  ctx.strokeStyle = "#9aa8c7"; ctx.lineWidth = 4.5 * S; ctx.lineCap = "round";
+  seg([-150, 0, 0], [84, 0, 0]);
+
+  /* --- Spulenenden → Schleifringe → Bürsten → Leitung --- */
+  const EF = [-A2, -B2 * sa, B2 * ca], EB = [-A2, B2 * sa, -B2 * ca];
+  ctx.strokeStyle = "#c97b2d"; ctx.lineWidth = 1.6;   // rotierende Zuleitungen
+  seg(EF, [-64, 2, 7.5]); seg(EB, [-78, 2, 7.5]);
+  const ring = x0 => {
+    ctx.beginPath();
+    for (let i = 0; i <= 28; i++){
+      const th = i / 28 * 2 * Math.PI, p = P(x0, 8 * Math.cos(th), 8 * Math.sin(th));
+      i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
+    }
+    ctx.strokeStyle = "#e08a3c"; ctx.lineWidth = 3 * S; ctx.stroke();
+  };
+  ring(-64); ring(-78);
+  const brush = x0 => {                                  // Bürsten (feststehend)
+    path3([[x0,8,-6],[x0,8,6],[x0,15,6],[x0,15,-6]]); ctx.closePath();
+    ctx.fillStyle = "#b45309"; ctx.fill();
+    ctx.strokeStyle = "#7c2d12"; ctx.lineWidth = 1; ctx.stroke();
+  };
+  brush(-64); brush(-78);
+  ctx.strokeStyle = "#c97b2d"; ctx.lineWidth = 1.8;      // Messleitungen
+  seg([-64, 15, 0], [-64, 60, 0]); seg([-64, 60, 0], [30, 60, 0]);
+  seg([-78, 15, 0], [-78, 58, 0]); seg([-78, 58, 0], [10, 58, 0]);
+  arrow2d(ctx, ...P(30, 60, 0), ...P(38, 60, 0), "#c97b2d", 1.8, 6);
+  arrow2d(ctx, ...P(10, 58, 0), ...P(18, 58, 0), "#c97b2d", 1.8, 6);
+  // Beschriftungen mit dunklem Halo (bleibt auch vor der Spule lesbar)
+  const label = (key, pt, col) => {
+    const p2 = P(pt[0], pt[1], pt[2]);
+    ctx.font = `${fs * 0.8}px system-ui`; ctx.textAlign = "left";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(10,17,32,.9)";
+    ctx.strokeText(T(key), p2[0], p2[1]);
+    ctx.fillStyle = col; ctx.fillText(T(key), p2[0], p2[1]);
+  };
+  label("lblToScope", [42, 63, 0], "#93a4c3");
+  label("lblRings", [-88, -26, 0], "#e08a3c");
+  label("lblBrushes", [-58, 27, 0], "#e08a3c");
+
+  /* --- Spule --- */
+  const F1 = [-A2, -B2 * sa, B2 * ca], F2 = [A2, -B2 * sa, B2 * ca];   // vordere aktive Seite
+  const B1 = [-A2, B2 * sa, -B2 * ca], B2p = [A2, B2 * sa, -B2 * ca];  // hintere aktive Seite
+  // Andeutung der Kreisbahn
+  ctx.setLineDash([4, 6]); ctx.strokeStyle = "rgba(148,163,184,.3)"; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i <= 40; i++){
+    const th = i / 40 * 2 * Math.PI, p = P(A2 + 8, B2 * Math.cos(th), B2 * Math.sin(th));
+    i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+  // inaktive Stege (verbinden vorn/hinten, tragen nichts bei)
+  ctx.strokeStyle = "#8a5a24"; ctx.lineWidth = 3.2 * S; ctx.lineCap = "round";
+  seg(F1, B1); seg(F2, B2p);
+  // aktive Seiten: je 3 Drähte, farblich nach Spannungsbetrag
+  const gl = Math.abs(sa);
+  const colA = gl >= 0.9 ? "#4ade80" : gl <= 0.15 ? "#fbbf24" : "#fb923c";
+  const side = (p, qq, dim) => {
+    for (const off of [-3.2, 0, 3.2]){
+      ctx.save();
+      if (!dim){ ctx.shadowColor = colA; ctx.shadowBlur = 16 * gl * S / 2; }
+      ctx.strokeStyle = colA; ctx.globalAlpha = dim ? 0.85 : 1; ctx.lineWidth = 4.2 * S;
+      seg([p[0], p[1], p[2] + off], [qq[0], qq[1], qq[2] + off]);
+      ctx.restore();
+    }
+  };
+  if (ca >= 0){ side(B1, B2p, true); side(F1, F2, false); }   // Tiefenkorrektur
+  else        { side(F1, F2, true);  side(B1, B2p, false); }
+
+  /* --- Elektronen (animierte Ladungsträger) --- */
+  ctx.fillStyle = "#fde047"; ctx.strokeStyle = "#a16207"; ctx.lineWidth = 0.8;
+  const dot = (x, y, z) => {
+    const p = P(x, y, z);
+    ctx.beginPath(); ctx.arc(p[0], p[1], Math.max(2.2, 1.1 * S), 0, 7); ctx.fill(); ctx.stroke();
+  };
+  // Position auf dem Leiterring zum Umlauf-Parameter s (Strom fließt durchgängig im Kreis)
+  const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const loopPos = s => {
+    let r = s;
+    if (r < SEG[0]) return lerp3(F1, F2, r / SEG[0]);
+    r -= SEG[0];
+    if (r < SEG[1]) return lerp3(F2, B2p, r / SEG[1]);
+    r -= SEG[1];
+    if (r < SEG[2]) return lerp3(B2p, B1, r / SEG[2]);
+    r -= SEG[2];
+    return lerp3(B1, F1, r / SEG[3]);
+  };
+  for (const p of eLoop){
+    const pos = loopPos(p.s);
+    dot(pos[0], pos[1], pos[2]);
+  }
+
+  /* --- Geschwindigkeitspfeile v (immer voll) --- */
+  ctx.font = `italic bold ${fs * 0.85}px Georgia`; ctx.textAlign = "left";
+  const vArrow = (M, dx, dy, dz) => {
+    const a = P(...M), b = P(M[0] + dx, M[1] + dy, M[2] + dz);
+    arrow2d(ctx, a[0], a[1], b[0], b[1], "#60a5fa", 2.2, 7);
+    ctx.fillStyle = "#93c5fd"; ctx.fillText(T("lblV"), b[0] + 5, b[1] - 4);
+  };
+  vArrow([0, -B2 * sa, B2 * ca], 0, -15 * ca, -15 * sa);   // v = ω × r
+  vArrow([0,  B2 * sa, -B2 * ca], 0,  15 * ca,  15 * sa);
+
+  /* --- Lorentz-Kraft-Pfeile F auf die Elektronen, Länge ∝ sin α --- */
+  if (Math.abs(sa) > 0.06){
+    const L = 6 + 16 * Math.abs(sa), sgn = Math.sign(sa);
+    const fArrow = (M, dx) => {
+      const a = P(...M), b = P(M[0] + dx, M[1], M[2]);
+      arrow2d(ctx, a[0], a[1], b[0], b[1], "#f472b6", 2.2, 7);
+      ctx.fillStyle = "#f9a8d4"; ctx.fillText(T("lblF"), b[0] + 5, b[1] - 4);
+    };
+    fArrow([ A2 * 0.55, -B2 * sa, B2 * ca],  sgn * L);   // vorne: F ∝ +x·sin α
+    fArrow([-A2 * 0.55,  B2 * sa, -B2 * ca], -sgn * L);  // hinten: entgegengesetzt
+  }
+
+  /* --- Windmühle am linken Achsende (dreht sich mit α) --- */
+  const blades = [];
+  for (let k = 0; k < 4; k++){
+    const th = -al + k * Math.PI / 2;
+    blades.push({
+      z: 30 * Math.sin(th),
+      pts: [[-150, 4 * Math.cos(th - 0.16), 4 * Math.sin(th - 0.16)],
+            [-150 + 6, 30 * Math.cos(th), 30 * Math.sin(th)],
+            [-150, 4 * Math.cos(th + 0.16), 4 * Math.sin(th + 0.16)]]
+    });
+  }
+  blades.sort((a, b) => a.z - b.z);          // Painter: hintere Flügel zuerst
+  for (const bl of blades){
+    path3(bl.pts); ctx.closePath();
+    ctx.fillStyle = bl.z < 0 ? "#c3cee4" : "#f4f7fd"; ctx.fill();
+    ctx.strokeStyle = "#4b5a74"; ctx.lineWidth = 1.3; ctx.stroke();
+  }
+  q = P(-150, 0, 0);
+  ctx.beginPath(); ctx.arc(q[0], q[1], Math.max(3.5, 1.8 * S), 0, 7);
+  ctx.fillStyle = "#54627f"; ctx.fill();
+  ctx.strokeStyle = "#2b3a5c"; ctx.lineWidth = 1.2; ctx.stroke();
+
+  /* --- Legende: Punkte = Elektronen, F = Kraft darauf --- */
+  ctx.font = `${fs * 0.8}px system-ui`; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "#fde047"; ctx.strokeStyle = "#a16207"; ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.arc(20, 18, Math.max(2.4, 1.1 * S), 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#cdd8ec"; ctx.fillText(T("legElectrons"), 30, 19);
+  ctx.fillStyle = "#f9a8d4"; ctx.fillText(T("legForce"), 14, 19 + fs + 6);
+  ctx.textBaseline = "alphabetic";
+
+  /* --- Status-Hinweis: u = 0 / u maximal --- */
+  statusChip(ctx, w, h, sa);
+}
+
+/* ---------------- 6. Status-Hinweis (synchron zur Animation) ---------------- */
+function statusChip(ctx, w, h, sa){
+  const a = Math.abs(sa);
+  let txt, col;
+  if (a >= 0.9){ txt = T("statusMax");  col = "#4ade80"; }
+  else if (a <= 0.15){ txt = T("statusZero"); col = "#fbbf24"; }
+  else return;
+  ctx.font = `bold ${fs * 0.92}px system-ui`;
+  const tw = ctx.measureText(txt).width, pw = tw + 24, ph = fs * 1.9;
+  const x = 14, y = h - 14 - ph;
+  rr(ctx, x, y, pw, ph, 8);
+  ctx.globalAlpha = 0.16; ctx.fillStyle = col; ctx.fill();
+  ctx.globalAlpha = 1; ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = col; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  ctx.fillText(txt, x + 12, y + ph / 2 + 1);
+  ctx.textBaseline = "alphabetic";
+}
+
+/* ---------------- 7. Fluss-Diagramm (Kreis mit Projektionsfläche) ---------------- */
+function drawFlux(){
+  const [w, h] = fitCanvas(fluxCv);
+  const ctx = fluxCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const cx0 = w * 0.30, cy0 = h * 0.56, R = Math.min(h * 0.36, w * 0.19);
+  const al = state.alpha, sa = Math.sin(al), ca = Math.cos(al);
+
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#e5ecf7"; ctx.font = `bold ${Math.max(12, h * 0.08)}px system-ui`;
+  ctx.fillText(T("fluxTitle"), 12, h * 0.14);
+  ctx.fillStyle = "#93a4c3"; ctx.font = `italic ${Math.max(11, h * 0.062)}px Georgia`;
+  ctx.fillText("Φ = B·A·cos α", 12, h * 0.26);
+
+  // B-Feld-Pfeil (senkrecht, N → S)
+  arrow2d(ctx, cx0 - R - 26, cy0 - R * 0.55, cx0 - R - 26, cy0 + R * 0.55, "#60a5fa", 2, 6);
+  ctx.fillStyle = "#93c5fd"; ctx.font = `italic bold ${Math.max(11, h * 0.066)}px Georgia`;
+  ctx.textAlign = "center"; ctx.fillText("B", cx0 - R - 26, cy0 - R * 0.55 - 6);
+
+  // Umrisskreis der Spule (von der Achse gesehen)
+  ctx.setLineDash([5, 5]); ctx.strokeStyle = "#475569"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cx0, cy0, R, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+
+  // Durchsetzte (projizierte) Fläche ∝ |cos α|
+  const rw = Math.max(1.5, Math.abs(ca) * R);
+  ctx.beginPath(); ctx.ellipse(cx0, cy0, rw, R, 0, 0, 7);
+  ctx.fillStyle = `rgba(74,222,128,${0.08 + 0.30 * Math.abs(ca)})`;
+  ctx.fill();
+  ctx.strokeStyle = "#4ade80"; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // Rotierender Zeiger, Länge ∝ cos α (Vorzeichen = Flussrichtung)
+  arrow2d(ctx, cx0, cy0, cx0 + ca * R, cy0 + sa * R, "#e5ecf7", 2.5, 7);
+
+  // Vorzeichen-Balken und Wert
+  const bx = w * 0.60, bw = w * 0.34, by = cy0;
+  ctx.lineCap = "round"; ctx.strokeStyle = "#334155"; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + bw, by); ctx.stroke();
+  ctx.fillStyle = "#4ade80";
+  ctx.beginPath(); ctx.arc(bx + bw / 2 + ca * bw / 2, by, 6, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#4ade80"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${Math.max(10, h * 0.05)}px system-ui`;
+  ctx.fillText("−", bx, by + 20); ctx.fillText("0", bx + bw / 2, by + 20); ctx.fillText("+", bx + bw, by + 20);
+  ctx.fillStyle = "#e5ecf7"; ctx.font = `bold ${Math.max(12, h * 0.066)}px system-ui`;
+  ctx.fillText(`Φ = ${fmt(flux() * 1000, 2)} mWb`, bx + bw / 2, by - 16);
+}
+
+/* ---------------- 8. Oszilloskop (laufende Sinuskurve) ---------------- */
+const hist = [];                    // Abtastwerte [simTime, u]
+const WIN = 1.0;                    // Zeitfenster in Sekunden
+function niceStep(x){
+  if (x <= 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(x))), n = x / p;
+  return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p;
+}
+function drawScope(){
+  const [w, h] = fitCanvas(scopeCv);
+  const ctx = scopeCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#04101c"; ctx.fillRect(0, 0, w, h);
+
+  const L = 46, Rr = 14, Tt = 16, Bb = 28;
+  const pw = w - L - Rr, ph = h - Tt - Bb;
+  const t1 = state.simTime, t0 = t1 - WIN;
+  const uh = Math.abs(Uhat());
+  const stepY = niceStep(uh / 2), yMax = stepY * 3;
+  const X = t => L + (t - t0) / WIN * pw;
+  const Y = u => Tt + ph / 2 - (u / yMax) * (ph / 2);
+  const fsS = Math.max(10, h * 0.075);
+
+  // Raster
+  ctx.strokeStyle = "rgba(148,163,184,.14)"; ctx.lineWidth = 1;
+  ctx.fillStyle = "#7c8db0"; ctx.font = `${fsS * 0.9}px system-ui`;
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  for (let i = 0; i <= 10; i++){
+    const x = L + i / 10 * pw;
+    ctx.beginPath(); ctx.moveTo(x, Tt); ctx.lineTo(x, Tt + ph); ctx.stroke();
+    ctx.fillText(fmt(i / 10 * WIN, 1), x, Tt + ph + 14);
+  }
+  ctx.textAlign = "right";
+  for (let u = -yMax; u <= yMax + 1e-9; u += stepY){
+    const y = Y(u);
+    ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke();
+    ctx.fillText(fmt(u, u % 1 ? 1 : 0), L - 5, y + 3);
+  }
+  // Achsenbeschriftung
+  ctx.fillStyle = "#9fb0d0"; ctx.textAlign = "left";
+  ctx.fillText("u/V", 6, Tt + 8);
+  ctx.textAlign = "right"; ctx.fillText("t/s", L + pw, h - 6);
+
+  // Nullinie
+  ctx.strokeStyle = "rgba(229,236,247,.55)"; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(L, Y(0)); ctx.lineTo(L + pw, Y(0)); ctx.stroke();
+
+  // ±Û (rot) und ±U_eff (amber), gestrichelt
+  const dashed = (val, col, label) => {
+    ctx.save(); ctx.setLineDash([6, 5]); ctx.strokeStyle = col; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(L, Y(val)); ctx.lineTo(L + pw, Y(val)); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle = col; ctx.textAlign = "left";
+    ctx.fillText(label, L + 5, Y(val) - 3); ctx.restore();
+  };
+  if (uh > 1e-6){
+    dashed( uh, "#f87171", "Û");
+    dashed(-uh, "#f87171", "−Û");
+    dashed( uh / Math.SQRT2, "#fbbf24", "U_eff");
+    dashed(-uh / Math.SQRT2, "#fbbf24", "−U_eff");
+  }
+
+  // Messkurve: Abtastwerte im Fenster zu Polylinie verbinden
+  ctx.save();
+  ctx.strokeStyle = "#4ade80"; ctx.lineWidth = 2;
+  ctx.shadowColor = "#4ade80"; ctx.shadowBlur = 7;
+  ctx.beginPath();
+  let started = false, prev = null;
+  for (const smp of hist){
+    const tt = smp[0], uu = smp[1];
+    if (tt < t0){
+      if (prev){ // Randpunkt interpolieren
+        const f = (t0 - prev[0]) / (tt - prev[0]);
+        ctx.moveTo(X(t0), Y(prev[1] + (uu - prev[1]) * f)); started = true;
+      }
+      prev = smp; continue;
+    }
+    if (!started){ ctx.moveTo(X(tt), Y(uu)); started = true; }
+    else ctx.lineTo(X(tt), Y(uu));
+    prev = smp;
+  }
+  ctx.stroke(); ctx.restore();
+
+  // Aktueller Messpunkt (farbe wie Spulen-Hervorhebung)
+  const sa = Math.abs(Math.sin(state.alpha)), gl2 = sa;
+  const colDot = gl2 >= 0.9 ? "#4ade80" : gl2 <= 0.15 ? "#fbbf24" : "#a7f3d0";
+  const px = X(state.simTime), py = Y(uNow());
+  ctx.strokeStyle = colDot; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px, Y(0)); ctx.lineTo(px, py); ctx.stroke();
+  ctx.fillStyle = colDot;
+  ctx.beginPath(); ctx.arc(px, py, 4, 0, 7); ctx.fill();
+
+  // Infozeile: Formel + Momentanwert
+  ctx.fillStyle = "#9fb0d0"; ctx.font = `${fsS}px system-ui`; ctx.textAlign = "left";
+  ctx.fillText(T("scopeInfo"), L + 4, Tt + fsS);
+  const u = uNow();
+  ctx.textAlign = "right"; ctx.fillStyle = colDot; ctx.font = `bold ${fsS}px system-ui`;
+  ctx.fillText(`u = ${u >= 0 ? "+" : ""}${fmt(u, 2)} V`, L + pw - 4, Tt + fsS);
+}
+
+/* ---------------- 9. Messwerte aktualisieren ---------------- */
+function updateReadouts(){
+  const deg = state.alpha * 180 / Math.PI % 360;
+  $("vAlpha").textContent  = fmt((deg + 360) % 360, 0) + " °";
+  $("vN").textContent      = fmt(state.wind * RPM_PER_WIND, 0) + (lang === "de" ? " U/min" : " rpm");
+  $("vF").textContent      = fmt(freq(), 2) + " Hz";
+  $("vOmega").textContent  = fmt(omega(), 1) + " rad/s";
+  $("vFlux").textContent   = fmt(flux() * 1000, 2) + " mWb";
+  const u = uNow();
+  $("vU").textContent      = (u >= 0 ? "+" : "") + fmt(u, 2) + " V";
+  $("vUhat").textContent   = fmt(Uhat(), 2) + " V";
+  $("vUeff").textContent   = fmt(Uhat() / Math.SQRT2, 2) + " V";
+}
+
+/* ---------------- 10. Hauptschleife (≈60 FPS) ---------------- */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min((now - last) / 1000, 0.05);   // bei Tab-Wechsel clampen
+  last = now;
+  if (state.running) state.alpha += omega() * dt;   // α = ω·t
+  state.simTime += dt;
+  // Kreisstrom-Umlauf ∝ sin α: Richtung kehrt bei jedem Nulldurchgang von u um
+  const flow = 30 * Math.sin(state.alpha);
+  if (state.running){
+    for (const p of eLoop) p.s = ((p.s + flow * dt) % LOOP + LOOP) % LOOP;
+  }
+  hist.push([state.simTime, uNow()]);
+  while (hist.length && hist[0][0] < state.simTime - WIN - 0.25) hist.shift();
+  drawScene(); drawFlux(); drawScope(); updateReadouts();
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- 11. Steuerung ---------------- */
+function bindRange(id, outId, key, digits, unit){
+  const el = $(id), out = $(outId);
+  const upd = () => { state[key] = parseFloat(el.value); out.textContent = fmt(state[key], digits) + " " + unit; };
+  el.addEventListener("input", upd); upd();
+}
+bindRange("rWind", "oWind", "wind", 1, "m/s");
+bindRange("rB",    "oB",    "B",    2, "T");
+bindRange("rN",    "oN",    "N",    0, "");
+bindRange("rA",    "oA",    "A",    0, "cm²");
+
+const btnRun = $("btnRun");
+function refreshRunBtn(){ btnRun.textContent = T(state.running ? "btnStop" : "btnStart"); }
+btnRun.addEventListener("click", () => { state.running = !state.running; refreshRunBtn(); });
+$("btnReset").addEventListener("click", () => { state.alpha = 0; hist.length = 0; });
+
+/* ---------------- 12. Sprachumschalter ---------------- */
+function applyLang(){
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = T(el.dataset.i18nHtml); });
+  document.documentElement.lang = lang;
+  document.title = T("title") + " – Simulation";
+  $("btnLang").textContent = lang === "de" ? "EN" : "DE";
+  refreshRunBtn();
+}
+$("btnLang").addEventListener("click", () => { lang = lang === "de" ? "en" : "de"; applyLang(); });
+
+/* ---------------- 13. Start ---------------- */
+applyLang();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

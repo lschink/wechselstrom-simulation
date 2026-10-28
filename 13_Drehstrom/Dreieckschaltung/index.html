@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dreieckschaltung – Simulation</title>
+<style>
+  /* ---------- Grundlayout (dunkles Labor-Design, Stil der bisherigen Sims) ---------- */
+  :root{
+    --bg:#0b1220; --panel:#141d33; --panel2:#1b2745; --text:#e5ecf7; --muted:#93a4c3;
+    --accent:#f59e0b; --green:#4ade80; --cyan:#22d3ee; --red:#f87171; --blue:#60a5fa;
+    --orange:#fb923c; --border:#26355a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--text);
+       font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+  header{display:flex;justify-content:space-between;align-items:center;gap:1rem;
+         padding:.8rem 1.2rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  h1{font-size:1.25rem}
+  .sub{color:var(--muted);font-size:.85rem}
+  button{background:var(--accent);color:#1a1206;border:0;border-radius:8px;
+         padding:.45rem .9rem;font-weight:700;font-size:.9rem;cursor:pointer}
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  button:hover{filter:brightness(1.12)}
+  main{max-width:1280px;margin:0 auto;padding:1rem}
+
+  /* ---------- Bühne: Szene links, Oszilloskop/Drehfeld/Messwerte rechts ---------- */
+  .stage{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:1rem}
+  @media (max-width:920px){.stage{grid-template-columns:1fr}}
+  .canvas-wrap{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  canvas{display:block;width:100%;height:auto}
+  #scene{aspect-ratio:3/2}
+  #scope{aspect-ratio:16/9}
+  #field{aspect-ratio:2/1}
+  .side{display:flex;flex-direction:column;gap:1rem}
+
+  /* Kopfzeile einer Canvas-Karte mit Segment-Buttons (Oszilloskop-Modus) */
+  .cardhead{display:flex;justify-content:space-between;align-items:center;gap:.6rem;
+            padding:.5rem .7rem 0;flex-wrap:wrap}
+  .cardhead h2.sec{margin:0}
+  .segbtns{display:flex;gap:.4rem}
+  .segbtns button{background:var(--panel2);color:var(--text);border:1px solid var(--border);
+                  padding:.3rem .7rem;font-size:.78rem;font-weight:600}
+  .segbtns button.active{background:var(--accent);color:#1a1206;border-color:var(--accent)}
+
+  /* ---------- Messwert-Chips ---------- */
+  h2.sec{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem}
+  .readouts{display:grid;grid-template-columns:repeat(auto-fill,minmax(106px,1fr));gap:.5rem}
+  .chip{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.45rem .6rem}
+  .chip .l{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+  .chip .v{font-size:1.02rem;font-weight:700;font-variant-numeric:tabular-nums}
+  .chip.warn .v{color:var(--red)}
+
+  /* ---------- Steuerung ---------- */
+  section h2.sec{margin:1.2rem 0 .5rem}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.8rem}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:.8rem}
+  .card h3{font-size:.85rem;color:var(--muted);margin-bottom:.5rem;font-weight:600}
+  .row{display:flex;justify-content:space-between;align-items:baseline;font-size:.9rem;margin-bottom:.25rem;gap:.5rem}
+  .row output{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
+  .buttons{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+  .hint{color:var(--muted);font-size:.75rem;margin-top:.4rem}
+
+  /* ---------- Formelzeile und Erklärung ---------- */
+  .formulas{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+  .formula{background:var(--panel2);border:1px solid var(--border);border-radius:10px;
+           padding:.45rem .8rem;font-family:Georgia,serif;font-style:italic;white-space:nowrap;font-size:.95rem}
+  .explain{margin-top:1.2rem;background:var(--panel);border:1px solid var(--border);
+           border-radius:12px;padding:1rem 1.2rem}
+  .explain h2{font-size:1.05rem;margin-bottom:.4rem}
+  .explain p{margin:.55rem 0;font-size:.92rem;color:#cdd8ec}
+  .explain strong{color:var(--text)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 data-i18n="title">Dreieckschaltung (Drehstrom)</h1>
+    <div class="sub" data-i18n="subtitle">Strangspannung = Leiterspannung, Leiterstrom = √3 · Strangstrom – der geschlossene Ring ohne Neutralleiter</div>
+  </div>
+  <button id="btnLang" class="secondary">EN</button>
+</header>
+
+<main>
+  <!-- ============ Bühne ============ -->
+  <div class="stage">
+    <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+    <div class="side">
+      <div class="canvas-wrap">
+        <div class="cardhead">
+          <h2 class="sec" data-i18n="scopeTitle">Oszilloskop</h2>
+          <div class="segbtns">
+            <button id="bModeV" data-i18n="modeV">Spannungen + Leistung</button>
+            <button id="bModeL" data-i18n="modeL">Strang- ↔ Leiterstrom</button>
+          </div>
+        </div>
+        <canvas id="scope"></canvas>
+        <div class="hint" id="hintLink" data-i18n="scNote12" style="padding:.2rem .7rem .5rem;display:none"></div>
+      </div>
+      <div class="canvas-wrap">
+        <div class="cardhead"><h2 class="sec" data-i18n="fieldTitle">Drehfeld – Zeigeraddition der drei Strangfelder</h2></div>
+        <canvas id="field"></canvas>
+      </div>
+      <div>
+        <h2 class="sec" data-i18n="readings">Messwerte</h2>
+        <div class="readouts">
+          <div class="chip"><div class="l" data-i18n="rUStr">U_Strang = U_Leiter</div><div class="v" id="vUStr">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rIStr">I_Strang (eff)</div><div class="v" id="vIStr">–</div></div>
+          <div class="chip" id="chipLei"><div class="l" data-i18n="rILei">I_Leiter (eff)</div><div class="v" id="vILei">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rRing">I_Ring (Umlauf)</div><div class="v" id="vRing">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rPges">p_ges</div><div class="v" id="vPges">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rI1">i₁(t)</div><div class="v" id="vI1">–</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Steuerung ============ -->
+  <section>
+    <h2 class="sec" data-i18n="settings">Einstellungen</h2>
+    <div class="controls">
+      <div class="card">
+        <div class="row"><span data-i18n="freq">Frequenz f</span><output id="oF"></output></div>
+        <input type="range" id="rF" min="0.1" max="8" step="0.1" value="1">
+        <div class="hint" data-i18n="freqHint">Zum Verfolgen der Kurven zeitdehnt dargestellt – das echte Netz arbeitet mit 50 Hz.</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="upeak">Scheitelwert Û (Strang = Leiter)</span><output id="oU"></output></div>
+        <input type="range" id="rU" min="50" max="400" step="5" value="325">
+        <div class="hint" data-i18n="upeakHint">Û = 325 V entspricht 230 V Effektivwert. Im Dreieck liegt jeder Strang an der vollen Leiterspannung.</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="load">Last pro Strang R (symmetrisch)</span><output id="oR"></output></div>
+        <input type="range" id="rR" min="20" max="500" step="5" value="115">
+        <div class="hint" data-i18n="loadHint">Rein ohmische Dreiecklast: jeder Strang (R) liegt zwischen zwei Außenleitern.</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="asym">Unsymmetrie: R₁₂</span><output id="oA"></output></div>
+        <input type="range" id="rA" min="0.25" max="2.5" step="0.05" value="1">
+        <div class="buttons" style="margin-top:.4rem">
+          <button id="bSym" class="secondary" data-i18n="symBtn">↺ symmetrisch</button>
+        </div>
+        <div class="hint" data-i18n="asymHint">R₁₂ ≠ R: Strang- und Leiterströme werden ungleich – ihre Summen bleiben 0, ein Neutralleiter ist nicht nötig.</div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="operation">Betrieb</h3>
+        <div class="buttons"><button id="btnRun"></button></div>
+        <div class="hint" data-i18n="runHint">Start/Stopp friert den Drehwinkel ein; alle Regler wirken sofort auch im Stillstand.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Formeln ============ -->
+  <h2 class="sec" data-i18n="formulas">Formeln</h2>
+  <div class="formulas">
+    <div class="formula">u<sub>k</sub>(t) = Û · sin(ωt − k·120°), k = 1…3</div>
+    <div class="formula">u<sub>12</sub> + u<sub>23</sub> + u<sub>31</sub> = 0 &nbsp;→&nbsp; kein Ringstrom</div>
+    <div class="formula">i<sub>1</sub> = i<sub>12</sub> − i<sub>31</sub></div>
+    <div class="formula">I<sub>Leiter</sub> = √3 · I<sub>Strang</sub>, &nbsp; U<sub>Leiter</sub> = U<sub>Strang</sub></div>
+    <div class="formula">p<sub>ges</sub> = 3 · U<sub>Strang</sub> · I<sub>Strang</sub> = const</div>
+  </div>
+
+  <!-- ============ Erklärung ============ -->
+  <article class="explain">
+    <h2 data-i18n="explanation">Erklärung</h2>
+    <p data-i18n-html="exp1"></p>
+    <p data-i18n-html="exp2"></p>
+    <p data-i18n-html="exp3"></p>
+    <p data-i18n-html="exp4"></p>
+    <p data-i18n-html="exp5"></p>
+  </article>
+</main>
+
+<script>
+"use strict";
+/* ==================================================================
+   Simulation: Dreieckschaltung (Drehstrom)
+   Reines JS + Canvas, keine externen Abhängigkeiten, offline lauffähig.
+
+   Physikmodell (zeitdehnt dargestellt, echtes Netz: f = 50 Hz):
+     Generator-Spannungen (Stern-Ersatzspannungen des Drehfelds):
+       u_k(t) = Û · sin(ωt − k·120°),          k = 1,2,3
+     Strangspannungen = Leiterspannungen (das ist das Kennzeichen Δ):
+       u_12 = u_1 − u_2,  u_23 = u_2 − u_3,  u_31 = u_3 − u_1
+     Strangströme (ohmsche Last im Dreieck):
+       i_12 = u_12/R_12,  i_23 = u_23/R,     i_31 = u_31/R
+       R_12 = asym·R (unsymmetrisch), R_23 = R_31 = R
+     Leiterströme (Knotenregel, immer i_1+i_2+i_3 = 0):
+       i_1 = i_12 − i_31, i_2 = i_23 − i_12, i_3 = i_31 − i_23
+     Ringstrom: i_Ring = −(u_12+u_23+u_31)/(R_12+R_23+R_31) ≡ 0
+     p_ges = u_12·i_12 + u_23·i_23 + u_31·i_31 = const bei Symmetrie
+     I_Leiter = √3 · I_Strang (Scheitelwerte), Spannungen gleich groß
+   ================================================================== */
+
+/* ---------------- 1. Sprachdatei (DE/EN) ---------------- */
+const I18N = {
+  de: {
+    title: "Dreieckschaltung (Drehstrom)",
+    subtitle: "Strangspannung = Leiterspannung, Leiterstrom = √3 · Strangstrom – der geschlossene Ring ohne Neutralleiter",
+    scopeTitle: "Oszilloskop", fieldTitle: "Drehfeld – Zeigeraddition der drei Strangfelder",
+    modeV: "Spannungen + Leistung", modeL: "Strang- ↔ Leiterstrom",
+    readings: "Messwerte",
+    rUStr: "U_Strang = U_Leiter", rIStr: "I_Strang (eff)", rILei: "I_Leiter (eff)",
+    rRing: "I_Ring (Umlauf)", rPges: "p_ges", rI1: "i₁(t)",
+    settings: "Einstellungen",
+    freq: "Frequenz f", freqHint: "Zum Verfolgen der Kurven zeitdehnt dargestellt – das echte Netz arbeitet mit 50 Hz.",
+    upeak: "Scheitelwert Û (Strang = Leiter)", upeakHint: "Û = 325 V entspricht 230 V Effektivwert. Im Dreieck liegt jeder Strang an der vollen Leiterspannung.",
+    load: "Last pro Strang R (symmetrisch)", loadHint: "Rein ohmische Dreiecklast: jeder Strang (R) liegt zwischen zwei Außenleitern.",
+    asym: "Unsymmetrie: R₁₂", symBtn: "↺ symmetrisch",
+    asymHint: "R₁₂ ≠ R: Strang- und Leiterströme werden ungleich – ihre Summen bleiben 0, ein Neutralleiter ist nicht nötig.",
+    operation: "Betrieb", runHint: "Start/Stopp friert den Drehwinkel ein; alle Regler wirken sofort auch im Stillstand.",
+    btnStart: "▶ Start", btnStop: "❚❚ Stopp",
+    formulas: "Formeln", explanation: "Erklärung",
+    /* Szene */
+    lblGen: "Erzeuger: Stator mit 3 Wicklungen à 120°, rotierender Magnet",
+    lblStator: "Stator",
+    lblDelta: "Δ-Last im Ring",
+    lblLegN: "Dreieck: kein Neutralleiter – drei Leiter genügen; i₁+i₂+i₃ ≡ 0",
+    /* Oszilloskop */
+    scU12: "u₁₂", scU23: "u₂₃", scU31: "u₃₁", scSum: "u₁₂+u₂₃+u₃₁ ≡ 0",
+    scP1: "p₁₂", scP2: "p₂₃", scP3: "p₃₁", scPges: "p_ges = const",
+    scI12: "i₁₂", scI31: "i₃₁", scI1: "i₁ = i₁₂ − i₃₁",
+    scGuideStr: "Î_Strang", scGuideLei: "Î_Leiter = √3·Î_Strang",
+    scNote12: "Der Leiterstrom i₁ = i₁₂ − i₃₁ ist √3-mal so groß wie der Strangstrom und eilt ihm um 30° nach.",
+    tAxis: "ωt / °",
+    /* Drehfeld */
+    fldRes: "Resultierendes Feld", fldConst: "Betrag konstant – Richtung dreht mit ω",
+    /* Erklärung */
+    exp1: `<strong>Aufbau:</strong> Beim Dreieck werden die drei Stränge <strong>Ende an Anfang</strong> zu einem geschlossenen Ring verschaltet: der Ausgang von L1 führt an L2, dessen Ausgang an L3 – und dessen Ausgang zurück an L1. Jeder Strang hängt damit <strong>zwischen zwei Außenleitern</strong>: Die <strong>Strangspannung ist gleich der Leiterspannung</strong> (U<sub>Strang</sub> = U<sub>Leiter</sub>, z. B. 230 V an jedem Strang bei 230 V zwischen den Leitern). Die drei Strangspannungen u₁₂, u₂₃, u₃₁ sind weiterhin um je 120° versetzt – die Verkettung entsteht erst durch die Verschaltung.`,
+    exp2: `<strong>Leiterstrom = √3 · Strangstrom:</strong> In jedem Knoten teilt sich der Strom nach der Knotenregel: <strong>i₁ = i₁₂ − i₃₁</strong>. Zwei um 120° versetzte Strangströme ergeben so einen Leiterstrom mit <strong>√3-fachem Scheitelwert</strong>, der dem Strangstrom um <strong>30° nacheilt</strong> (Modus „Strang- ↔ Leiterstrom"). Die Verhältnisse aus der Sternschaltung kehren sich also um: Beim <strong>Stern</strong> war die Spannung √3-fach und der Strom gleich – beim <strong>Dreieck</strong> ist die Spannung gleich und der Strom √3-fach.`,
+    exp3: `<strong>Konstante Leistung – wie im Stern:</strong> Auch im Dreieck heben sich die pulsierenden Einzelleistungen exakt auf: <strong>p<sub>ges</sub> = p<sub>12</sub>+p<sub>23</sub>+p<sub>31</sub> = 3·U<sub>Strang</sub>·I<sub>Strang</sub> = konstant</strong> – dieselbe gerade Linie im Oszilloskop, dieselbe glatte Drehmomentübertragung wie bei der Sternschaltung. Die Vorteile des Drehstroms hängen also nicht von der Verschaltung ab.`,
+    exp4: `<strong>Kein Ringstrom, kein Neutralleiter:</strong> Obwohl die Stränge einen geschlossenen Ring bilden, fließt <strong>kein Umlaufstrom</strong> – rund um den Ring gilt exakt <strong>u₁₂+u₂₃+u₃₁ = 0</strong> (sichtbar als gestrichelte Linie im Oszilloskop, Messwert I_Ring ≡ 0). Der Regler „Unsymmetrie" macht die Ströme ungleich groß – ihre <strong>Summen bleiben trotzdem null</strong>. Drei Leiter genügen also völlig. Vorteil: bei gleicher Leiterspannung bekommt jeder Strang im Dreieck die volle Leiterspannung – bei gleichen Widerständen wird die <strong>dreifache Leistung</strong> umgesetzt wie im Stern.`,
+    exp5: `<strong>Praxis:</strong> Viele Drehstrommotoren sind wahlweise in Stern oder Dreieck betreibbar (Klemmbrett, z. B. „230 Δ / 400 Y"). Beim <strong>Stern-Dreieck-Anlauf</strong> startet der Motor im Stern: Jede Wicklung sieht nur 230 V statt 400 V, der Anlaufstrom sinkt auf ein Drittel – im Lauf wird auf Dreieck umgeschaltet und die volle Leistung freigegeben. Auch Heizungen und Netzteile nutzen die Umschaltbarkeit für 230-V- und 400-V-Netze. Der Haushaltsanschluss bleibt ein <strong>Stern mit Neutralleiter</strong>; das Dreieck ist der Standard für Drehstromverbraucher ohne Neutralleiter.`,
+  },
+  en: {
+    title: "Delta Connection (Three-Phase)",
+    subtitle: "Phase voltage = line voltage, line current = √3 · phase current – the closed ring without a neutral",
+    scopeTitle: "Oscilloscope", fieldTitle: "Rotating field – phasor sum of the three phase fields",
+    modeV: "Voltages + power", modeL: "Phase ↔ line current",
+    readings: "Readings",
+    rUStr: "U_phase = U_line", rIStr: "I_phase (rms)", rILei: "I_line (rms)",
+    rRing: "I_loop (ring)", rPges: "p_total", rI1: "i₁(t)",
+    settings: "Settings",
+    freq: "Frequency f", freqHint: "Shown slowed down so the curves can be followed – the real grid runs at 50 Hz.",
+    upeak: "Peak value Û (phase = line)", upeakHint: "Û = 325 V corresponds to 230 V RMS. In delta every phase sees the full line voltage.",
+    load: "Load per phase R (symmetric)", loadHint: "Purely resistive delta load: each phase (R) sits between two line conductors.",
+    asym: "Asymmetry: R₁₂", symBtn: "↺ symmetric",
+    asymHint: "R₁₂ ≠ R: phase and line currents become unequal – their sums stay 0, no neutral is needed.",
+    operation: "Operation", runHint: "Start/Stop freezes the angle; all sliders take effect immediately, even when stopped.",
+    btnStart: "▶ Start", btnStop: "❚❚ Stop",
+    formulas: "Formulas", explanation: "Explanation",
+    lblGen: "Generator: stator with 3 windings at 120°, rotating magnet",
+    lblStator: "Stator",
+    lblDelta: "Δ load (ring)",
+    lblLegN: "Delta: no neutral – three wires suffice; i₁+i₂+i₃ ≡ 0",
+    scU12: "u₁₂", scU23: "u₂₃", scU31: "u₃₁", scSum: "u₁₂+u₂₃+u₃₁ ≡ 0",
+    scP1: "p₁₂", scP2: "p₂₃", scP3: "p₃₁", scPges: "p_total = const",
+    scI12: "i₁₂", scI31: "i₃₁", scI1: "i₁ = i₁₂ − i₃₁",
+    scGuideStr: "Î_phase", scGuideLei: "Î_line = √3·Î_phase",
+    scNote12: "The line current i₁ = i₁₂ − i₃₁ is √3 times the phase current and lags it by 30°.",
+    tAxis: "ωt / °",
+    fldRes: "Resultant field", fldConst: "Constant magnitude – direction rotates at ω",
+    exp1: `<strong>Setup:</strong> In the delta connection the three phases are wired <strong>end-to-end</strong> into a closed ring: the end of L1 feeds L2, whose end feeds L3 – whose end returns to L1. Each phase therefore sits <strong>between two line conductors</strong>: the <strong>phase voltage equals the line voltage</strong> (U<sub>phase</sub> = U<sub>line</sub>, e.g. 230 V across each phase at 230 V between lines). The three phase voltages u₁₂, u₂₃, u₃₁ are still 120° apart – the linkage is created purely by the wiring.`,
+    exp2: `<strong>Line current = √3 · phase current:</strong> At every node the current splits according to Kirchhoff: <strong>i₁ = i₁₂ − i₃₁</strong>. Two phase currents 120° apart combine into a line current with a <strong>√3 times larger peak</strong>, <strong>lagging the phase current by 30°</strong> (mode “Phase ↔ line current"). The star relationships are inverted: in a <strong>star</strong> the voltage was √3-fold and the current equal – in <strong>delta</strong> the voltage is equal and the current √3-fold.`,
+    exp3: `<strong>Constant power – as in the star:</strong> In delta, too, the pulsating single-phase powers cancel exactly: <strong>p<sub>total</sub> = p<sub>12</sub>+p<sub>23</sub>+p<sub>31</sub> = 3·U<sub>phase</sub>·I<sub>phase</sub> = constant</strong> – the same straight line in the scope, the same smooth torque. The benefits of three-phase power are independent of the connection type.`,
+    exp4: `<strong>No ring current, no neutral:</strong> Although the phases form a closed ring, <strong>no circulating current flows</strong> – around the loop <strong>u₁₂+u₂₃+u₃₁ = 0</strong> exactly (visible as the dashed line; reading I_loop ≡ 0). The “Asymmetry" slider makes the currents unequal – their <strong>sums still remain zero</strong>. Three wires are therefore sufficient. Advantage: with the same line voltage each delta phase receives the full line voltage – with equal resistors <strong>three times the power</strong> is delivered compared with star.`,
+    exp5: `<strong>Practice:</strong> Many three-phase motors can be wired in star or delta (terminal board, e.g. “230 Δ / 400 Y"). During <strong>star-delta starting</strong> the motor starts in star: each winding sees only 230 V instead of 400 V, reducing the starting current to one third – once running, it is switched to delta for full power. Heaters and power supplies use the same trick for 230 V and 400 V grids. Household wiring remains a <strong>star with neutral</strong>; delta is the standard for three-phase loads without a neutral.`,
+  }
+};
+let lang = "de";
+const T = k => (I18N[lang] && I18N[lang][k]) || I18N.de[k] || k;
+
+/* ---------------- 2. Zustand und Physik ---------------- */
+const state = { running: true, t: 0, f: 1, UPeak: 325, R: 115, asym: 1, scopeMode: "volt" };
+const SQRT3 = Math.sqrt(3);
+const PH = 2 * Math.PI / 3;                    // 120° in rad
+
+const omega  = () => 2 * Math.PI * state.f;
+const Ueff   = () => state.UPeak / Math.SQRT2;
+const Rk     = k => k === 0 ? state.asym * state.R : state.R;   // R12, R23=R31=R
+// Generator-Strangspannungen (Stern-Ersatz) und daraus die verketteten Spannungen
+const uk     = (k, t = state.t) => state.UPeak * Math.sin(omega() * t - k * PH);
+const u12    = (t = state.t) => uk(0, t) - uk(1, t);            // = u_Leiter
+const u23    = (t = state.t) => uk(1, t) - uk(2, t);
+const u31    = (t = state.t) => uk(2, t) - uk(0, t);
+const i12    = (t = state.t) => u12(t) / Rk(0);                 // Strangströme
+const i23    = (t = state.t) => u23(t) / state.R;
+const i31    = (t = state.t) => u31(t) / state.R;
+const iL1    = (t = state.t) => i12(t) - i31(t);                // Leiterströme (Knotenregel)
+const iRing  = (t = state.t) => -(u12(t) + u23(t) + u31(t)) / (Rk(0) + 2 * state.R); // ≡ 0
+const pGes   = (t = state.t) => u12(t) * i12(t) + u23(t) * i23(t) + u31(t) * i31(t); // const bei Symmetrie
+
+/* ---------------- 3. DOM und Canvas-Hilfen ---------------- */
+const $ = id => document.getElementById(id);
+const sceneCv = $("scene"), scopeCv = $("scope"), fieldCv = $("field");
+const sceneCtx = sceneCv.getContext("2d"), scopeCtx = scopeCv.getContext("2d"), fieldCtx = fieldCv.getContext("2d");
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+// Canvas an CSS-Größe anpassen (Retina-scharf), gibt CSS-Größe zurück
+function fitCanvas(cv){
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (w > 0 && (cv.width !== Math.round(w * DPR) || cv.height !== Math.round(h * DPR))){
+    cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  }
+  return [w, h];
+}
+// Pfeil von (x1,y1) nach (x2,y2) mit Dreieckskopf (auch für „negative" Länge)
+function arrow2d(ctx, x1, y1, x2, y2, color, width = 2, head = 7){
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - head * Math.cos(a - 0.42), y2 - head * Math.sin(a - 0.42));
+  ctx.lineTo(x2 - head * Math.cos(a + 0.42), y2 - head * Math.sin(a + 0.42));
+  ctx.closePath(); ctx.fill();
+}
+const locale = () => lang === "de" ? "de-DE" : "en-US";
+const fmt = (x, d = 1) => x.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
+// Phasenfarben: L1 amber, L2 grün, L3 blau, Zweige/Leitungen stahl, Leistung amber-hell
+const colL = ["#fbbf24", "#4ade80", "#60a5fa"];
+const colBr = "#8fa3c8", colSum = "#e5ecf7", colP = "#f59e0b", colI1 = "#f472b6";
+
+/* ---------------- 4. Hauptszene: Stator + Rotor + 3 Leiter + Δ-Ring ---------------- */
+function drawScene(){
+  const [w, h] = fitCanvas(sceneCv);
+  const ctx = sceneCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  // Hintergrund
+  const grd = ctx.createRadialGradient(w / 2, h * 0.4, 10, w / 2, h * 0.4, Math.max(w, h) * 0.75);
+  grd.addColorStop(0, "#17223d"); grd.addColorStop(1, "#0a1120");
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+
+  const fs = Math.max(11, Math.min(w, h) * 0.042);
+  const om = omega(), th = om * state.t;
+
+  /* --- Generator: Stator-Ring mit drei 120°-Wicklungen (unverändertes Prinzip) --- */
+  const cx = w * 0.215, cy = h * 0.40;
+  const RsOut = Math.min(w, h) * 0.215, RsIn = RsOut * 0.78, RsMid = (RsOut + RsIn) / 2;
+  ctx.fillStyle = "#1b2745";
+  ctx.beginPath(); ctx.arc(cx, cy, RsOut, 0, 7); ctx.arc(cx, cy, RsIn, 0, 7, true);
+  ctx.fill("evenodd");
+  ctx.strokeStyle = "#8fa3c8"; ctx.lineWidth = 2.2;
+  ctx.beginPath(); ctx.arc(cx, cy, RsOut, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, RsIn, 0, 7); ctx.stroke();
+  const wAng = [-Math.PI / 2, Math.PI * 5 / 6, Math.PI / 6];
+  for (let k = 0; k < 3; k++){
+    const a = wAng[k];
+    ctx.strokeStyle = colL[k]; ctx.globalAlpha = 0.9; ctx.lineWidth = RsOut - RsIn - 3;
+    ctx.beginPath(); ctx.arc(cx, cy, RsMid, a - 0.58, a + 0.58); ctx.stroke();
+    ctx.globalAlpha = 0.45; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, RsIn + 4, a - 0.55, a + 0.55); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = colL[k]; ctx.font = `bold ${fs * 0.95}px system-ui`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const rLab = k === 0 ? RsIn - fs * 1.35 : RsOut + fs * 1.15;
+    ctx.fillText("L" + (k + 1), cx + Math.cos(a) * rLab, cy + Math.sin(a) * rLab);
+    // Momentanpolarität an den Wicklungsenden
+    const s = uk(k) / state.UPeak;
+    const al = 0.15 + 0.85 * Math.abs(s);
+    ctx.globalAlpha = al; ctx.fillStyle = "#e5ecf7"; ctx.font = `bold ${fs * 0.8}px system-ui`;
+    const sgn = s >= 0 ? ["+", "−"] : ["−", "+"];
+    ctx.fillText(sgn[0], cx + Math.cos(a - 0.48) * RsMid, cy + Math.sin(a - 0.48) * RsMid);
+    ctx.fillText(sgn[1], cx + Math.cos(a + 0.48) * RsMid, cy + Math.sin(a + 0.48) * RsMid);
+    ctx.globalAlpha = 1;
+  }
+  // Titel oben links über der Szene
+  ctx.fillStyle = "#cdd8ec"; ctx.font = `${fs * 0.82}px system-ui`;
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText(T("lblGen"), 14, fs * 1.5);
+
+  /* --- Rotor: rotierender Stabmagnet (N rot / S blau) --- */
+  const rr = RsIn * 0.60;
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(th);
+  ctx.strokeStyle = "rgba(245,158,11,.25)"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(0, 0, rr + 9, (rr + 9) * 0.5, 0, Math.PI, 2 * Math.PI); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, 0, rr + 9, (rr + 9) * 0.5, 0, 0, Math.PI); ctx.stroke();
+  ctx.fillStyle = "#f87171"; ctx.fillRect(0, -rr * 0.30, rr, rr * 0.60);      // N (rechts)
+  ctx.fillStyle = "#60a5fa"; ctx.fillRect(-rr, -rr * 0.30, rr, rr * 0.60);     // S (links)
+  ctx.strokeStyle = "#e5ecf7"; ctx.lineWidth = 1.6;
+  ctx.strokeRect(-rr, -rr * 0.30, 2 * rr, rr * 0.60);
+  ctx.fillStyle = "#0b1220"; ctx.font = `bold ${fs * 0.9}px system-ui`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("N", rr * 0.55, 0); ctx.fillText("S", -rr * 0.55, 0);
+  ctx.fillStyle = "#e5ecf7"; ctx.beginPath(); ctx.arc(0, 0, 3.2, 0, 7); ctx.fill();
+  ctx.restore();
+  const ar = rr + fs * 0.45, a0 = -2.1, a1 = a0 + 1.5;
+  ctx.strokeStyle = "rgba(245,158,11,.8)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(cx, cy, ar, a0, a1); ctx.stroke();
+  const ae = a1;
+  arrow2d(ctx, cx + Math.cos(ae - 0.16) * ar, cy + Math.sin(ae - 0.16) * ar,
+                cx + Math.cos(ae) * ar, cy + Math.sin(ae) * ar, "rgba(245,158,11,.8)", 2, 7);
+  ctx.fillStyle = "#93a4c3"; ctx.font = `italic ${fs * 0.75}px Georgia`;
+  ctx.textAlign = "center";
+  ctx.fillText("ω", cx + Math.cos(a0 - 0.3) * (ar + 8), cy + Math.sin(a0 - 0.3) * (ar + 8));
+
+  /* --- Drei Außenleiter L1..L3 (kein Neutralleiter) mit Elektronen --- */
+  const x0 = cx + RsOut + fs * 1.7;
+  const xJ = w * 0.64;                                   // Knotenpunkte des Dreiecks
+  const yL = [h * 0.16, h * 0.36, h * 0.56];
+  const fscl = Math.pow(1 / Math.max(state.f, 0.2), 0.8) * 0.45;   // Amplituden-Skalierung fürs Display
+
+  for (let k = 0; k < 3; k++){
+    const y = yL[k];
+    ctx.strokeStyle = colL[k]; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(xJ, y); ctx.stroke();
+    ctx.fillStyle = colL[k];
+    ctx.beginPath(); ctx.arc(x0 - fs * 0.7, y, 4.5, 0, 7); ctx.fill();
+    // Richtung des Leiterstroms (Dreieck oberhalb des Leitungsanfangs)
+    const iLarr = [iL1(), i23() - i12(), i31() - i23()];
+    const i = iLarr[k];
+    const iMax = 3 * state.UPeak / Math.min(Rk(0), state.R);
+    ctx.globalAlpha = Math.min(1, Math.abs(i) / iMax);
+    const dir = i >= 0 ? 1 : -1, tx = x0 + fs * 1.1, ty = y - 11;
+    ctx.beginPath();
+    ctx.moveTo(tx + dir * 7, ty); ctx.lineTo(tx - dir * 4, ty - 5); ctx.lineTo(tx - dir * 4, ty + 5);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+    // Elektronen: Leiterstrom i_k, gegen konventionelle Stromrichtung oszillierend
+    const n = 9, sp = (xJ - x0) / n;
+    const amp = Math.min(sp * 0.45, 30 * (3 * Ueff() / state.R) * fscl);
+    const disp = amp * Math.cos(th - k * PH);
+    for (let j = 0; j < n; j++){
+      const bx = x0 + (j + 0.5) * sp;
+      ctx.beginPath(); ctx.arc(bx + disp, y, 4.2, 0, 7); ctx.fill();
+    }
+    // Knotenpunkt
+    ctx.fillStyle = colL[k];
+    ctx.beginPath(); ctx.arc(xJ, y, 6, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#e5ecf7"; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(xJ, y, 6, 0, 7); ctx.stroke();
+  }
+
+  /* --- Δ-Ring: Zweige A→B (R₁₂), B→C (R₂₃), C→A über Spitze D (R₃₁) --- */
+  const Ax = xJ, Ay = yL[0], Bx = xJ, By = yL[1], Cx = xJ, Cy = yL[2];
+  const Dx = w * 0.86, Dy = h * 0.36;
+  ctx.strokeStyle = colBr; ctx.lineWidth = 2.5;
+  // A→B und B→C vertikal
+  ctx.beginPath(); ctx.moveTo(Ax, Ay); ctx.lineTo(Bx, By); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(Bx, By); ctx.lineTo(Cx, Cy); ctx.stroke();
+  // C→D→A (dritte Seite über die Spitze)
+  ctx.beginPath(); ctx.moveTo(Cx, Cy); ctx.lineTo(Dx, Dy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(Dx, Dy); ctx.lineTo(Ax, Ay); ctx.stroke();
+  ctx.fillStyle = "#e5ecf7"; ctx.beginPath(); ctx.arc(Dx, Dy, 3.5, 0, 7); ctx.fill();
+
+  // Widerstände als Kästchen auf den Zweigen
+  const box = (x, y) => {
+    ctx.fillStyle = "#141d33"; ctx.fillRect(x - 13, y - 7, 26, 14);
+    ctx.strokeRect(x - 13, y - 7, 26, 14);
+  };
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = colBr;
+  box(Ax, (Ay + By) / 2); box(Bx, (By + Cy) / 2);
+  const Mx = (Ax + Dx) / 2, My = (Ay + Dy) / 2; box(Mx, My);
+  ctx.fillStyle = "#cdd8ec"; ctx.font = `${fs * 0.66}px system-ui`;
+  ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
+  ctx.fillText("R₁₂", Ax - 16, (Ay + By) / 2 + fs * 0.25);
+  ctx.fillText("R₂₃", Bx - 16, (By + Cy) / 2 + fs * 0.25);
+  ctx.textAlign = "left";
+  ctx.fillText("R₃₁", Mx + 4, My - 10);
+  // Δ-Beschriftung in der Mitte des Rings (freie Fläche, gekürzt)
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fs * 0.68}px system-ui`; ctx.textAlign = "center";
+  ctx.fillText(T("lblDelta"), (Ax + Bx + Dx) / 3, Dy + fs * 1.0);
+
+  /* --- Elektronen in den drei Ringzweigen (Strangströme i₁₂, i₂₃, i₃₁) --- */
+  const ampB = r => Math.min(16, 30 * (SQRT3 * Ueff() / r) * fscl);   // senkrechte Zweige
+  const ampD = Math.min(14, 30 * (SQRT3 * Ueff() / state.R) * fscl);  // schräge Seite
+  ctx.fillStyle = colBr;
+  // Zweig A→B: i₁₂ (Phase +30°), positive Richtung nach unten
+  {
+    const n = 5, amp = ampB(Rk(0)), d = amp * Math.cos(th + Math.PI / 6);
+    for (let j = 0; j < n; j++){
+      const by = Ay + (j + 0.5) * (By - Ay) / n;
+      ctx.beginPath(); ctx.arc(Ax, by + d, 4, 0, 7); ctx.fill();
+    }
+  }
+  // Zweig B→C: i₂₃ (Phase −90°)
+  {
+    const n = 5, amp = ampB(state.R), d = amp * Math.cos(th - Math.PI / 2);
+    for (let j = 0; j < n; j++){
+      const by = By + (j + 0.5) * (Cy - By) / n;
+      ctx.beginPath(); ctx.arc(Bx, by + d, 4, 0, 7); ctx.fill();
+    }
+  }
+  // Zweig C→A über D: i₃₁ (Phase +150°), positive Richtung C→D→A
+  {
+    const n1 = 4, n2 = 4, amp = ampD, d = amp * Math.cos(th + 5 * Math.PI / 6);
+    const ux1 = (Dx - Cx) / Math.hypot(Dx - Cx, Dy - Cy), uy1 = (Dy - Cy) / Math.hypot(Dx - Cx, Dy - Cy);
+    const ux2 = (Ax - Dx) / Math.hypot(Ax - Dx, Ay - Dy), uy2 = (Ay - Dy) / Math.hypot(Ax - Dx, Ay - Dy);
+    for (let j = 0; j < n1; j++){
+      const s = (j + 0.5) / n1;
+      ctx.beginPath(); ctx.arc(Cx + (Dx - Cx) * s + ux1 * d, Cy + (Dy - Cy) * s + uy1 * d, 4, 0, 7); ctx.fill();
+    }
+    for (let j = 0; j < n2; j++){
+      const s = (j + 0.5) / n2;
+      ctx.beginPath(); ctx.arc(Dx + (Ax - Dx) * s + ux2 * d, Dy + (Ay - Dy) * s + uy2 * d, 4, 0, 7); ctx.fill();
+    }
+  }
+  // Strangstrom-Lesewerte in freien Zonen (außerhalb des Dreiecks)
+  ctx.font = `${fs * 0.68}px system-ui`; ctx.textAlign = "left";
+  ctx.fillStyle = colL[0];
+  ctx.fillText(`i₁₂ = ${(i12() >= 0 ? "+" : "") + fmt(i12(), 1)} A`, Ax + fs * 0.8, Ay - fs * 0.7);
+  ctx.fillStyle = colL[1];
+  ctx.fillText(`i₂₃ = ${(i23() >= 0 ? "+" : "") + fmt(i23(), 1)} A`, Bx + fs * 0.8, Cy + fs * 1.2);
+  ctx.fillStyle = colL[2];
+  ctx.fillText(`i₃₁ = ${(i31() >= 0 ? "+" : "") + fmt(i31(), 1)} A`, Dx, Dy + fs * 1.7);
+
+  /* --- Legende unten --- */
+  const ly = h * 0.86;
+  ctx.textBaseline = "middle";
+  const leg = [["L1", colL[0]], ["L2", colL[1]], ["L3", colL[2]]];
+  let lx = w * 0.04;
+  for (const [lb, c] of leg){
+    ctx.fillStyle = c; ctx.beginPath(); ctx.arc(lx, ly, 5, 0, 7); ctx.fill();
+    ctx.fillStyle = "#cdd8ec"; ctx.font = `${fs * 0.78}px system-ui`;
+    ctx.fillText(lb, lx + 10, ly);
+    lx += 10 + ctx.measureText(lb).width + fs * 1.2;
+  }
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fs * 0.72}px system-ui`;
+  ctx.fillText(T("lblLegN"), lx + fs * 0.5, ly);
+  ctx.textBaseline = "alphabetic";
+}
+
+/* ---------------- 5. Oszilloskop: Strangspannungen + Summe + Leistung, oder Strang↔Leiterstrom ---------------- */
+function drawScope(){
+  const [w, h] = fitCanvas(scopeCv);
+  const ctx = scopeCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#04101c"; ctx.fillRect(0, 0, w, h);
+
+  const L = 42, Rr = 10, Tt = 26, Bb = 22;
+  const pw = w - L - Rr, ph = h - Tt - Bb;
+  const om = omega(), th = om * state.t;
+  const span = 4 * Math.PI;                     // Zeitfenster: 2 Perioden
+  const X = psi => L + (psi - (th - span)) / span * pw;
+  const fsS = Math.max(10, h * 0.075);
+
+  /* --- Raster: vertikale Linien alle 60° (Phase) --- */
+  ctx.strokeStyle = "rgba(148,163,184,.12)"; ctx.lineWidth = 1;
+  ctx.fillStyle = "#7c8db0"; ctx.font = `${fsS * 0.72}px system-ui`;
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const step = Math.PI / 3;
+  for (let psi = Math.ceil((th - span) / step) * step; psi <= th; psi += step){
+    const x = X(psi);
+    ctx.beginPath(); ctx.moveTo(x, Tt); ctx.lineTo(x, Tt + ph); ctx.stroke();
+    const deg = ((Math.round(psi * 180 / Math.PI) % 720) + 720) % 720;
+    ctx.fillText(`${deg}°`, x, Tt + ph + 12);
+  }
+  ctx.fillStyle = "#9fb0d0"; ctx.textAlign = "right";
+  ctx.fillText(T("tAxis"), L + pw, Tt - 9);
+
+  // Nullinie
+  const yZero = Tt + ph * (state.scopeMode === "volt" ? 0.30 : 0.5);
+  ctx.strokeStyle = "rgba(229,236,247,.5)"; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(L, yZero); ctx.lineTo(L + pw, yZero); ctx.stroke();
+
+  const N = 180, pts = [];
+  for (let k = 0; k <= N; k++){
+    const psi = th - span + (k / N) * span;
+    const t = psi / om;
+    pts.push([X(psi), u12(t), u23(t), u31(t), pGes(t), i12(t), i23(t), i31(t), iL1(t)]);
+  }
+
+  if (state.scopeMode === "volt"){
+    /* ===== Modus 1: u12,u23,u31 (+ Summe ≡ 0) oben, p12..p31 + p_ges unten ===== */
+    const amp = ph * 0.30 * 0.92;
+    const yP0 = Tt + ph * 0.60, pAmp = ph * 0.30 * 0.92;
+    // Skalierung: max. p_ges = 4,5·Û²/minR → Reserve für Unsymmetrie
+    const pMax = state.UPeak * state.UPeak * (1 / Rk(0) + 2 / state.R) * 1.875;
+
+    ctx.strokeStyle = "rgba(148,163,184,.25)";
+    ctx.beginPath(); ctx.moveTo(L, Tt + ph * 0.56); ctx.lineTo(L + pw, Tt + ph * 0.56); ctx.stroke();
+
+    // Summenkurve u12+u23+u31 ≡ 0 (gestrichelt – Ringstromlos)
+    ctx.save();
+    ctx.setLineDash([6, 5]); ctx.strokeStyle = "rgba(229,236,247,.85)"; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(L, yZero); ctx.lineTo(L + pw, yZero); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = colSum; ctx.font = `${fsS * 0.8}px system-ui`; ctx.textAlign = "left";
+    ctx.fillText(T("scSum"), L + 4, yZero - 6);
+
+    // Strangspannungen (= Leiterspannungen), normiert auf √3·Û
+    for (let k = 0; k < 3; k++){
+      ctx.save();
+      ctx.strokeStyle = colL[k]; ctx.lineWidth = 2; ctx.shadowColor = colL[k]; ctx.shadowBlur = 5;
+      ctx.beginPath();
+      pts.forEach((p, j) => { const y = yZero - (p[1 + k] / (SQRT3 * state.UPeak)) * amp; j ? ctx.lineTo(p[0], y) : ctx.moveTo(p[0], y); });
+      ctx.stroke(); ctx.restore();
+    }
+    // Leistungen: p12..p31 dünn, p_ges als dicke Gerade
+    const YP = p => yP0 - (p / pMax) * pAmp;
+    for (let k = 0; k < 3; k++){
+      ctx.strokeStyle = colL[k]; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      pts.forEach((p, j) => { const y = YP(p[1 + k] * p[5 + k]); j ? ctx.lineTo(p[0], y) : ctx.moveTo(p[0], y); });
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    ctx.save();
+    ctx.strokeStyle = colP; ctx.lineWidth = 2.6; ctx.shadowColor = colP; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    pts.forEach((p, j) => { j ? ctx.lineTo(p[0], YP(p[4])) : ctx.moveTo(p[0], YP(p[4])); });
+    ctx.stroke(); ctx.restore();
+    // Mittelwert-Linie (bei Symmetrie exakt die konstante Gerade) als Bezug
+    const pMean = 3 * Ueff() * Ueff() * (1 / Rk(0) + 2 / state.R);
+    ctx.save();
+    ctx.setLineDash([7, 5]); ctx.strokeStyle = "rgba(245,158,11,.5)"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(L, YP(pMean)); ctx.lineTo(L + pw, YP(pMean)); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = colP; ctx.font = `bold ${fsS * 0.82}px system-ui`; ctx.textAlign = "right";
+    ctx.fillText(T("scPges"), L + pw - 4, YP(pMean) - 6);
+
+    // Cursor + Punkte
+    const xc = X(th);
+    ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = "rgba(229,236,247,.55)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xc, Tt); ctx.lineTo(xc, Tt + ph); ctx.stroke(); ctx.restore();
+    const dot = (y, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(xc, y, 3.4, 0, 7); ctx.fill(); };
+    for (let k = 0; k < 3; k++) dot(yZero - ([u12(), u23(), u31()][k] / (SQRT3 * state.UPeak)) * amp, colL[k]);
+    dot(YP(pGes()), colP);
+
+    // Legende
+    ctx.font = `${fsS * 0.82}px system-ui`; ctx.textAlign = "left";
+    let lx2 = L + 4;
+    const leg = [[T("scU12"), colL[0]], [T("scU23"), colL[1]], [T("scU31"), colL[2]],
+                 [T("scP1") + "," + T("scP2") + "," + T("scP3"), "#93a4c3"]];
+    for (const [lb, c] of leg){
+      ctx.strokeStyle = c; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(lx2, Tt - 9); ctx.lineTo(lx2 + 13, Tt - 9); ctx.stroke();
+      ctx.fillStyle = c; ctx.fillText(lb, lx2 + 17, Tt - 5);
+      lx2 += ctx.measureText(lb).width + 32;
+    }
+  } else {
+    /* ===== Modus 2: i1 = i12 − i31, Leiterstrom √3-fach, 30° nachelend ===== */
+    const Nrm = 3 * state.UPeak / Math.min(Rk(0), state.R);   // Î_Leiter (Peak)
+    const ampL = ph * 0.34;
+    const ampS = ampL / SQRT3;
+    // Amplituden-Hilfslinien
+    ctx.save(); ctx.setLineDash([5, 5]); ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(148,163,184,.4)";
+    ctx.beginPath(); ctx.moveTo(L, yZero - ampS); ctx.lineTo(L + pw, yZero - ampS); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(L, yZero + ampS); ctx.lineTo(L + pw, yZero + ampS); ctx.stroke();
+    ctx.strokeStyle = "rgba(244,114,182,.5)";
+    ctx.beginPath(); ctx.moveTo(L, yZero - ampL); ctx.lineTo(L + pw, yZero - ampL); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(L, yZero + ampL); ctx.lineTo(L + pw, yZero + ampL); ctx.stroke();
+    ctx.restore();
+    ctx.font = `${fsS * 0.78}px system-ui`; ctx.textAlign = "right";
+    ctx.fillStyle = "#93a4c3"; ctx.fillText(T("scGuideStr"), L + pw - 4, yZero - ampS - 4);
+    ctx.fillStyle = colI1; ctx.fillText(T("scGuideLei"), L + pw - 4, yZero - ampL - 4);
+
+    // Kurven: i12, i31 (Strang) dünn; i1 = i12 − i31 (Leiter) dick
+    const curve = (idx, col, width, glow) => {
+      ctx.save();
+      ctx.strokeStyle = col; ctx.lineWidth = width; ctx.shadowColor = col; ctx.shadowBlur = glow;
+      ctx.beginPath();
+      pts.forEach((p, j) => { const y = yZero - (p[idx] / Nrm) * ampL;
+                              j ? ctx.lineTo(p[0], y) : ctx.moveTo(p[0], y); });
+      ctx.stroke(); ctx.restore();
+    };
+    curve(5, colL[0], 1.6, 0); curve(7, colL[2], 1.6, 0);
+    curve(8, colI1, 2.6, 6);
+    ctx.fillStyle = colI1; ctx.font = `bold ${fsS * 0.85}px system-ui`; ctx.textAlign = "left";
+    ctx.fillText(T("scI1"), L + 6, Tt + fsS);
+
+    // Cursor
+    const xc = X(th);
+    ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = "rgba(229,236,247,.55)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xc, Tt); ctx.lineTo(xc, Tt + ph); ctx.stroke(); ctx.restore();
+    const dot = (val, c) => { ctx.fillStyle = c; ctx.beginPath();
+      ctx.arc(xc, yZero - (val / Nrm) * ampL, 3.4, 0, 7); ctx.fill(); };
+    dot(i12(), colL[0]); dot(i31(), colL[2]); dot(iL1(), colI1);
+  }
+}
+
+/* ---------------- 6. Drehfeld: drei Strangfelder + konstanter Resultierender ---------------- */
+function drawField(){
+  const [w, h] = fitCanvas(fieldCv);
+  const ctx = fieldCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#0a1120"; ctx.fillRect(0, 0, w, h);
+
+  const fsF = Math.max(10, h * 0.11);
+  const cx = w * 0.32, cy = h * 0.52, R = Math.min(w * 0.26, h * 0.40);
+  const om = omega(), th = om * state.t;
+
+  ctx.strokeStyle = "rgba(148,163,184,.22)"; ctx.lineWidth = 1;
+  ctx.setLineDash([3, 5]);
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
+  ctx.setLineDash([]);
+  for (let k = 0; k < 3; k++){
+    const a = -k * PH;
+    ctx.strokeStyle = "rgba(148,163,184,.18)";
+    ctx.beginPath(); ctx.moveTo(cx - Math.cos(a) * R, cy - Math.sin(a) * R);
+    ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
+    ctx.fillStyle = colL[k]; ctx.font = `bold ${fsF * 0.85}px system-ui`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("B" + (k + 1), cx + Math.cos(a) * (R + fsF * 0.9), cy + Math.sin(a) * (R + fsF * 0.9));
+  }
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fsF * 0.7}px system-ui`;
+  ctx.fillText(T("lblStator"), cx, cy + R + fsF * 2.2);
+
+  let sx = 0, sy = 0;
+  for (let k = 0; k < 3; k++){
+    const a = -k * PH;
+    const b = uk(k) / state.UPeak;
+    const vx = Math.cos(a) * b * R * 0.62, vy = Math.sin(a) * b * R * 0.62;
+    sx += vx; sy += vy;
+    ctx.globalAlpha = 0.75;
+    arrow2d(ctx, cx, cy, cx + vx, cy + vy, colL[k], 2.4, 7);
+    ctx.globalAlpha = 1;
+  }
+  ctx.save();
+  ctx.strokeStyle = "#f0f6ff"; ctx.shadowColor = "#f0f6ff"; ctx.shadowBlur = 8;
+  arrow2d(ctx, cx, cy, cx + sx, cy + sy, "#f0f6ff", 3.2, 9);
+  ctx.restore();
+  ctx.fillStyle = "#f0f6ff"; ctx.beginPath(); ctx.arc(cx + sx, cy + sy, 3.6, 0, 7); ctx.fill();
+
+  // Textblock rechts
+  const tx = w * 0.60, tw = w * 0.37;
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#e5ecf7"; ctx.font = `bold ${fsF * 0.70}px system-ui`;
+  ctx.fillText(T("fldRes"), tx, h * 0.28);
+  ctx.fillStyle = "#cdd8ec"; ctx.font = `bold ${fsF * 0.72}px system-ui`;
+  ctx.fillText("B = B₁ + B₂ + B₃", tx, h * 0.44);
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fsF * 0.66}px system-ui`;
+  wrapText(ctx, T("fldConst"), tx, h * 0.60, tw, fsF * 1.05);
+  ctx.fillStyle = "#fbbf24"; ctx.font = `italic ${fsF * 0.68}px Georgia`;
+  ctx.fillText(`|B| = ${fmt(1.5, 1)} · B̂ = const`, tx, h * 0.88);
+}
+// Mehrzeiliger Text (einfacher Umbruch)
+function wrapText(ctx, text, x, y, maxW, lh){
+  const words = text.split(" ");
+  let line = "", yy = y;
+  for (const wd of words){
+    const test = line ? line + " " + wd : wd;
+    if (ctx.measureText(test).width > maxW && line){ ctx.fillText(line, x, yy); line = wd; yy += lh; }
+    else line = test;
+  }
+  if (line) ctx.fillText(line, x, yy);
+}
+
+/* ---------------- 7. Messwerte ---------------- */
+function updateReadouts(){
+  $("vUStr").textContent = fmt(Ueff(), 0) + " V";                       // Strang = Leiter
+  $("vIStr").textContent = fmt(SQRT3 * Ueff() / state.R, 1) + " A";
+  $("vILei").textContent = fmt(3 * Ueff() / state.R, 1) + " A";
+  $("chipLei").classList.toggle("warn", Math.abs(state.asym - 1) > 0.01);
+  const ir = iRing();
+  $("vRing").textContent = fmt(Math.abs(ir) < 0.005 ? 0 : ir, 3) + " A";
+  $("vPges").textContent = fmt(pGes(), 0) + " W";
+  const i1 = iL1();
+  $("vI1").textContent = (Math.abs(i1) > 0.005 ? (i1 >= 0 ? "+" : "") : "") + fmt(i1, 2) + " A";
+}
+
+/* ---------------- 8. Hauptschleife (≈60 FPS) ---------------- */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min((now - last) / 1000, 0.05);   // bei Tab-Wechsel clampen
+  last = now;
+  if (state.running) state.t += dt;
+  drawScene(); drawScope(); drawField(); updateReadouts();
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- 9. Steuerung ---------------- */
+function bindRange(id, outId, key, digits, unit){
+  const el = $(id), out = $(outId);
+  const upd = () => { state[key] = parseFloat(el.value); out.textContent = fmt(state[key], digits) + " " + unit; };
+  el.addEventListener("input", upd); upd();
+}
+bindRange("rF", "oF", "f", 1, "Hz");
+bindRange("rU", "oU", "UPeak", 0, "V");
+bindRange("rR", "oR", "R", 0, "Ω");
+// Unsymmetrie als Faktor anzeigen: R12 = x · R
+{
+  const el = $("rA"), out = $("oA");
+  const upd = () => {
+    state.asym = parseFloat(el.value);
+    out.textContent = "R₁₂ = " + fmt(state.asym, 2) + " · R" +
+      (Math.abs(state.asym - 1) < 0.001 ? " ✓" : "");
+  };
+  el.addEventListener("input", upd); upd();
+  $("bSym").addEventListener("click", () => { el.value = 1; el.dispatchEvent(new Event("input")); });
+}
+
+// Oszilloskop-Modus (Segment-Buttons mit Aktiv-Markierung)
+const modeBtns = { volt: $("bModeV"), link: $("bModeL") };
+function setMode(m){
+  state.scopeMode = m;
+  for (const k in modeBtns) modeBtns[k].classList.toggle("active", k === m);
+  $("hintLink").style.display = m === "link" ? "block" : "none";
+}
+$("bModeV").addEventListener("click", () => setMode("volt"));
+$("bModeL").addEventListener("click", () => setMode("link"));
+setMode("volt");
+
+const btnRun = $("btnRun");
+function refreshRunBtn(){ btnRun.textContent = T(state.running ? "btnStop" : "btnStart"); }
+btnRun.addEventListener("click", () => { state.running = !state.running; refreshRunBtn(); });
+
+/* ---------------- 10. Sprachumschalter ---------------- */
+function applyLang(){
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = T(el.dataset.i18nHtml); });
+  document.documentElement.lang = lang;
+  document.title = T("title") + " – Simulation";
+  $("btnLang").textContent = lang === "de" ? "EN" : "DE";
+  refreshRunBtn();
+}
+$("btnLang").addEventListener("click", () => { lang = lang === "de" ? "en" : "de"; applyLang(); });
+
+/* ---------------- 11. Start ---------------- */
+applyLang();
+refreshRunBtn();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

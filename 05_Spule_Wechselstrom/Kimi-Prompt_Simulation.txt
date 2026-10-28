@@ -1,0 +1,94 @@
+ To resume this session: kimi -r session_15a45e93-57ba-4fed-b4cc-eade1480b9ab
+
+
+KIMI-CODE-PROMPT – Simulation: Spule im Wechselstromkreis
+=============================================================
+Ziel: Eine vollständig clientseitige, eigenständige Website (eine einzelne HTML-Datei,
+Canvas-Rendering), die zeigt, wie eine Spule (Induktivität) im Wechselstromkreis „widersteht"
+und die Phasenverschiebung von 90° erzeugt – im gleichen Stil und mit dem gleichen
+Funktionsumfang wie die Simulation 04_Kondensator_Wechselstrom. GitHub-Pages-tauglich.
+
+Physikalischer Kern (Abweichungen zur Kondensator-Simulation beachten!)
+- Die Spule leitet Gleichstrom fast ungehindert (nur der kleine ohmsche Wicklungswiderstand),
+  blockt aber Wechselstrom umso stärker, je höher die Frequenz ist.
+- Der Strom i(t) HINKT der Spannung u_L(t) um exakt 90° NACH (Kondensator: Strom eilt VORAUS).
+  Strommaximum bei der Spannungsspitze; Spannungsmaximum am steilsten Punkt der Stromflanke
+  (dort ist i = 0).
+- Induktiver Blindwiderstand: X_L = ωL = 2πfL – er WÄCHST mit Frequenz und Induktivität
+  (Gegenstück zum Kondensator: X_C = 1/(ωC) fällt). Sichtbare Kernaussage:
+  I_eff = U_eff/√(R²+X_L²) FÄLLT mit steigendem f bzw. L.
+
+Hauptszene
+- AC-Quelle → Spule (Wicklung als Zylinder mit sichtbaren Windungen im Schnitt) → Widerstand
+  R = 1 kΩ → zurück zur Quelle (Reihenschaltung, rechteckige Leitungsschleife wie in 04).
+- Elektronen (blaue Punkte) pendeln in allen Leitungen hin und her – durch die Spule fließt
+  der Strom tatsächlich DURCH die Wicklung; verdeutliche stattdessen die Selbstinduktion:
+  ein induziertes Gegenfeld bremst jede Stromänderung (Lenzsche Regel).
+- Magnetfeld der Spule: Feldlinien (geschlossene B-Linien durch und um die Wicklung),
+  Dichte und Leuchtstärke ∝ |i(t)|, Richtung wechselt mit i(t) – deutlich pulsierend/
+  wechselnd anzeigen. Energieanzeige: Feldenergie W = ½·L·i² als kleiner Füllbalken.
+- Pfeil für i(t) in den Zuleitungen (Bewegung ∝ umgeladener „Stromänderung", Richtung =
+  Stromrichtung, Sichtbarkeit ∝ |i|).
+- Widerstand R = 1 kΩ mit Glüh-Anzeige ∝ u_R(t) und Status-Text in Ampel-Farben:
+  „Signal kommt durch (cos φ = …)" / „teilweise gekoppelt" / „Signal wird geschluckt (cos φ = …)"
+  – hier Tiefpass-Logik: Tiefe Frequenzen (kleines X_L) kommen durch, hohe Frequenzen
+  (großes X_L) werden geschluckt.
+
+Oszilloskop-Diagramm (fünf übereinanderliegende Spuren, getrennte Nulllinien)
+- u_L(t) rot, i(t) blau: Strom nacheilt um genau 90° – MARKIEREN: Spannungsspitze
+  „u_L = Û bei i = 0" am Strom-Nulldurchgang (Punkt + gestrichelter Verbinder).
+- p_L(t) = u_L(t)·i(t) grün: pendelt gleichmäßig zwischen positiv und negativ,
+  Mittelwert = 0 → keine Wirkleistung (gestrichelte Nulllinie, Schattierung der
+  positiven Halbschwingungen).
+- u_R(t) bernstein (in Phase mit i).
+- p_R(t) orange = R·i² ≥ 0, pulsierend, gefüllte „Energiepakete": Mittelwert =
+  Wirkleistung P = I_eff²·R, die am Widerstand als Wärme ankommt.
+- Rechtsbündige Amplituden-Labels mit Live-Werten; Zeitcursor wandert langsam durchs Fenster.
+- Messwerte (Panel): U_eff, I_eff = U_eff/√(R²+X_L²), X_L = ωL, Q = I_eff²·X_L
+  (Blindleistung), P = I_eff²·R (Wirkleistung am R), cos φ = R/Z (Wirkanteil).
+
+Zeigerdiagramm
+- U_L-Zeiger rot, I-Zeiger blau: I HINKT U_L um 90° nach (im Drehsinn gesehen HINTERHER),
+  Drehung im Uhrzeigersinn, ω-Pfeil, 90°-Bogen mit Pfeilrichtung „nach hinten" kennzeichnen,
+  Hinweis „Zeigerlängen nicht maßstäblich zueinander".
+
+Impedanzdreieck (drittes Canvas, wie in 04)
+- Z = √(R²+X_L²) aus R (grün, horizontal) und X_L (blau, nach OBEN = induktiv!),
+  Hypotenuse Z weiß; Winkel φ mit Sektor am Ursprung; Beschriftung der Schenkel mit
+  Live-Werten; hervorgehoben „cos φ = R/Z = …" in der Status-Ampelfarbe
+  (rot < 0,25, bernstein dazwischen, grün > 0,75).
+
+Steuerung (Schieberegler, sofortige Wirkung)
+- Induktivität L (1 mH – 10 H, logarithmisch), Frequenz f (10 Hz – 10 kHz, logarithmisch),
+  Scheitelwert Û (1–325 V, linear). Kernaussage sichtbar: I_eff fällt mit f und L, weil
+  X_L = ωL wächst (Gegenstück zum ohmschen Widerstand: f↑ → Strom↓; Grenze f→∞: I→0).
+- Start/Stopp (zusätzlich Leertaste).
+- Animationsgeschwindigkeit folgt der Frequenz logarithmisch (10 Hz ≈ 0,9 Hz sichtbar,
+  10 kHz ≈ 12 Hz), Zeitlupe-Badge „⏱ Zeitlupe ×N" mit Live-Faktor.
+
+Erklärbereich (5–6 Absätze, Deutsch mit EN-Umschalter)
+1. Warum die Spule Gleichstrom leitet, aber Wechselstrom zunehmend blockt
+   (Selbstinduktion: jeder Stromänderung wirkt die induzierte Gegenspannung entgegen,
+   Lenzsche Regel – keine „Lücke" wie beim Kondensator, sondern aktive Gegenwirkung).
+2. Herleitung u = L·di/dt → Spannungsmaximum an der steilsten Stromflanke (i = 0) →
+   Strom nacheilt um exakt 90°.
+3. Induktiver Widerstand X_L = ωL = 2πfL wächst mit Frequenz und Induktivität –
+   Gegenstück zum Kondensator (X_C = 1/(ωC) fällt); Drosselwirkung.
+4. Blindleistung als hin- und herpendelnde Energie (Magnetfeldenergie W = ½Li²),
+   Mittelwert der Leistung null; Q = I_eff²·X_L.
+5. Tiefpass hinter der Spule: was am R ankommt; Fallbeispiele mit Zahlen
+   (z. B. L = 1 H, f = 10 Hz: X_L = 63 Ω ≪ R → P groß, Signal kommt durch;
+   L = 1 H, f = 10 kHz: X_L = 63 kΩ ≫ R → P ≈ 0, geschluckt); Grenzfrequenz
+   f_g = R/(2πL); Hinweis auf die umgekehrte Kapazitäts-/Induktivitäts-Falle
+   (X_L wächst mit L – im Gegensatz zu X_C).
+6. Praxis: Drosseln, Sieb-/Glättungsdrosseln, Schaltnetzteile, Tiefpässe in der
+   Signaltechnik, EMV-Entstörung, Motorwicklungen.
+
+Technische Anforderungen
+- Eine einzige index.html, kein Framework, offline, ca. 60 FPS, responsiv
+  (Canvas mit aspect-ratio, Design-Koordinaten skaliert, devicePixelRatio beachten).
+- Übersichtlich kommentierter Code (deutsche Kommentare); deutsches UI mit EN-Umschalter
+  (vollständiges Dictionary inkl. Erklärtexte und Canvas-Beschriftungen); dunkles Design
+  im gleichen Stil wie 04_Kondensator_Wechselstrom (Farbpalette, Panels, Typografie).
+- Auf korrekte String-Quotes achten (typografische Anführungszeichen in Texten,
+  keine ASCII-" in doppel-quotierten Strings).

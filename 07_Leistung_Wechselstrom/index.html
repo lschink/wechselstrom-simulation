@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Leistung im Wechselstromkreis – Simulation</title>
+<style>
+  /* ---------- Grundlayout (dunkles Labor-Design, Stil der bisherigen Sims) ---------- */
+  :root{
+    --bg:#0b1220; --panel:#141d33; --panel2:#1b2745; --text:#e5ecf7; --muted:#93a4c3;
+    --accent:#f59e0b; --green:#4ade80; --cyan:#22d3ee; --red:#f87171; --blue:#60a5fa;
+    --orange:#fb923c; --border:#26355a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--text);
+       font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+  header{display:flex;justify-content:space-between;align-items:center;gap:1rem;
+         padding:.8rem 1.2rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  h1{font-size:1.25rem}
+  .sub{color:var(--muted);font-size:.85rem}
+  button{background:var(--accent);color:#1a1206;border:0;border-radius:8px;
+         padding:.45rem .9rem;font-weight:700;font-size:.9rem;cursor:pointer}
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  button:hover{filter:brightness(1.12)}
+  main{max-width:1280px;margin:0 auto;padding:1rem}
+
+  /* ---------- Bühne: Szene links, Messwerte/Oszilloskop/Dreieck rechts ---------- */
+  .stage{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:1rem}
+  @media (max-width:920px){.stage{grid-template-columns:1fr}}
+  .canvas-wrap{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  canvas{display:block;width:100%;height:auto}
+  #scene{aspect-ratio:3/2}
+  #scope{aspect-ratio:8/3}
+  #triangle{aspect-ratio:8/3}
+  .side{display:flex;flex-direction:column;gap:1rem}
+
+  /* ---------- Messwert-Chips ---------- */
+  h2.sec{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem}
+  .readouts{display:grid;grid-template-columns:repeat(auto-fill,minmax(106px,1fr));gap:.5rem}
+  .chip{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.45rem .6rem}
+  .chip .l{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+  .chip .v{font-size:1.02rem;font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* ---------- Steuerung ---------- */
+  section h2.sec{margin:1.2rem 0 .5rem}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.8rem}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:.8rem}
+  .card h3{font-size:.85rem;color:var(--muted);margin-bottom:.5rem;font-weight:600}
+  .row{display:flex;justify-content:space-between;align-items:baseline;font-size:.9rem;margin-bottom:.25rem;gap:.5rem}
+  .row output{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
+  .buttons{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+  .hint{color:var(--muted);font-size:.75rem;margin-top:.4rem}
+
+  /* Lastart-Auswahl */
+  .loadbtns{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
+  .loadbtns button{background:var(--panel2);color:var(--text);border:1px solid var(--border);
+                   padding:.45rem .2rem;font-size:.82rem;font-weight:600}
+  .loadbtns button.active{background:var(--accent);color:#1a1206;border-color:var(--accent)}
+
+  /* cos-φ-Balken */
+  .coswrap{margin-top:.3rem}
+  .cosbar{position:relative;height:16px;border-radius:8px;background:var(--panel2);
+          border:1px solid var(--border);overflow:hidden}
+  .cosbar .fill{position:absolute;inset:0 auto 0 0;width:0%;background:var(--green);transition:width .1s linear}
+  .cosbar .mark{position:absolute;top:-2px;bottom:-2px;width:3px;background:var(--text);left:90%}
+  .cosbar .mark::after{content:"0,9";position:absolute;top:-16px;left:-10px;font-size:.62rem;color:var(--muted)}
+  .cosrow{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted);margin-top:3px}
+
+  /* ---------- Formelzeile und Erklärung ---------- */
+  .formulas{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+  .formula{background:var(--panel2);border:1px solid var(--border);border-radius:10px;
+           padding:.45rem .8rem;font-family:Georgia,serif;font-style:italic;white-space:nowrap;font-size:.95rem}
+  .explain{margin-top:1.2rem;background:var(--panel);border:1px solid var(--border);
+           border-radius:12px;padding:1rem 1.2rem}
+  .explain h2{font-size:1.05rem;margin-bottom:.4rem}
+  .explain p{margin:.55rem 0;font-size:.92rem;color:#cdd8ec}
+  .explain strong{color:var(--text)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 data-i18n="title">Leistung im Wechselstromkreis</h1>
+    <div class="sub" data-i18n="subtitle">Wirk-, Blind- und Scheinleistung bei Phasenverschiebung zwischen Strom und Spannung</div>
+  </div>
+  <button id="btnLang" class="secondary">EN</button>
+</header>
+
+<main>
+  <!-- ============ Bühne ============ -->
+  <div class="stage">
+    <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+    <div class="side">
+      <div class="canvas-wrap"><canvas id="scope"></canvas></div>
+      <div class="canvas-wrap"><canvas id="triangle"></canvas></div>
+      <div>
+        <h2 class="sec" data-i18n="readings">Messwerte</h2>
+        <div class="readouts">
+          <div class="chip"><div class="l">φ</div><div class="v" id="vPhi">–</div></div>
+          <div class="chip"><div class="l">cos φ</div><div class="v" id="vCos">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rUeff">U_eff</div><div class="v" id="vUeff">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rIeff">I_eff</div><div class="v" id="vIeff">–</div></div>
+          <div class="chip"><div class="l">u(t)</div><div class="v" id="vU">–</div></div>
+          <div class="chip"><div class="l">i(t)</div><div class="v" id="vI">–</div></div>
+          <div class="chip"><div class="l">p(t)</div><div class="v" id="vP">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rP">Wirkleistung P</div><div class="v" id="vPw">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rQ">Blindleistung Q</div><div class="v" id="vQ">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rS">Scheinleistung S</div><div class="v" id="vS">–</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Steuerung ============ -->
+  <section>
+    <h2 class="sec" data-i18n="settings">Einstellungen</h2>
+    <div class="controls">
+      <div class="card">
+        <h3 data-i18n="load">Lastart (Phasenverschiebung)</h3>
+        <div class="loadbtns">
+          <button id="bOhm" data-i18n="loadOhm">ohmsch</button>
+          <button id="bInd" data-i18n="loadInd">induktiv</button>
+          <button id="bCap" data-i18n="loadCap">kapazitiv</button>
+        </div>
+        <div class="hint" data-i18n="loadHint">Ohmsch: φ = 0. Induktiv: Strom hinkt hinter der Spannung her (−90°…0°). Kapazitiv: Strom eilt voraus. Kompensation mischt beides.</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="phi">Phasenwinkel |φ|</span><output id="oPhi"></output></div>
+        <input type="range" id="rPhi" min="0" max="90" step="0.5" value="35">
+        <div class="hint" data-i18n="phiHint">Bei induktiver Last nimmt der Strom zu, wenn die Spannung schon abfällt – u und i sind nicht mehr „gleichgerichtet“.</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="u">Effektivwert U</span><output id="oU"></output></div>
+        <input type="range" id="rU" min="1" max="230" step="1" value="230">
+        <div class="row" style="margin-top:.4rem"><span data-i18n="i">Effektivwert I</span><output id="oI"></output></div>
+        <input type="range" id="rI" min="0.1" max="16" step="0.1" value="6">
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="speed">Abspielgeschwindigkeit</span><output id="oSpeed"></output></div>
+        <input type="range" id="rSpeed" min="0.001" max="1" step="0.001" value="0.05">
+        <div class="hint" data-i18n="speedHint">100 % = Echtzeit (50 Hz), 0,1 % ≈ eine Periode in 20 s. Weit runterregeln, bis die Kurven gut zu verfolgen sind.</div>
+      </div>
+      <div class="card">
+        <div class="row"><span>Leistungsfaktor cos φ</span><output id="oCos">–</output></div>
+        <div class="coswrap">
+          <div class="cosbar"><div class="fill" id="cosFill"></div><div class="mark"></div></div>
+          <div class="cosrow"><span>0</span><span data-i18n="cosBad">schlecht</span><span>1</span></div>
+        </div>
+        <div class="buttons" style="margin-top:.7rem">
+          <button id="btnRun"></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Formeln ============ -->
+  <h2 class="sec" data-i18n="formulas">Formeln</h2>
+  <div class="formulas">
+    <div class="formula">p(t) = u(t) · i(t)</div>
+    <div class="formula">S = U<sub>eff</sub> · I<sub>eff</sub></div>
+    <div class="formula">P = S · cos φ</div>
+    <div class="formula">Q = S · sin φ</div>
+    <div class="formula">P² + Q² = S²</div>
+  </div>
+
+  <!-- ============ Erklärung ============ -->
+  <article class="explain">
+    <h2 data-i18n="explanation">Erklärung</h2>
+    <p data-i18n-html="exp1"></p>
+    <p data-i18n-html="exp2"></p>
+    <p data-i18n-html="exp3"></p>
+    <p data-i18n-html="exp4"></p>
+    <p data-i18n-html="exp5"></p>
+  </article>
+</main>
+
+<script>
+"use strict";
+/* ==================================================================
+   Simulation: Wirk-, Blind- und Scheinleistung im Wechselstromkreis
+   Reines JS + Canvas, keine externen Abhängigkeiten, offline lauffähig.
+
+   Physikmodell (f = 50 Hz, als Zeitlupe dargestellt):
+     u(t) = √2·U·sin(ωt)
+     i(t) = √2·I·sin(ωt − φ)          φ > 0: induktiv (Strom hinkt nach)
+     p(t) = u·i = P − S·cos(2ωt + φ)  Mittelwert P, Pendelanteil ±S bei 2ω
+     S = U·I,  P = S·cos φ,  Q = S·sin φ
+   ================================================================== */
+
+/* ---------------- 1. Sprachdatei (DE/EN) ---------------- */
+const I18N = {
+  de: {
+    title: "Leistung im Wechselstromkreis",
+    subtitle: "Wirk-, Blind- und Scheinleistung bei Phasenverschiebung zwischen Strom und Spannung",
+    readings: "Messwerte",
+    rUeff: "Spannung U_eff", rIeff: "Strom I_eff", rP: "Wirkleistung P", rQ: "Blindleistung Q", rS: "Scheinleistung S",
+    settings: "Einstellungen",
+    load: "Lastart (Phasenverschiebung)", loadOhm: "ohmsch", loadInd: "induktiv", loadCap: "kapazitiv",
+    loadHint: "Ohmsch: φ = 0 (Strom und Spannung gleichphasig). Induktiv: Strom hinkt hinter der Spannung her. Kapazitiv: Strom eilt voraus – so wie bei der Kompensation mit Kondensatoren.",
+    phi: "Phasenwinkel |φ|", phiHint: "Bei phasenverschobener Last sind u und i nicht mehr gleichgerichtet – die Momentanleistung pendelt teils ins Netz zurück.",
+    u: "Effektivwert U", i: "Effektivwert I",
+    speed: "Abspielgeschwindigkeit", speedHint: "100 % = Echtzeit (50 Hz), 0,1 % ≈ eine Periode in 20 s. Weit runterregeln, bis die Kurven gut zu verfolgen sind – z. B. 5 % für ~2,5 sichtbare Hz.",
+    cosBad: "schlecht (< 0,9)", operation: "Betrieb", btnStart: "▶ Start", btnStop: "❚❚ Stopp",
+    formulas: "Formeln", explanation: "Erklärung",
+    /* Szene */
+    lblGen: "Generator", lblLoadOhm: "Widerstand", lblLoadInd: "Spule / Motor", lblLoadCap: "Kondensator",
+    lblNet: "Netto-Energiefluss (P)", lblPendel: "Pendel-Energie (Q, Mittelwert 0)", lblPhasor: "Zeigerdiagramm",
+    lblU: "U", lblI: "I", lblPhi: "φ", lblFreq: "f = 50 Hz",
+    /* Oszilloskop */
+    scU: "u", scI: "i", scP: "p = u·i", scMean: "P (Mittelwert)", scWin: "Wirk-Anteil", scPend: "Pendel-Anteil",
+    /* Dreieck */
+    triTitle: "Leistungsdreieck", triVA: "VA", triW: "W", triVar: "var",
+    exp1: `<strong>Momentanleistung und Mittelwert:</strong> Die Leistung ist das Produkt aus Spannung und Strom: <strong>p(t) = u(t) · i(t)</strong>. Nur wenn u und i <strong>gleichgerichtet</strong> sind (beide positiv oder beide negativ), fließt Energie vom Generator zur Last. Sind sie zeitverschoben, wird in manchen Zeitabschnitten – wenn u und i entgegengesetzte Vorzeichen haben – Energie <strong>zurück</strong> ins Netz geschoben. Was dauerhaft bei der Last ankommt, ist der <strong>Mittelwert von p über eine Periode</strong>: die Wirkleistung <strong>P = U·I·cos φ</strong>.`,
+    exp2: `<strong>Wirkleistung P (Watt):</strong> Sie ist die tatsächlich umgesetzte Leistung – Wärme im Widerstand, Drehmoment und mechanische Arbeit am Motor, Licht in der Lampe. Bei φ = 0 (rein ohmsche Last) ist p(t) immer ≥ 0: die gesamte Fläche unter der grünen Kurve ist Nutzenergie.`,
+    exp3: `<strong>Blindleistung Q (var):</strong> Bei phasenverschobener Last pendelt ein Teil der Energie im Takt von 2·f zwischen Generator und Last hin und her (orange markierter Anteil von p). Er hat den Mittelwert <strong>Null</strong> – es wird kein Netto-Nutzen übertragen –, aber der Strom, der diese Energie hin- und herschiebt, <strong>erwärmt die Leitungen</strong> und muss von Generator, Trafos und Sicherungen mitbefördert werden. Spulen und Motoren erzeugen induktive Blindleistung, Kondensatoren kapazitive.`,
+    exp4: `<strong>Scheinleistung S (VA):</strong> Sie ist das Produkt der Effektivwerte, <strong>S = U·I</strong>, und entspricht der Hypotenuse im Leistungsdreieck: <strong>S² = P² + Q²</strong>. Transformatoren, Kabel und Sicherungen müssen nach S bemessen werden, nicht nach P – deshalb belastet Blindleistung die Infrastruktur, ohne etwas Nutzbares zu liefern.`,
+    exp5: `<strong>Leistungsfaktor cos φ in der Praxis:</strong> Er gibt an, welcher Anteil von S als Wirkleistung nutzbar ist. Industriebetriebe mit vielen Motoren haben typisch cos φ = 0,7…0,85 und zahlen deshalb oft <strong>Blindleistungs-Abgaben</strong> ans Netz. Abhilfe: <strong>Kompensation mit Kondensatoren</strong>, die kapazitive Blindleistung erzeugen und die induktive teilweise aufhebt – cos φ steigt Richtung 1, der Strom und damit die Leitungsverluste sinken.`
+  },
+  en: {
+    title: "Power in AC Circuits",
+    subtitle: "Active, reactive and apparent power with phase shift between current and voltage",
+    readings: "Readings",
+    rUeff: "Voltage U_eff", rIeff: "Current I_eff", rP: "Active power P", rQ: "Reactive power Q", rS: "Apparent power S",
+    settings: "Settings",
+    load: "Load type (phase shift)", loadOhm: "resistive", loadInd: "inductive", loadCap: "capacitive",
+    loadHint: "Resistive: φ = 0 (current and voltage in phase). Inductive: current lags the voltage. Capacitive: current leads – as with capacitor compensation.",
+    phi: "Phase angle |φ|", phiHint: "With a phase-shifted load, u and i are no longer aligned – part of the instantaneous power flows back into the grid.",
+    u: "RMS value U", i: "RMS value I",
+    speed: "Playback speed", speedHint: "100 % = real time (50 Hz), 0.1 % ≈ one period in 20 s. Turn it well down until the curves are easy to follow – e.g. 5 % for ~2.5 visible Hz.",
+    cosBad: "poor (< 0.9)", operation: "Operation", btnStart: "▶ Start", btnStop: "❚❚ Stop",
+    formulas: "Formulas", explanation: "Explanation",
+    lblGen: "Generator", lblLoadOhm: "Resistor", lblLoadInd: "Coil / motor", lblLoadCap: "Capacitor",
+    lblNet: "Net energy flow (P)", lblPendel: "Pendulum energy (Q, average 0)", lblPhasor: "Phasor diagram",
+    lblU: "U", lblI: "I", lblPhi: "φ", lblFreq: "f = 50 Hz",
+    scU: "u", scI: "i", scP: "p = u·i", scMean: "P (average)", scWin: "active share", scPend: "pendulum share",
+    triTitle: "Power triangle", triVA: "VA", triW: "W", triVar: "var",
+    exp1: `<strong>Instantaneous power and average:</strong> Power is the product of voltage and current: <strong>p(t) = u(t) · i(t)</strong>. Energy only flows from generator to load while u and i have the <strong>same sign</strong>. With a phase shift, u and i oppose each other during part of each cycle and energy is pushed <strong>back</strong> into the grid. What permanently arrives at the load is the <strong>average of p over one period</strong> – the active power <strong>P = U·I·cos φ</strong>.`,
+    exp2: `<strong>Active power P (watts):</strong> The power actually converted – heat in the resistor, torque and mechanical work at the motor, light in the lamp. At φ = 0 (purely resistive load) p(t) is always ≥ 0: the entire area under the green curve is useful energy.`,
+    exp3: `<strong>Reactive power Q (var):</strong> With a phase-shifted load, part of the energy sloshes back and forth between generator and load at twice the frequency (orange part of p). Its average is <strong>zero</strong> – no net benefit is transferred – but the current that shuttles this energy <strong>heats the lines</strong> and must be carried by generators, transformers and fuses. Coils and motors produce inductive reactive power, capacitors produce capacitive.`,
+    exp4: `<strong>Apparent power S (VA):</strong> The product of the RMS values, <strong>S = U·I</strong>, forming the hypotenuse of the power triangle: <strong>S² = P² + Q²</strong>. Transformers, cables and fuses must be rated for S, not P – that is why reactive power burdens the infrastructure without delivering anything useful.`,
+    exp5: `<strong>Power factor cos φ in practice:</strong> It states which fraction of S is usable as active power. Industrial plants with many motors typically have cos φ = 0.7…0.85 and therefore often pay <strong>reactive-power charges</strong> to the grid operator. Remedy: <strong>compensation with capacitors</strong>, whose capacitive reactive power cancels part of the inductive one – cos φ rises towards 1, current and line losses drop.`
+  }
+};
+let lang = "de";
+const T = k => (I18N[lang] && I18N[lang][k]) || I18N.de[k] || k;
+
+/* ---------------- 2. Zustand und Physik ---------------- */
+const F = 50;                 // Netzfrequenz [Hz]
+const OMEGA = 2 * Math.PI * F;
+const state = { running: true, t: 0, load: "ind", phiDeg: 35, U: 230, I: 6, speed: 0.05 };
+// speed = Abspielgeschwindigkeit (1 = Echtzeit/50 Hz, 0.05 = 5 % Zeitlupe → sichtbar ~2,5 Hz)
+
+// Vorzeichen der Phasenverschiebung: +φ induktiv, −φ kapazitiv, 0 ohmsch
+const signOf = () => state.load === "ind" ? 1 : state.load === "cap" ? -1 : 0;
+const phi    = () => signOf() * state.phiDeg * Math.PI / 180;   // φ [rad], vorzeichenbehaftet
+const S      = () => state.U * state.I;                          // Scheinleistung [VA]
+const P      = () => S() * Math.cos(phi());                      // Wirkleistung [W]
+const Q      = () => S() * Math.sin(phi());                      // Blindleistung [var]
+const uNow   = () => Math.SQRT2 * state.U * Math.sin(OMEGA * state.t);
+const iNow   = () => Math.SQRT2 * state.I * Math.sin(OMEGA * state.t - phi());
+const pNow   = () => uNow() * iNow();
+
+/* ---------------- 3. DOM und Canvas-Hilfen ---------------- */
+const $ = id => document.getElementById(id);
+const sceneCv = $("scene"), scopeCv = $("scope"), triCv = $("triangle");
+const sceneCtx = sceneCv.getContext("2d"), scopeCtx = scopeCv.getContext("2d"), triCtx = triCv.getContext("2d");
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+// Canvas an CSS-Größe anpassen (Retina-scharf), gibt CSS-Größe zurück
+function fitCanvas(cv){
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (w > 0 && (cv.width !== Math.round(w * DPR) || cv.height !== Math.round(h * DPR))){
+    cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  }
+  return [w, h];
+}
+// Pfeil von (x1,y1) nach (x2,y2) mit Dreieckskopf
+function arrow2d(ctx, x1, y1, x2, y2, color, width = 2, head = 7){
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - head * Math.cos(a - 0.42), y2 - head * Math.sin(a - 0.42));
+  ctx.lineTo(x2 - head * Math.cos(a + 0.42), y2 - head * Math.sin(a + 0.42));
+  ctx.closePath(); ctx.fill();
+}
+const locale = () => lang === "de" ? "de-DE" : "en-US";
+const fmt = (x, d = 1) => x.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
+const colU = "#f87171", colI = "#60a5fa", colP = "#4ade80", colQ = "#fb923c", colS = "#22d3ee";
+
+/* ---------------- 4. Hauptszene: Generator → Last, Energiefluss, Zeigerdiagramm ---------------- */
+function drawScene(){
+  const [w, h] = fitCanvas(sceneCv);
+  const ctx = sceneCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  // Hintergrund
+  const grd = ctx.createRadialGradient(w / 2, h * 0.4, 10, w / 2, h * 0.4, Math.max(w, h) * 0.75);
+  grd.addColorStop(0, "#17223d"); grd.addColorStop(1, "#0a1120");
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+
+  const fs = Math.max(11, Math.min(w, h) * 0.045);
+  const gx = w * 0.15, gy = h * 0.34;     // Generator-Mitte
+  const lx = w * 0.85, ly = h * 0.34;     // Last-Mitte
+  const R  = Math.min(w, h) * 0.085;      // Symbolradius
+
+  /* --- Verbindungsleitung --- */
+  ctx.strokeStyle = "#54709f"; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(gx + R, gy); ctx.lineTo(lx - R, ly); ctx.stroke();
+
+  /* --- Generator: Kreis mit Wechselstrom-Wellenzeichen --- */
+  ctx.beginPath(); ctx.arc(gx, gy, R, 0, 7);
+  ctx.fillStyle = "#1b2745"; ctx.fill();
+  ctx.strokeStyle = "#8fa3c8"; ctx.lineWidth = 2.5; ctx.stroke();
+  // ~-Zeichen als Sinuswelle
+  ctx.save();
+  ctx.beginPath(); ctx.arc(gx, gy, R - 3, 0, 7); ctx.clip();
+  ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let x = -R; x <= R; x += 2){
+    const y = Math.sin(x / R * Math.PI * 1.5 + OMEGA * state.t) * R * 0.45;
+    x === -R ? ctx.moveTo(gx + x, gy + y) : ctx.lineTo(gx + x, gy + y);
+  }
+  ctx.stroke(); ctx.restore();
+  ctx.fillStyle = "#cdd8ec"; ctx.font = `${fs * 0.85}px system-ui`;
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillText(T("lblGen"), gx, gy + R + 8);
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fs * 0.7}px system-ui`;
+  ctx.fillText(`${T("lblFreq")} · ${fmt(state.speed * 100, state.speed < 0.01 ? 1 : 0)} %`, gx, gy + R + 8 + fs);
+
+  /* --- Last: Symbol je nach Lastart --- */
+  ctx.beginPath(); ctx.arc(lx, ly, R, 0, 7);
+  ctx.fillStyle = "#1b2745"; ctx.fill();
+  ctx.strokeStyle = "#8fa3c8"; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.save();
+  ctx.translate(lx, ly);
+  ctx.strokeStyle = "#e5ecf7"; ctx.lineWidth = 2.4; ctx.lineCap = "round";
+  if (state.load === "ohm"){
+    // Widerstand: Rechteck
+    ctx.strokeRect(-R * 0.55, -R * 0.3, R * 1.1, R * 0.6);
+  } else if (state.load === "ind"){
+    // Spule: 4 Bögen
+    ctx.beginPath();
+    for (let k = 0; k < 4; k++){
+      const x0 = -R * 0.6 + k * R * 0.4;
+      ctx.arc(x0 + R * 0.2, 0, R * 0.2, Math.PI, 0);
+    }
+    ctx.stroke();
+  } else {
+    // Kondensator: zwei Platten
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.12, -R * 0.45); ctx.lineTo(-R * 0.12, R * 0.45);
+    ctx.moveTo(R * 0.12, -R * 0.45); ctx.lineTo(R * 0.12, R * 0.45);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle = "#cdd8ec"; ctx.font = `${fs * 0.85}px system-ui`;
+  ctx.fillText(T(state.load === "ohm" ? "lblLoadOhm" : state.load === "ind" ? "lblLoadInd" : "lblLoadCap"), lx, ly + R + 8);
+
+  /* --- Energiefluss zwischen Generator und Last --- */
+  const x0 = gx + R + 14, x1 = lx - R - 14, xm = (x0 + x1) / 2, span = (x1 - x0) / 2;
+  // Netto-Pfeil (Wirkleistung): grüne Punkte wandern dauerhaft Generator → Last
+  const yN = gy - R * 0.55;
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fs * 0.72}px system-ui`;
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  ctx.fillText(T("lblNet"), xm, yN - 16);
+  if (P() > 0.5){
+    const n = 7;
+    const off = (state.t * 0.5) % 1;                 // Flussgeschwindigkeit ∝ P (hier normiert)
+    for (let k = 0; k < n; k++){
+      const f = ((k / n + off * (0.35 + 0.65 * P() / S())) % 1);
+      const x = x0 + f * (x1 - x0);
+      ctx.globalAlpha = 0.35 + 0.65 * Math.sin(f * Math.PI);  // am Rand verblassen
+      ctx.fillStyle = colP;
+      ctx.beginPath(); ctx.arc(x, yN, 4.2, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    arrow2d(ctx, x0, yN, x1, yN, "rgba(74,222,128,.75)", 2, 8);
+  } else {
+    ctx.setLineDash([4, 6]); ctx.strokeStyle = "rgba(148,163,184,.4)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x0, yN); ctx.lineTo(x1, yN); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // Pendel-Pfeil (Blindleistung): orange Doppelpfeil, oszilliert mit q(t) = Q·sin(2ωt)
+  const yQ = gy + R * 0.55;
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fs * 0.72}px system-ui`;
+  ctx.fillText(T("lblPendel"), xm, yQ + 26);
+  const qInst = Q() * Math.sin(2 * OMEGA * state.t);       // Momentanwert des Pendelanteils
+  const qMax  = S();                                        // Skalierung: ±S = volle Amplitude
+  if (Math.abs(qInst) > qMax * 0.02){
+    const dx = (qInst / qMax) * span;
+    const a = xm - dx, b = xm + dx;                          // Pfeil wächst aus der Mitte
+    ctx.globalAlpha = 0.45 + 0.55 * Math.abs(qInst / qMax);
+    arrow2d(ctx, a, yQ, b, yQ, colQ, 2.5, 8);
+    ctx.globalAlpha = 1;
+  }
+  // Ruhe-Markierung in der Mitte der Pendelspur
+  ctx.fillStyle = "rgba(251,146,60,.8)";
+  ctx.beginPath(); ctx.arc(xm, yQ, 2.5, 0, 7); ctx.fill();
+
+  /* --- Zeigerdiagramm (unten): rotierende Zeiger U und I mit Winkel φ --- */
+  const zx = w * 0.30, zy = h * 0.80, zr = Math.min(w, h) * 0.19;
+  const th = OMEGA * state.t;                    // Drehwinkel des U-Zeigers
+  ctx.strokeStyle = "rgba(148,163,184,.25)"; ctx.lineWidth = 1;
+  ctx.setLineDash([4, 5]);
+  ctx.beginPath(); ctx.arc(zx, zy, zr, 0, 7); ctx.stroke();
+  ctx.setLineDash([]);
+  // Bezugsachse (0°)
+  ctx.strokeStyle = "rgba(148,163,184,.35)";
+  ctx.beginPath(); ctx.moveTo(zx - zr - 6, zy); ctx.lineTo(zx + zr + 6, zy); ctx.stroke();
+  // U-Zeiger (rot, Referenz)
+  const ux = zx + Math.cos(-th) * zr, uy = zy + Math.sin(-th) * zr;
+  arrow2d(ctx, zx, zy, ux, uy, colU, 2.5, 8);
+  // I-Zeiger (blau, um −φ verdreht; kapazitiv: entgegengesetzt)
+  const ti = th - phi();
+  const ix = zx + Math.cos(-ti) * zr * 0.8, iy = zy + Math.sin(-ti) * zr * 0.8;
+  arrow2d(ctx, zx, zy, ix, iy, colI, 2.5, 8);
+  // φ-Bogen zwischen den Zeigern (nur am Nullpunkt lesbar → bei U-Zeiger zeichnen)
+  const aU = -th, aI = -ti;
+  ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(zx, zy, zr * 0.42, Math.min(aU, aI), Math.max(aU, aI)); ctx.stroke();
+  // Beschriftung φ nahe dem Bogen, U/I an den Zeigerspitzen
+  const am = (aU + aI) / 2;
+  ctx.fillStyle = "#f59e0b"; ctx.font = `italic bold ${fs * 0.9}px Georgia`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(T("lblPhi"), zx + Math.cos(am) * zr * 0.62, zy + Math.sin(am) * zr * 0.62);
+  ctx.fillStyle = colU; ctx.fillText(T("lblU"), ux + Math.cos(aU) * 12, uy + Math.sin(aU) * 12);
+  ctx.fillStyle = colI; ctx.fillText(T("lblI"), ix + Math.cos(aI) * 14, iy + Math.sin(aI) * 14);
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fs * 0.78}px system-ui`;
+  ctx.fillText(T("lblPhasor"), zx, zy + zr + 16);
+  ctx.textBaseline = "alphabetic";
+
+  /* --- Mini-Momentanwert-Anzeige rechts unten: Balken u, i, p --- */
+  const bx = w * 0.68, bw = w * 0.26, by = h * 0.62, bh = h * 0.30;
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fs * 0.72}px system-ui`;
+  ctx.textAlign = "left";
+  const bars = [
+    [T("scU"), uNow() / (Math.SQRT2 * state.U), colU],
+    [T("scI"), iNow() / (Math.SQRT2 * state.I), colI],
+    [T("scP"), pNow() / (2 * S() || 1) * 2,  colP]   // p auf ±2·S normiert
+  ];
+  bars.forEach(([lb, v, col], k) => {
+    const y = by + k * (bh / 3) + 8;
+    ctx.fillStyle = "#93a4c3"; ctx.fillText(lb, bx, y + 4);
+    ctx.strokeStyle = "#334155"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(bx + 22, y); ctx.lineTo(bx + 22 + bw, y); ctx.stroke();
+    const vv = Math.max(-1, Math.min(1, v)) * bw * 0.5;
+    ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(bx + 22 + bw / 2, y); ctx.lineTo(bx + 22 + bw / 2 + vv, y); ctx.stroke();
+  });
+}
+
+/* ---------------- 5. Oszilloskop: u(t), i(t) und p(t) mit Wirk-/Pendel-Anteil ---------------- */
+function drawScope(){
+  const [w, h] = fitCanvas(scopeCv);
+  const ctx = scopeCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#04101c"; ctx.fillRect(0, 0, w, h);
+
+  const L = 40, Rr = 10, Tt = 20, Bb = 22;
+  const pw = w - L - Rr, ph = h - Tt - Bb;
+  const uh = ph * 0.55;                       // oberer Bereich: u und i (normiert)
+  const phh = ph - uh;                        // unterer Bereich: p in W
+  const Tper = 1 / F;                         // Periodendauer
+  const t1 = state.t, t0 = t1 - 2 * Tper;     // Zeitfenster: 2 Perioden
+  const X = t => L + (t - t0) / (2 * Tper) * pw;
+  const yU0 = Tt + uh * 0.5;                  // Nullinie u/i
+  const yP0 = Tt + uh + phh * 0.5;            // Nullinie p
+  const pMax = 2 * S() || 1;                  // p pendelt maximal ±S um P
+  const YP = p => yP0 - (p / pMax) * (phh * 0.5);
+  const fsS = Math.max(10, h * 0.085);
+
+  // Abtastung: u, i, p über das Fenster
+  const N = 160, pts = [];
+  for (let k = 0; k <= N; k++){
+    const t = t0 + (k / N) * 2 * Tper;
+    const u = Math.SQRT2 * state.U * Math.sin(OMEGA * t);
+    const i = Math.SQRT2 * state.I * Math.sin(OMEGA * t - phi());
+    pts.push([X(t), u, i, u * i]);
+  }
+
+  // Raster: Zeit in ms, 10 ms-Schritte
+  ctx.strokeStyle = "rgba(148,163,184,.12)"; ctx.lineWidth = 1;
+  ctx.fillStyle = "#7c8db0"; ctx.font = `${fsS * 0.78}px system-ui`;
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  for (let ms = Math.ceil(t0 * 1000 / 10) * 10; ms <= t1 * 1000; ms += 10){
+    const x = X(ms / 1000);
+    ctx.beginPath(); ctx.moveTo(x, Tt); ctx.lineTo(x, Tt + ph); ctx.stroke();
+    ctx.fillText(String(ms), x, Tt + ph + 13);
+  }
+  ctx.fillStyle = "#9fb0d0"; ctx.textAlign = "left";
+  ctx.fillText("t/ms", L + pw - 30, h - 5);
+
+  /* --- Füllungen im p-Bereich --- */
+  // (a) Wirk-Anteil: Fläche zwischen Mittelwertlinie P und 0 (grün schraffiert)
+  const yMean = YP(P());
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(L, Math.min(yMean, yP0), pw, Math.abs(yMean - yP0));
+  ctx.clip();
+  ctx.strokeStyle = "rgba(74,222,128,.35)"; ctx.lineWidth = 1;
+  for (let x = L - ph; x < L + pw + ph; x += 7){
+    ctx.beginPath(); ctx.moveTo(x, Tt + uh); ctx.lineTo(x + ph, Tt + ph); ctx.stroke();
+  }
+  ctx.restore();
+  // (b) Pendel-Anteil: Fläche zwischen p(t) und der Mittelwertlinie (orange, transparent)
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], yMean);
+  for (const p of pts) ctx.lineTo(p[0], YP(p[3]));
+  ctx.lineTo(pts[pts.length - 1][0], yMean);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(251,146,60,.16)"; ctx.fill();
+  ctx.restore();
+  // (c) positive p-Anteile oberhalb 0 (gestrichelt grün umrandet)
+  ctx.save();
+  ctx.strokeStyle = "rgba(74,222,128,.6)"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  let pen = false;
+  for (const p of pts){
+    const y = YP(p[3]);
+    if (p[3] >= 0){
+      if (!pen){ ctx.moveTo(p[0], yP0); ctx.lineTo(p[0], y); pen = true; }
+      else ctx.lineTo(p[0], y);
+    } else if (pen){ ctx.lineTo(p[0], yP0); pen = false; }
+  }
+  if (pen) ctx.lineTo(pts[pts.length - 1][0], yP0);
+  ctx.stroke(); ctx.restore();
+
+  // Trennlinie zwischen u/i- und p-Bereich
+  ctx.strokeStyle = "rgba(148,163,184,.25)";
+  ctx.beginPath(); ctx.moveTo(L, Tt + uh); ctx.lineTo(L + pw, Tt + uh); ctx.stroke();
+
+  // Nullinien
+  ctx.strokeStyle = "rgba(229,236,247,.5)"; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(L, yU0); ctx.lineTo(L + pw, yU0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(L, yP0); ctx.lineTo(L + pw, yP0); ctx.stroke();
+
+  /* --- Kurven: u und i (normiert auf ±1 des oberen Bereichs) --- */
+  const amp = uh * 0.46;
+  const curve = (idx, col, glow) => {
+    ctx.save();
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.shadowColor = col; ctx.shadowBlur = glow;
+    ctx.beginPath();
+    pts.forEach((p, k) => { const y = yU0 - (p[idx] / (Math.SQRT2 * (idx === 1 ? state.U : state.I))) * amp;
+                            k ? ctx.lineTo(p[0], y) : ctx.moveTo(p[0], y); });
+    ctx.stroke(); ctx.restore();
+  };
+  curve(1, colU, 5); curve(2, colI, 5);
+  // p(t)
+  ctx.save();
+  ctx.strokeStyle = colP; ctx.lineWidth = 2; ctx.shadowColor = colP; ctx.shadowBlur = 5;
+  ctx.beginPath();
+  pts.forEach((p, k) => { k ? ctx.lineTo(p[0], YP(p[3])) : ctx.moveTo(p[0], YP(p[3])); });
+  ctx.stroke(); ctx.restore();
+
+  // Mittelwertlinie P (gestrichelt, amber)
+  ctx.save();
+  ctx.setLineDash([7, 5]); ctx.strokeStyle = "#fbbf24"; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(L, yMean); ctx.lineTo(L + pw, yMean); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = "#fbbf24"; ctx.font = `${fsS * 0.8}px system-ui`;
+  ctx.textAlign = "right"; ctx.fillText(`P = ${fmt(P(), 0)} W`, L + pw - 4, yMean - 5);
+
+  /* --- Legende + Cursor am aktuellen Zeitpunkt --- */
+  ctx.font = `${fsS * 0.85}px system-ui`; ctx.textAlign = "left";
+  const leg = [[T("scU"), colU], [T("scI"), colI], [T("scP"), colP], [T("scMean"), "#fbbf24"]];
+  let lx2 = L + 4;
+  for (const [lb, col] of leg){
+    ctx.strokeStyle = col; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(lx2, Tt - 7); ctx.lineTo(lx2 + 14, Tt - 7); ctx.stroke();
+    ctx.fillStyle = col; ctx.fillText(lb, lx2 + 18, Tt - 3);
+    lx2 += ctx.measureText(lb).width + 34;
+  }
+  const xc = X(state.t);
+  ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = "rgba(229,236,247,.6)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xc, Tt); ctx.lineTo(xc, Tt + ph); ctx.stroke(); ctx.restore();
+  const dot = (y, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(xc, y, 3.5, 0, 7); ctx.fill(); };
+  dot(yU0 - (uNow() / (Math.SQRT2 * state.U)) * amp, colU);
+  dot(yU0 - (iNow() / (Math.SQRT2 * state.I)) * amp, colI);
+  dot(YP(pNow()), colP);
+}
+
+/* ---------------- 6. Leistungsdreieck: S als Hypotenuse, P ankathete, Q gegenkathete ---------------- */
+function drawTriangle(){
+  const [w, h] = fitCanvas(triCv);
+  const ctx = triCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#0a1120"; ctx.fillRect(0, 0, w, h);
+
+  const fsT = Math.max(10, h * 0.09);
+  ctx.fillStyle = "#e5ecf7"; ctx.font = `bold ${fsT}px system-ui`;
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText(T("triTitle"), 12, 12 + fsT * 0.5);
+
+  // Geometrie: Hypotenuse fester Länge, φ aus dem Zustand
+  const cx = w * 0.38, cy = h * 0.58;
+  const hyp = Math.min(w * 0.40, h * 0.50);
+  const phr = phi();
+  const flat = Math.abs(phr) < 0.1;                                   // φ ≈ 0: Dreieck degeneriert zur Linie
+  const px = cx + hyp * Math.cos(phr), py = cy;                     // P-Ende (Ankathete)
+  const qx = px, qy = cy - hyp * Math.sin(phr);                     // Q-Spitze (Gegenkathete, kapazitiv: nach unten)
+  // Achsen
+  ctx.strokeStyle = "rgba(148,163,184,.3)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx - 10, cy); ctx.lineTo(cx + hyp + 26, cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px, cy); ctx.lineTo(px, qy + (qy < cy ? -20 : 8)); ctx.stroke();
+  // Dreieck
+  ctx.lineWidth = 3; ctx.lineCap = "round";
+  arrow2d(ctx, cx, cy, px, py, colP, 3, 8);                          // P
+  arrow2d(ctx, px, py, qx, qy, colQ, 3, 8);                          // Q
+  arrow2d(ctx, cx, cy, qx, qy, colS, 3, 8);                          // S (Hypotenuse)
+  // rechter Winkel
+  ctx.strokeStyle = "#93a4c3"; ctx.lineWidth = 1.5;
+  if (qy < cy) ctx.strokeRect(px - 8, cy - 8, 8, 8);
+  else ctx.strokeRect(px - 8, cy, 8, 8);
+  // φ-Bogen IM Dreieck: zwischen P-Achse (Canvas-Winkel 0) und Hypotenuse (Canvas-Winkel −φ, y zeigt nach unten)
+  const aHyp = -phr;
+  ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 30, Math.min(0, aHyp), Math.max(0, aHyp));
+  ctx.stroke();
+  // φ-Symbol auf der Winkelhalbierenden (Wert steht in Chips und Regler)
+  if (state.phiDeg >= 1){
+    const aMid = aHyp / 2;
+    ctx.fillStyle = "#f59e0b"; ctx.font = `italic bold ${fsT * 0.9}px Georgia`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(T("lblPhi"), cx + Math.cos(aMid) * 46, cy + Math.sin(aMid) * 46);
+  }
+  // Werte an den Seiten
+  ctx.font = `bold ${fsT * 0.95}px system-ui`;
+  // P-Label auf der freien Seite der Achse (gegenüber Q, also außerhalb des Dreiecks)
+  const pLabelY = flat ? cy + 26 : (qy < cy ? cy + 22 : cy - 12);
+  const pLabelX = flat ? cx + hyp * 0.78 : cx + 8;
+  ctx.fillStyle = colP; ctx.fillText(`P = ${fmt(Math.abs(P()), 0)} ${T("triW")}`, pLabelX, pLabelY);
+  ctx.fillStyle = colQ;
+  ctx.fillText(`Q = ${fmt(Math.abs(Q()), 0)} ${T("triVar")}`, px + 12, (cy + qy) / 2);
+  // S-Label: bei degeneriertem Fall über die Linie, sonst rechts neben die S-Pfeilspitze
+  ctx.fillStyle = colS;
+  if (flat) ctx.fillText(`S = ${fmt(S(), 0)} ${T("triVA")}`, cx + 8, cy - 12);
+  else ctx.fillText(`S = ${fmt(S(), 0)} ${T("triVA")}`, qx + 16, qy + (qy < cy ? 14 : -6));
+  // cos φ unten rechts
+  ctx.textAlign = "right"; ctx.fillStyle = "#cdd8ec";
+  ctx.font = `${fsT * 0.9}px system-ui`;
+  ctx.fillText(`cos φ = ${fmt(Math.cos(phr), 2)}`, w - 12, h - 12);
+  // entarteter Fall: φ-Wertetext zusätzlich unter die Achse
+  if (flat){
+    ctx.textAlign = "left"; ctx.fillStyle = "#f59e0b";
+    ctx.font = `italic bold ${fsT * 0.9}px Georgia`;
+    ctx.textBaseline = "middle";
+    ctx.fillText(`φ = ${fmt(state.phiDeg, 1)}°`, cx + 10, cy + 26);
+  }
+}
+
+/* ---------------- 7. Messwerte und cos-φ-Balken ---------------- */
+function updateReadouts(){
+  $("vPhi").textContent  = fmt(state.phiDeg, 1) + "°" + (state.load === "ind" ? " (ind)" : state.load === "cap" ? " (kap)" : "");
+  $("vCos").textContent  = fmt(Math.cos(phi()), 2);
+  $("vUeff").textContent = fmt(state.U, 0) + " V";
+  $("vIeff").textContent = fmt(state.I, 1) + " A";
+  const u = uNow(), i = iNow(), p = pNow();
+  $("vU").textContent = (u >= 0 ? "+" : "") + fmt(u, 1) + " V";
+  $("vI").textContent = (i >= 0 ? "+" : "") + fmt(i, 2) + " A";
+  $("vP").textContent = (p >= 0 ? "+" : "") + fmt(p, 0) + " W";
+  $("vPw").textContent = fmt(P(), 0) + " W";
+  $("vQ").textContent  = fmt(Math.abs(Q()), 0) + " var";
+  $("vS").textContent  = fmt(S(), 0) + " VA";
+
+  // cos-φ-Balken: Füllung = cos φ, Farbe rot < 0,9 / amber 0,9…0,95 / grün ≥ 0,95
+  const c = Math.cos(phi());
+  const fill = $("cosFill");
+  fill.style.width = (c * 100).toFixed(1) + "%";
+  fill.style.background = c < 0.9 ? "var(--red)" : c < 0.95 ? "var(--accent)" : "var(--green)";
+  $("oCos").textContent = fmt(c, 2) + (c < 0.9 ? (lang === "de" ? " (schlecht)" : " (poor)") : "");
+}
+
+/* ---------------- 8. Hauptschleife (≈60 FPS) ---------------- */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min((now - last) / 1000, 0.05);   // bei Tab-Wechsel clampen
+  last = now;
+  if (state.running) state.t += dt * state.speed;  // Geschwindigkeit einstellbar (Zeitlupe)
+  drawScene(); drawScope(); drawTriangle(); updateReadouts();
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- 9. Steuerung ---------------- */
+// Regler mit sofortiger Wirkung
+function bindRange(id, outId, key, digits, unit){
+  const el = $(id), out = $(outId);
+  const upd = () => { state[key] = parseFloat(el.value); out.textContent = fmt(state[key], digits) + " " + unit; };
+  el.addEventListener("input", upd); upd();
+}
+bindRange("rPhi", "oPhi", "phiDeg", 1, "°");
+bindRange("rU", "oU", "U", 0, "V");
+bindRange("rI", "oI", "I", 1, "A");
+// Geschwindigkeit wird in Prozent angezeigt (unter 1 % eine Dezimale)
+{
+  const el = $("rSpeed"), out = $("oSpeed");
+  const upd = () => {
+    state.speed = parseFloat(el.value);
+    out.textContent = fmt(state.speed * 100, state.speed < 0.01 ? 1 : 0) + " %";
+  };
+  el.addEventListener("input", upd); upd();
+}
+
+// Lastart-Buttons (aktiver Zustand wird farblich markiert)
+const loadBtns = { ohm: $("bOhm"), ind: $("bInd"), cap: $("bCap") };
+function setLoad(kind){
+  state.load = kind;
+  for (const k in loadBtns) loadBtns[k].classList.toggle("active", k === kind);
+  // Ohmsche Last: sinnvollerweise φ = 0
+  if (kind === "ohm"){ $("rPhi").value = 0; state.phiDeg = 0; $("oPhi").textContent = fmt(0, 1) + " °"; }
+}
+$("bOhm").addEventListener("click", () => setLoad("ohm"));
+$("bInd").addEventListener("click", () => setLoad("ind"));
+$("bCap").addEventListener("click", () => setLoad("cap"));
+setLoad("ind");
+
+const btnRun = $("btnRun");
+function refreshRunBtn(){ btnRun.textContent = T(state.running ? "btnStop" : "btnStart"); }
+btnRun.addEventListener("click", () => { state.running = !state.running; refreshRunBtn(); });
+
+/* ---------------- 10. Sprachumschalter ---------------- */
+function applyLang(){
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = T(el.dataset.i18nHtml); });
+  document.documentElement.lang = lang;
+  document.title = T("title") + " – Simulation";
+  $("btnLang").textContent = lang === "de" ? "EN" : "DE";
+  refreshRunBtn();
+}
+$("btnLang").addEventListener("click", () => { lang = lang === "de" ? "en" : "de"; applyLang(); });
+
+/* ---------------- 11. Start ---------------- */
+applyLang();
+refreshRunBtn();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

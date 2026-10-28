@@ -1,0 +1,44 @@
+ To resume this session: kimi -r session_9935898e-0966-49ba-8bb6-d76d6b0005ec
+
+
+KIMI-CODE-PROMPT – Simulation: Drehstrom (Dreiphasenwechselstrom)
+=============================================================
+Ziel: Eine vollständig clientseitige, eigenständige Website (eine einzelne HTML-Datei,
+Canvas-Rendering), die die Erzeugung und die Vorteile des Drehstromsystems zeigt.
+GitHub-Pages-tauglich.
+
+Hauptszene
+- Erzeugeransicht: Stator mit drei um jeweils 120° versetzten Wicklungen (L1, L2, L3
+  farbcodiert); ein rotierender Magnet (oder der bekannte Leiterrahmen umgebaut als
+  Drehfeld-Erzeuger) dreht sich im Inneren. Jede Wicklung liefert eine Sinusspannung.
+- Elektronen in drei getrennten Strang-Leitungen plus Neutralleiter (Sternpunkt);
+  Animation: drei Stromflüsse mit 120°-Versatz, Neutralleiterstrom bei symmetrischer
+  Last = 0 (sichtbar: keine Elektronenbewegung im Neutralleiter).
+- Optional: Drehfeld-Darstellung durch drei um 120° versetzte Spulen mit rotierendem
+  Feldvektor (Zeigeraddition der drei Strangfelder → konstanter, umlaufender Vektor).
+
+Oszilloskop-Diagramm
+- Drei synchron laufende Sinuskurven u₁(t), u₂(t), u₃(t) mit 120°-Versatz,
+  farbcodiert wie die Wicklungen; Momentanwerte und gemeinsame Nullpunkte sichtbar.
+- Summenkurve u₁+u₂+u₃ ≡ 0 als gestrichelte Linie (Verschwinden des Neutralleiters).
+- Gesamtleistung p_ges(t) = p₁+p₂+p₃: **konstant** (gerade Linie!) – Kernbotschaft:
+  gleichmäßige Leistung/Drehmoment, anders als beim Einphasen-Wechselstrom.
+- Strangspannung U_Strang vs. verkettete Leiterspannung U_Leiter = √3·U_Strang
+  (messbar, mit Kurzaufklärung).
+
+Steuerung (Schieberegler, sofortige Wirkung)
+- Frequenz f, Scheitelwert Û, Last pro Strang (symmetrisch) bzw. Schieber für
+  Unsymmetrie auf einem Strang (Neutralleiterstrom entsteht dann!).
+- Start/Stopp.
+
+Erklärbereich
+- 3–5 Absätze auf Deutsch: Warum drei Phasen (konstante Momentanleistung, glatteres
+  Drehmoment für Motoren); 120°-Versatz und das Verschwinden der Summe bei Symmetrie
+  (dreiadrige Übertragung statt sechsadrig, Neutralleiter entfällt); Verkettungsfaktor
+  √3 (Stern/Dreieck nur erwähnen); Praxis: Haushaltsanschluss = ein Strang + Neutral-
+  leiter, Drehstrom für Herde/Maschinen; kurzer Ausblick Drehfeld → Asynchronmotor.
+
+Technische Anforderungen
+- Eine einzige index.html, kein Framework, offline, ca. 60 FPS, responsiv.
+- Übersichtlich kommentierter Code; deutsches UI mit EN-Umschalter; dunkles Design
+  im gleichen Stil wie die bisherigen Simulationen.

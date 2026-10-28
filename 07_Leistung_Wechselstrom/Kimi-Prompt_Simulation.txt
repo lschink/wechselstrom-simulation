@@ -1,0 +1,45 @@
+ To resume this session: kimi -r session_09b7c839-0939-42ed-aaff-f4563e9601bb
+
+
+KIMI-CODE-PROMPT – Simulation: Leistung im Wechselstromkreis (Wirk-, Blind-, Scheinleistung)
+=============================================================
+Ziel: Eine vollständig clientseitige, eigenständige Website (eine einzelne HTML-Datei,
+Canvas-Rendering), die verständlich macht, was bei Phasenverschiebung zwischen
+Spannung und Strom mit der Leistung passiert. GitHub-Pages-tauglich.
+
+Hauptszene
+- Generator-Symbol → regelbare Phasenverschiebung: Eine Last-Auswahl (ohmsch /
+  kapazitiv / induktiv / Mischung) oder direkt ein φ-Regler (0–90°) stellt den
+  Phasenwinkel ein. Zeigerdiagramm zeigt U und I mit einstellbarem Winkel φ.
+- Energiefluss-Darstellung: Pendelpfeile zwischen Generator und Last, die den
+  hin- und herpendelnden Blindenergieanteil zeigen; nur der Netto-Pfeil ist
+  Wirkleistung.
+
+Oszilloskop-Diagramm
+- u(t) rot, i(t) blau (mit φ-Versatz), darunter p(t) = u(t)·i(t) grün:
+  - Positive Anteile von p (genähert, gestrichelt): Fläche = Wirkleistung P.
+  - Pendelanteil oberhalb/unterhalb der Mittellinie: Blindleistung Q.
+  - Momentanwerte, Mittelwertlinie P = U_eff·I_eff·cos φ.
+- Wichtig: Bei φ = 0 nur positive Fläche (reine Wirkleistung); bei φ = 90°
+  symmetrische Pendelung (reine Blindleistung, Mittelwert 0).
+
+Leistungsdreieck
+- Zeichne S (Scheinleistung, Hypotenuse), P (Ankathete), Q (Gegenkathete) mit
+  dem Winkel φ; Werte live: S = U_eff·I_eff, P = S·cos φ, Q = S·sin φ,
+  Leistungsfaktor cos φ.
+
+Steuerung (Schieberegler, sofortige Wirkung)
+- Phasenwinkel φ (0–90°) oder Lastart-Mischung, U_eff (1–230 V), I_eff (0,1–16 A).
+- Start/Stopp; cos-φ-Anzeige als Zahl und als farbiger Balken (gut < 0,9 = rot?).
+
+Erklärbereich
+- 3–5 Absätze auf Deutsch: Warum nur der gleichgerichtete Anteil von u und i Arbeit
+  leistet (Mittelung über p); Wirkleistung (Wärme/Arbeit), Blindleistung (hin- und
+  herpendelnde Energie, belastet Leitungen ohne Nutzen), Scheinleistung (Bemessung
+  von Trafos/Sicherungen); Leistungsfaktor cos φ in der Praxis (Industrie zahlt für
+  Blindleistung, Kompensation mit Kondensatoren).
+
+Technische Anforderungen
+- Eine einzige index.html, kein Framework, offline, ca. 60 FPS, responsiv.
+- Übersichtlich kommentierter Code; deutsches UI mit EN-Umschalter; dunkles Design
+  im gleichen Stil wie die bisherigen Simulationen.

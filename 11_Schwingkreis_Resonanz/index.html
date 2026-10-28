@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RLC-Reihenschwingkreis – Simulation</title>
+<style>
+  /* ============================================================
+     Farbschema / Basis-Layout (dunkles Design)
+     ============================================================ */
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel2: #1c2330;
+    --border: #30363d;
+    --text: #e6edf3;
+    --dim: #8b949e;
+    --r-col: #3fb950;   /* Widerstand  – grün  */
+    --l-col: #58a6ff;   /* Spule       – blau  */
+    --c-col: #e3b341;   /* Kondensator – gelb  */
+    --src-col: #f0883e; /* Quelle      – orange */
+    --i-col: #39c5cf;   /* Strom       – cyan  */
+    --res-col: #f778ba; /* Resonanz    – pink  */
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.5;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 22px; border-bottom: 1px solid var(--border);
+    background: var(--panel); position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 1.15rem; font-weight: 600; }
+  header .sub { color: var(--dim); font-size: 0.8rem; }
+  #langBtn {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 0.85rem;
+  }
+  #langBtn:hover { border-color: var(--dim); }
+
+  main { max-width: 1400px; margin: 0 auto; padding: 18px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; margin-bottom: 18px;
+  }
+  .panel h2 {
+    font-size: 0.95rem; margin-bottom: 10px; color: var(--dim);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  canvas { display: block; width: 100%; border-radius: 6px; }
+  .canvasBox { background: var(--panel2); border-radius: 6px; padding: 6px; }
+
+  /* Grid für die drei Diagramme */
+  .diagramGrid {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  }
+
+  /* ============================================================
+     Steuerung (Schieberegler)
+     ============================================================ */
+  .ctrlRow {
+    display: grid; grid-template-columns: 130px 1fr 110px;
+    align-items: center; gap: 12px; margin: 8px 0;
+  }
+  .ctrlRow label { font-size: 0.9rem; color: var(--text); }
+  .ctrlRow .val {
+    font-family: Consolas, "Courier New", monospace; font-size: 0.85rem;
+    text-align: right; color: var(--i-col);
+  }
+  input[type="range"] { width: 100%; accent-color: var(--src-col); cursor: pointer; }
+
+  .presetRow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .presetBtn {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 16px; cursor: pointer; font-size: 0.85rem;
+  }
+  .presetBtn:hover { border-color: var(--res-col); color: var(--res-col); }
+
+  /* ============================================================
+     Messwert-Anzeigen
+     ============================================================ */
+  .meterGrid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .meter {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .meter .name { font-size: 0.75rem; color: var(--dim); }
+  .meter .num {
+    font-family: Consolas, "Courier New", monospace; font-size: 1.05rem;
+  }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+
+  /* Instrumente unter dem Schaltplan: Momentanwerte */
+  .instGrid {
+    display: grid; gap: 10px; margin-top: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  .inst {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; font-family: Consolas, "Courier New", monospace; font-size: 0.85rem;
+  }
+  .inst .lbl { font-family: inherit; color: var(--dim); font-size: 0.72rem; }
+
+  /* Resonanz-Badge */
+  #resBadge {
+    display: none; margin-top: 10px; padding: 6px 14px; border-radius: 20px;
+    background: rgba(247, 120, 186, 0.12); border: 1px solid var(--res-col);
+    color: var(--res-col); font-size: 0.85rem; font-weight: 600;
+  }
+  #resBadge.on { display: inline-block; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: 0.55; } }
+
+  /* Erklärbereich */
+  #explain p { margin: 0 0 12px; font-size: 0.92rem; color: #c9d1d9; }
+  #explain p:last-child { margin-bottom: 0; }
+  footer { color: var(--dim); font-size: 0.78rem; text-align: center; padding: 16px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 data-de="RLC-Reihenschwingkreis &amp; Resonanz" data-en="Series RLC Circuit &amp; Resonance">RLC-Reihenschwingkreis &amp; Resonanz</h1>
+    <div class="sub" data-de="Interaktive Simulation · Wechselstromtechnik" data-en="Interactive simulation · AC circuits">Interaktive Simulation · Wechselstromtechnik</div>
+  </div>
+  <button id="langBtn">EN</button>
+</header>
+
+<main>
+
+  <!-- ==================== Hauptszene: Schaltplan ==================== -->
+  <section class="panel">
+    <h2 data-de="Schaltplan (animiert)" data-en="Circuit diagram (animated)">Schaltplan (animiert)</h2>
+    <div class="canvasBox"><canvas id="circuitCv"></canvas></div>
+    <div class="instGrid">
+      <div class="inst"><span class="lbl" data-de="Momentanwert u_R" data-en="Instantaneous u_R">Momentanwert u_R</span><br><span id="instR" style="color:var(--r-col)">0 V</span></div>
+      <div class="inst"><span class="lbl" data-de="Momentanwert u_L" data-en="Instantaneous u_L">Momentanwert u_L</span><br><span id="instL" style="color:var(--l-col)">0 V</span></div>
+      <div class="inst"><span class="lbl" data-de="Momentanwert u_C" data-en="Instantaneous u_C">Momentanwert u_C</span><br><span id="instC" style="color:var(--c-col)">0 V</span></div>
+      <div class="inst"><span class="lbl" data-de="Momentanwert i" data-en="Instantaneous i">Momentanwert i</span><br><span id="instI" style="color:var(--i-col)">0 A</span></div>
+    </div>
+    <div id="resBadge"></div>
+  </section>
+
+  <!-- ==================== Steuerung + Messwerte ==================== -->
+  <section class="panel">
+    <h2 data-de="Steuerung" data-en="Controls">Steuerung</h2>
+
+    <div class="ctrlRow">
+      <label>R</label>
+      <input type="range" id="slR" min="0" max="1000" value="566">
+      <span class="val" id="vR">50 Ω</span>
+    </div>
+    <div class="ctrlRow">
+      <label>L</label>
+      <input type="range" id="slL" min="0" max="1000" value="667">
+      <span class="val" id="vL">10 mH</span>
+    </div>
+    <div class="ctrlRow">
+      <label>C</label>
+      <input type="range" id="slC" min="0" max="1000" value="833">
+      <span class="val" id="vC">100 nF</span>
+    </div>
+    <div class="ctrlRow">
+      <label data-de="f (um f₀)" data-en="f (around f₀)">f (um f₀)</label>
+      <input type="range" id="slF" min="0" max="1000" value="500">
+      <span class="val" id="vF">5.03 kHz</span>
+    </div>
+    <div class="ctrlRow">
+      <label>Û</label>
+      <input type="range" id="slU" min="0" max="1000" value="495">
+      <span class="val" id="vU">5.0 V</span>
+    </div>
+
+    <div class="presetRow">
+      <button class="presetBtn" id="pRes" data-de="⚡ Resonanz" data-en="⚡ Resonance">⚡ Resonanz</button>
+      <button class="presetBtn" id="pLow" data-de="unterhalb f₀" data-en="below f₀">unterhalb f₀</button>
+      <button class="presetBtn" id="pHigh" data-de="oberhalb f₀" data-en="above f₀">oberhalb f₀</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 data-de="Messwerte (live)" data-en="Measurements (live)">Messwerte (live)</h2>
+    <div class="meterGrid">
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--src-col)"></span>f₀ = 1/(2π√(LC))</div><div class="num" id="mF0">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--res-col)"></span><span data-de="Güte Q" data-en="Quality Q">Güte Q</span></div><div class="num" id="mQ">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--res-col)"></span><span data-de="Bandbreite B" data-en="Bandwidth B">Bandbreite B</span></div><div class="num" id="mB">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--i-col)"></span><span data-de="Strom I (eff)" data-en="Current I (rms)">Strom I (eff)</span></div><div class="num" id="mI">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--r-col)"></span>U_R (eff)</div><div class="num" id="mUR">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--l-col)"></span>U_L (eff)</div><div class="num" id="mUL">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--c-col)"></span>U_C (eff)</div><div class="num" id="mUC">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--src-col)"></span><span data-de="Scheinwiderstand Z" data-en="Impedance Z">Scheinwiderstand Z</span></div><div class="num" id="mZ">–</div></div>
+    </div>
+  </section>
+
+  <!-- ==================== Diagramme ==================== -->
+  <section class="panel">
+    <h2 data-de="Diagramme" data-en="Diagrams">Diagramme</h2>
+    <div class="diagramGrid">
+      <div>
+        <div class="canvasBox"><canvas id="scopeCv"></canvas></div>
+        <div style="font-size:0.78rem;color:var(--dim);margin-top:6px" id="scopeLbl"></div>
+      </div>
+      <div>
+        <div class="canvasBox"><canvas id="resoCv"></canvas></div>
+        <div style="font-size:0.78rem;color:var(--dim);margin-top:6px" id="resoLbl"></div>
+      </div>
+      <div>
+        <div class="canvasBox"><canvas id="phasorCv"></canvas></div>
+        <div style="font-size:0.78rem;color:var(--dim);margin-top:6px" id="phasorLbl"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Erklärbereich ==================== -->
+  <section class="panel" id="explain">
+    <h2 data-de="Erklärung" data-en="Explanation">Erklärung</h2>
+    <p data-de="Ein Reihenschwingkreis besteht aus Widerstand R, Spule L und Kondensator C, die von einer Wechselspannungsquelle durchflossen werden. Induktiver und kapazitiver Blindwiderstand hängen entgegengesetzt von der Frequenz ab: X_L = ωL wächst, X_C = 1/(ωC) fällt mit steigender Frequenz. Bei der Resonanzfrequenz f₀ = 1/(2π√(LC)) sind beide gleich groß – die Blindanteile „kurzschließen" sich gegenseitig, der Scheinwiderstand Z = R wird minimal und der Strom nimmt sein Maximum an. Quellenspannung und Strom sind dann phasengleich."
+       data-en="A series resonant circuit consists of a resistor R, an inductor L and a capacitor C driven by an AC voltage source. Inductive and capacitive reactance depend on frequency in opposite ways: X_L = ωL grows, X_C = 1/(ωC) falls as frequency increases. At the resonant frequency f₀ = 1/(2π√(LC)) the two are equal – the reactive parts effectively „short out", the impedance Z = R becomes minimal and the current reaches its maximum. Source voltage and current are then in phase.">Ein Reihenschwingkreis besteht aus Widerstand R, Spule L und Kondensator C, die von einer Wechselspannungsquelle durchflossen werden. Induktiver und kapazitiver Blindwiderstand hängen entgegengesetzt von der Frequenz ab: X_L = ωL wächst, X_C = 1/(ωC) fällt mit steigender Frequenz. Bei der Resonanzfrequenz f₀ = 1/(2π√(LC)) sind beide gleich groß – die Blindanteile „kurzschließen" sich gegenseitig, der Scheinwiderstand Z = R wird minimal und der Strom nimmt sein Maximum an. Quellenspannung und Strom sind dann phasengleich.</p>
+    <p data-de="Besonders spektakulär ist die Spannungsüberhöhung: Obwohl an der gesamten Reihenschaltung nur die Quellenspannung anliegt, können an Spule und Kondensator einzeln Spannungen herrschen, die um den Gütefaktor Q = (1/R)·√(L/C) höher liegen: U_L = U_C = Q·U. Die beiden Spannungen sind gegenphasig und heben sich in der Summe auf – das Zeigerdiagramm zeigt zwei entgegengesetzt gleich lange Zeiger. Die Bauteile tauschen also laufend Energie miteinander aus, und trotzdem fließt ein großer Strom, weil die Quelle nur den ohmschen Verlust R ausgleichen muss."
+       data-en="Particularly striking is the voltage magnification: although the whole series connection only sees the source voltage, the voltages across the inductor and the capacitor individually can be higher by the quality factor Q = (1/R)·√(L/C): U_L = U_C = Q·U. The two voltages are in antiphase and cancel in the sum – the phasor diagram shows two equal-length, opposite phasors. The components continuously exchange energy with each other, and yet a large current flows, because the source only has to make up for the ohmmic loss R.">Besonders spektakulär ist die Spannungsüberhöhung: Obwohl an der gesamten Reihenschaltung nur die Quellenspannung anliegt, können an Spule und Kondensator einzeln Spannungen herrschen, die um den Gütefaktor Q = (1/R)·√(L/C) höher liegen: U_L = U_C = Q·U. Die beiden Spannungen sind gegenphasig und heben sich in der Summe auf – das Zeigerdiagramm zeigt zwei entgegengesetzt gleich lange Zeiger. Die Bauteile tauschen also laufend Energie miteinander aus, und trotzdem fließt ein großer Strom, weil die Quelle nur den ohmschen Verlust R ausgleichen muss.</p>
+    <p data-de="Die Güte Q beschreibt zugleich die Selektivität des Kreises: Die Bandbreite B = f₀/Q ist der Frequenzbereich, in dem der Strom mindestens 1/√2 ≈ 70,7 % seines Maximums erreicht (Grenzfrequenzen f₁ und f₂). Hohe Güte (kleines R) bedeutet eine hohe, schmale Resonanzkurve – der Kreis ist selektiv; kleine Güte ergibt eine breite, flache Kurve. Bei den Grenzfrequenzen beträgt die Phasenverschiebung zwischen Strom und Spannung jeweils ±45°."
+       data-en="The quality factor Q also describes the selectivity of the circuit: the bandwidth B = f₀/Q is the frequency range in which the current reaches at least 1/√2 ≈ 70.7 % of its maximum (cutoff frequencies f₁ and f₂). High Q (small R) means a tall, narrow resonance curve – the circuit is selective; low Q gives a broad, flat curve. At the cutoff frequencies the phase shift between current and voltage is ±45° each.">Die Güte Q beschreibt zugleich die Selektivität des Kreises: Die Bandbreite B = f₀/Q ist der Frequenzbereich, in dem der Strom mindestens 1/√2 ≈ 70,7 % seines Maximums erreicht (Grenzfrequenzen f₁ und f₂). Hohe Güte (kleines R) bedeutet eine hohe, schmale Resonanzkurve – der Kreis ist selektiv; kleine Güte ergibt eine breite, flache Kurve. Bei den Grenzfrequenzen beträgt die Phasenverschiebung zwischen Strom und Spannung jeweils ±45°.</p>
+    <p data-de="Serienresonanzkreise finden sich überall in der Elektronik: als Filterschaltungen zum Ausblenden oder Durchlassen einzelner Frequenzen, in Sende- und Empfangstechnik (Sender- und Empfängerabstimmung, Antennenkreise), als Saugkreise und in der NF-Entzerrung. Achtung in der Praxis: In Resonanznähe liegen an Spule und Kondensator deutlich höhere Spannungen als an der Quelle – die Bauteile müssen für diese Überspannungen bemessen sein, sonst droht Durchschlag oder Beschädigung!"
+       data-en="Series resonant circuits are found throughout electronics: as filter circuits for blocking or passing individual frequencies, in radio transmission and reception (transmitter and receiver tuning, antenna circuits), as trap circuits and in audio equalization. A practical warning: near resonance the inductor and capacitor see significantly higher voltages than the source – the components must be rated for these overvoltages, otherwise breakdown or damage is imminent!">Serienresonanzkreise finden sich überall in der Elektronik: als Filterschaltungen zum Ausblenden oder Durchlassen einzelner Frequenzen, in Sende- und Empfangstechnik (Sender- und Empfängerabstimmung, Antennenkreise), als Saugkreise und in der NF-Entzerrung. Achtung in der Praxis: In Resonanznähe liegen an Spule und Kondensator deutlich höhere Spannungen als an der Quelle – die Bauteile müssen für diese Überspannungen bemessen sein, sonst droht Durchschlag oder Beschädigung!</p>
+  </section>
+
+</main>
+
+<footer>
+  RLC-Resonanz-Simulation · Offline-fähig · Canvas 2D ·
+  <span data-de="keine externen Abhängigkeiten" data-en="no external dependencies">keine externen Abhängigkeiten</span>
+</footer>
+
+<script>
+"use strict";
+/* ================================================================
+   RLC-Reihenschwingkreis – gesamte Logik in einer Datei
+   Alle Berechnungen in SI-Einheiten (H, F, Ω, Hz, V, A).
+   ================================================================ */
+
+/* ---------- 1. Globale Zustandsvariablen ---------- */
+let R  = 50;        // Widerstand [Ω]
+let L  = 10e-3;     // Induktivität [H]
+let C  = 100e-9;    // Kapazität [F]
+let Uh = 5;         // Scheitelwert der Quellenspannung [V]
+let fDec = 0;       // Frequenz als Dekaden-Versatz um f₀: f = f₀·10^fDec
+let simT = 0;       // Simulationszeit [s]
+let lang = "de";    // aktive Sprache
+
+const TWO_PI = 2 * Math.PI;
+const F_DEC_MIN = -1.5, F_DEC_MAX = 1.5;   // Frequenz-Slider: ±1,5 Dekaden
+
+/* Texte für die Canvas-Beschriftungen (Sprachumschaltung) */
+const T = {
+  scopeTitle:   { de: "Oszilloskop: u(t) und i(t)", en: "Oscilloscope: u(t) and i(t)" },
+  uTrace:       { de: "Spannung u", en: "voltage u" },
+  iTrace:       { de: "Strom i", en: "current i" },
+  resoTitle:    { de: "Resonanzkurve I(f)", en: "Resonance curve I(f)" },
+  bandwidth:    { de: "Bandbreite", en: "bandwidth" },
+  f0Label:      { de: "f₀", en: "f₀" },
+  phasorTitle:  { de: "Zeigerdiagramm", en: "Phasor diagram" },
+  resBadge:     { de: "⚡ RESONANZ – Spannungsüberhöhung an L und C! (U_L = U_C = Q·U)",
+                   en: "⚡ RESONANCE – voltage magnification at L and C! (U_L = U_C = Q·U)" },
+  resHint:      { de: "U_L und U_C sind gegenphasig und heben sich auf.",
+                   en: "U_L and U_C are in antiphase and cancel." },
+  scopeCap:     { de: (u, i, p) => `u ~ ${u} (orange), i ~ ${i} (cyan) · bei Resonanz phasengleich (φ = 0°)`,
+                   en: (u, i, p) => `u ~ ${u} (orange), i ~ ${i} (cyan) · in phase at resonance (φ = 0°)` },
+  resoCap:      { de: (b, f1, f2) => `B = ${b} · f₁ = ${f1} · f₂ = ${f2} · I₀ = Û/R`,
+                   en: (b, f1, f2) => `B = ${b} · f₁ = ${f1} · f₂ = ${f2} · I₀ = Û/R` },
+  phasorCap:    { de: m => `Scheitelwerte · längster Zeiger: ${m}`,
+                   en: m => `peak values · longest phasor: ${m}` }
+};
+
+/* ---------- 2. Hilfsfunktionen ---------- */
+
+/* Zahl mit SI-Präfix formatieren, z. B. 0.0047 -> "4.70 m" */
+function si(v, unit) {
+  if (!isFinite(v)) return "–";
+  const a = Math.abs(v);
+  const p = [[1e9,"G"],[1e6,"M"],[1e3,"k"],[1,"",],[1e-3,"m"],[1e-6,"µ"],[1e-9,"n"],[1e-12,"p"]];
+  for (const [f, s] of p) {
+    if (a >= f) return trim3(v / f) + " " + s + unit;
+  }
+  return trim3(v / 1e-12) + " p" + unit;
+}
+/* 3 signifikante Stellen, trailing zeros entfernen */
+function trim3(x) {
+  let s = x.toPrecision(3);
+  if (s.includes(".")) s = s.replace(/\.?0+$/, "");
+  return s;
+}
+/* „Schöne" Skalen-Obergrenze (1/2/2.5/5×10^n) für Diagramme */
+function niceCeil(v) {
+  const e = Math.pow(10, Math.floor(Math.log10(v)));
+  const m = v / e;
+  const nice = m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10;
+  return nice * e;
+}
+/* Canvas für scharfe Darstellung auf HiDPI-Skalieren */
+function fitCanvas(cv, cssH) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cssH;
+  if (cv.width !== w * dpr || cv.height !== h * dpr) {
+    cv.width = w * dpr; cv.height = h * dpr;
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+
+/* ---------- 3. Physik des Reihenschwingkreises ---------- */
+function computeCircuit() {
+  const f0 = 1 / (TWO_PI * Math.sqrt(L * C));        // Resonanzfrequenz
+  const Q  = (1 / R) * Math.sqrt(L / C);             // Güte
+  const B  = f0 / Q;                                 // Bandbreite
+  // Grenzfrequenzen: |X_L − X_C| = R  ⇒  f₁·f₂ = f₀², f₂−f₁ = B
+  const k  = Math.sqrt(1 + 1 / (4 * Q * Q));
+  const f1 = f0 * (k - 1 / (2 * Q));
+  const f2 = f0 * (k + 1 / (2 * Q));
+  const f  = f0 * Math.pow(10, fDec);                // aktuelle Frequenz
+  const w  = TWO_PI * f;
+  const XL = w * L, XC = 1 / (w * C);
+  const Z  = Math.sqrt(R * R + (XL - XC) * (XL - XC));
+  const I  = Uh / Z;                                 // Strom-Scheitelwert
+  const phi = Math.atan2(XL - XC, R);                // Phasenwinkel u gegenüber i
+  return { f0, Q, B, f1, f2, f, w, XL, XC, Z, I, phi,
+           UR: I * R, UL: I * XL, UC: I * XC };       // Spannungs-Scheitelwerte
+}
+
+/* ---------- 4. DOM-Referenzen ---------- */
+const $ = id => document.getElementById(id);
+const circuitCv = $("circuitCv"), scopeCv = $("scopeCv"),
+      resoCv = $("resoCv"), phasorCv = $("phasorCv");
+
+/* ---------- 5. Schieberegler: Werte einlesen ---------- */
+/* Logarithmische Regler: Slider 0..1000 wird exponentiell auf Bereich abgebildet */
+$("slR").addEventListener("input", e => { R  = Math.pow(10, 3 * e.target.value / 1000); updateLabels(); });
+$("slL").addEventListener("input", e => { L  = Math.pow(10, -6 + 6 * e.target.value / 1000); updateLabels(); });
+$("slC").addEventListener("input", e => { C  = Math.pow(10, -12 + 6 * e.target.value / 1000); updateLabels(); });
+$("slF").addEventListener("input", e => { fDec = F_DEC_MIN + 3 * e.target.value / 1000; updateLabels(); });
+$("slU").addEventListener("input", e => { Uh = 0.1 + 9.9 * e.target.value / 1000; updateLabels(); });
+
+/* Presets: Frequenz relativ zu f₀ setzen */
+function setFDec(d) { fDec = d; $("slF").value = (d - F_DEC_MIN) / 3 * 1000; updateLabels(); }
+$("pRes").addEventListener("click",  () => setFDec(0));
+$("pLow").addEventListener("click",  () => setFDec(-1));
+$("pHigh").addEventListener("click", () => setFDec(1));
+
+/* Anzeige der Regler-Werte aktualisieren */
+function updateLabels() {
+  const c = computeCircuit();
+  $("vR").textContent = si(R, "Ω");
+  $("vL").textContent = si(L, "H");
+  $("vC").textContent = si(C, "F");
+  $("vF").textContent = si(c.f, "Hz");
+  $("vU").textContent = trim3(Uh) + " V";
+  // statische Messwerte
+  $("mF0").textContent = si(c.f0, "Hz");
+  $("mQ").textContent  = trim3(c.Q);
+  $("mB").textContent  = si(c.B, "Hz");
+  $("mI").textContent  = si(c.I / Math.SQRT2, "A");
+  $("mUR").textContent = si(c.UR / Math.SQRT2, "V");
+  $("mUL").textContent = si(c.UL / Math.SQRT2, "V");
+  $("mUC").textContent = si(c.UC / Math.SQRT2, "V");
+  $("mZ").textContent  = si(c.Z, "Ω");
+  // Resonanz-Badge
+  const badge = $("resBadge");
+  const nearRes = Math.abs(c.XL - c.XC) < R;   // „im Durchlassbereich"
+  badge.classList.toggle("on", nearRes);
+  badge.textContent = T.resBadge[lang];
+}
+
+/* ---------- 6. Schaltplan zeichnen ---------- */
+/* Layout-Konstanten des Schaltplans (Basisgröße 900×470, wird skaliert) */
+const CW = 900, CH = 470;
+const TOP = 120, BOT = 350;                // y-Position der oberen/unteren Leitung
+const SRC = { x: 100, y: 235, r: 40 };     // Quelle links
+const R_X1 = 200, R_X2 = 310;              // Widerstand oben links
+const L_X1 = 350, L_X2 = 470;              // Spule oben Mitte
+const C_X  = 530, C_GAP = 26;              // Kondensator oben rechts
+const RIGHT_X = 790;                       // rechte Vertikalleitung
+
+/* Punktliste des Strompfads (für die Elektronen-Animation) */
+function buildLoopPath() {
+  const pts = [
+    [SRC.x, SRC.y - SRC.r], [SRC.x, TOP],
+    [RIGHT_X, TOP], [RIGHT_X, BOT], [SRC.x, BOT], [SRC.x, SRC.y + SRC.r]
+  ];
+  // Teilstreckenlängen aufsummieren
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  }
+  return { pts, cum, len: cum[cum.length - 1] };
+}
+const LOOP = buildLoopPath();
+
+/* Position auf dem Pfad im Abstand s (girlandenförmig) */
+function pointAt(s) {
+  s = ((s % LOOP.len) + LOOP.len) % LOOP.len;
+  let i = 1;
+  while (i < LOOP.cum.length - 1 && LOOP.cum[i] < s) i++;
+  const t = (s - LOOP.cum[i - 1]) / (LOOP.cum[i] - LOOP.cum[i - 1]);
+  const a = LOOP.pts[i - 1], b = LOOP.pts[i];
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+}
+
+function drawCircuit(c) {
+  const { ctx, w, h } = fitCanvas(circuitCv, Math.max(300, w0() * CH / CW));
+  const s = Math.min(w / CW, h / CH);      // gleichmäßige Skalierung
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.translate((w - CW * s) / 2, (h - CH * s) / 2);
+  ctx.scale(s, s);
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+
+  /* ---- Leitungen ---- */
+  ctx.strokeStyle = "#8b949e";
+  ctx.beginPath();
+  ctx.moveTo(SRC.x, SRC.y - SRC.r); ctx.lineTo(SRC.x, TOP);
+  ctx.lineTo(RIGHT_X, TOP);
+  ctx.moveTo(RIGHT_X, TOP); ctx.lineTo(RIGHT_X, BOT);
+  ctx.lineTo(SRC.x, BOT); ctx.lineTo(SRC.x, SRC.y + SRC.r);
+  ctx.stroke();
+
+  /* ---- AC-Quelle (Kreis mit Sinus) ---- */
+  ctx.strokeStyle = getCss("--src-col");
+  ctx.beginPath(); ctx.arc(SRC.x, SRC.y, SRC.r, 0, TWO_PI); ctx.stroke();
+  // eingezeichnete Momentanspannung als Sinus im Kreis
+  ctx.beginPath();
+  for (let i = 0; i <= 40; i++) {
+    const a = i / 40 * TWO_PI;
+    const rr = SRC.r * 0.55 + 8 * Math.sin(2 * a + c.w * simT);
+    const x = SRC.x + rr * Math.cos(a), y = SRC.y + rr * Math.sin(a);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = getCss("--src-col");
+  ctx.font = "600 22px Consolas, monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("u", SRC.x, SRC.y - SRC.r - 14);
+
+  /* ---- Widerstand R (Rechteck) ---- */
+  ctx.strokeStyle = getCss("--r-col");
+  ctx.strokeRect(R_X1, TOP - 20, R_X2 - R_X1, 40);
+  ctx.fillStyle = getCss("--r-col");
+  ctx.fillText("R", (R_X1 + R_X2) / 2, TOP);
+  ctx.font = "15px Consolas, monospace";
+  ctx.fillText(si(R, "Ω"), (R_X1 + R_X2) / 2, TOP + 34);
+  ctx.font = "600 22px Consolas, monospace";
+
+  /* ---- Spule L (vier Bögen) + Fluss-Pendel ---- */
+  ctx.strokeStyle = getCss("--l-col");
+  const arcR = (L_X2 - L_X1) / 8;
+  for (let i = 0; i < 4; i++) {
+    const cx = L_X1 + arcR + i * 2 * arcR;
+    ctx.beginPath(); ctx.arc(cx, TOP, arcR, Math.PI, 0); ctx.stroke();
+  }
+  ctx.fillStyle = getCss("--l-col");
+  ctx.fillText("L", (L_X1 + L_X2) / 2, TOP - 40);
+  ctx.font = "15px Consolas, monospace";
+  ctx.fillText(si(L, "H"), (L_X1 + L_X2) / 2, TOP + 34);
+  ctx.font = "600 22px Consolas, monospace";
+  /* Pendel-Visualisierung des magnetischen Flusses:
+     Auslenkung folgt dem Fluss (um 90° gegenüber dem Strom verschoben) */
+  const flux = Math.sin(c.w * simT - Math.PI / 2);
+  const px = (L_X1 + L_X2) / 2, py = TOP - 78;
+  ctx.strokeStyle = "#6e7681"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(px, py - 16); ctx.lineTo(px + 26 * flux, py + 8); ctx.stroke();
+  ctx.fillStyle = getCss("--l-col");
+  ctx.beginPath(); ctx.arc(px + 26 * flux, py + 12, 5, 0, TWO_PI); ctx.fill();
+  // Feldlinien-Bogen um die Spule, Intensität ~ |Fluss|
+  ctx.globalAlpha = 0.25 + 0.5 * Math.abs(flux);
+  ctx.beginPath(); ctx.arc((L_X1 + L_X2) / 2, TOP, 52, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  ctx.globalAlpha = 1; ctx.lineWidth = 2.2;
+
+  /* ---- Kondensator C (Platten) + Ladungs-Pendel ---- */
+  ctx.strokeStyle = getCss("--c-col");
+  ctx.beginPath();
+  ctx.moveTo(C_X, TOP - 26); ctx.lineTo(C_X, TOP + 26);
+  ctx.moveTo(C_X + C_GAP, TOP - 26); ctx.lineTo(C_X + C_GAP, TOP + 26);
+  ctx.stroke();
+  ctx.fillStyle = getCss("--c-col");
+  ctx.fillText("C", C_X + C_GAP / 2, TOP - 40);
+  ctx.font = "15px Consolas, monospace";
+  ctx.fillText(si(C, "F"), C_X + C_GAP / 2, TOP + 40);
+  ctx.font = "600 22px Consolas, monospace";
+  /* Plattenladung q(t): proportional zu u_C (Strom eilt um 90° vor) */
+  const q = Math.sin(c.w * simT - Math.PI / 2);     // Ladung auf linker Platte
+  const nPack = Math.round(6 * Math.abs(q));
+  for (let i = 0; i < nPack; i++) {
+    const off = (i - (nPack - 1) / 2) * 9;
+    ctx.fillStyle = q >= 0 ? "#ff7b72" : "#79c0ff";   // rot = +, blau = −
+    ctx.font = "600 13px Consolas, monospace";
+    ctx.fillText(q >= 0 ? "+" : "−", C_X - 12, TOP + off);
+    ctx.fillText(q >= 0 ? "−" : "+", C_X + C_GAP + 12, TOP + off);
+  }
+  ctx.font = "600 22px Consolas, monospace";
+
+  /* ---- Strommesser unten ---- */
+  ctx.strokeStyle = getCss("--i-col");
+  ctx.beginPath(); ctx.arc(445, BOT, 20, 0, TWO_PI); ctx.stroke();
+  ctx.fillStyle = getCss("--i-col");
+  ctx.fillText("A", 445, BOT);
+
+  /* ---- Elektronen: Verschiebungswelle entlang des Pfads ----
+     Jedes Elektron schwingt um seine Ruhelage; die Phase läuft als Welle
+     einmal pro Umlauf um den Kreis (Signaltransport von der Quelle aus). */
+  const nEl = 46;
+  const amp = Math.min(26, 6 + 30 * c.I);            // Auslenkung ~ Strom
+  for (let i = 0; i < nEl; i++) {
+    const s0 = i / nEl * LOOP.len;
+    const d = amp * Math.sin(c.w * simT - TWO_PI * s0 / LOOP.len);
+    const [x, y] = pointAt(s0 + d);
+    const glow = 0.35 + 0.65 * Math.abs(Math.sin(c.w * simT));
+    ctx.fillStyle = `rgba(57,197,207,${glow})`;
+    ctx.beginPath(); ctx.arc(x, y, 3.2, 0, TWO_PI); ctx.fill();
+  }
+
+  /* ---- Spannungs-Messpfeile über den Bauteilen ----
+     Länge ~ Momentanwert (begrenzt); bei Resonanz leuchten U_L, U_C. */
+  const resGlow = Math.abs(c.XL - c.XC) < R;         // „im Durchlassbereich"
+  drawVArrow(ctx, (R_X1 + R_X2) / 2, TOP, c.UR, Math.sin(c.w * simT),
+             getCss("--r-col"), false);
+  drawVArrow(ctx, (L_X1 + L_X2) / 2, TOP - 62, c.UL, Math.sin(c.w * simT + Math.PI / 2),
+             getCss("--l-col"), resGlow && c.Q > 2);
+  drawVArrow(ctx, C_X + C_GAP / 2, TOP - 62, c.UC, Math.sin(c.w * simT - Math.PI / 2),
+             getCss("--c-col"), resGlow && c.Q > 2);
+
+  ctx.restore();
+}
+
+/* Vertikaler Pfeil als Spannungsanzeige (nach oben = positiver Momentanwert) */
+function drawVArrow(ctx, x, yBase, uPeak, inst, col, glow) {
+  const maxLen = 40;
+  const rel = uPeak > 0 ? inst / uPeak * Math.min(1, uPeak / (Uh || 1)) : 0;
+  const len = Math.max(-maxLen, Math.min(maxLen, rel * maxLen));
+  if (Math.abs(len) < 1) return;
+  ctx.save();
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3;
+  if (glow) { ctx.shadowColor = col; ctx.shadowBlur = 18; }
+  const yTip = yBase - 12 - len;
+  ctx.beginPath();
+  ctx.moveTo(x, yBase - 12);
+  ctx.lineTo(x, yTip);
+  ctx.stroke();
+  // Pfeilspitze: zeigt vom Schaftende zur Spitze
+  const dir = len > 0 ? -1 : 1;              // -1 = Spitze oben, +1 = unten
+  ctx.beginPath();
+  ctx.moveTo(x, yTip);
+  ctx.lineTo(x - 6, yTip + dir * 11);
+  ctx.lineTo(x + 6, yTip + dir * 11);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function w0() { return circuitCv.clientWidth; }
+
+/* ---------- 7. Oszilloskop: u(t) und i(t) ---------- */
+function drawScope(c) {
+  const cssH = 230;
+  const { ctx, w, h } = fitCanvas(scopeCv, cssH);
+  ctx.clearRect(0, 0, w, h);
+  const padL = 44, padR = 12, padT = 30, padB = 24;
+  const pw = w - padL - padR, ph = h - padT - padB;
+
+  const Tper = 1 / c.f;
+  const tWin = 3 * Tper;                             // Fenster: 3 Perioden
+  const tEnd = simT;
+  /* Normierte Darstellung: beide Spuren werden auf ihren Scheitelwert
+     skaliert und deckungsgleich auf 80 % der halben Höhe gezeichnet –
+     so ist die Phasenlage direkt vergleichbar, ohne über den Rand zu laufen. */
+  const yAmp = ph / 2 * 0.8;
+
+  /* Raster */
+  ctx.strokeStyle = "#21262d"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 6; i++) {
+    ctx.beginPath(); ctx.moveTo(padL + i * pw / 6, padT); ctx.lineTo(padL + i * pw / 6, padT + ph); ctx.stroke();
+  }
+  for (let i = 0; i <= 4; i++) {
+    ctx.beginPath(); ctx.moveTo(padL, padT + i * ph / 4); ctx.lineTo(padL + pw, padT + i * ph / 4); ctx.stroke();
+  }
+  /* Nulllinie */
+  ctx.strokeStyle = "#30363d";
+  ctx.beginPath(); ctx.moveTo(padL, padT + ph / 2); ctx.lineTo(padL + pw, padT + ph / 2); ctx.stroke();
+
+  /* Spannung u(t) = Û·sin(ωt) */
+  ctx.strokeStyle = getCss("--src-col"); ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let x = 0; x <= pw; x++) {
+    const t = tEnd - tWin + x / pw * tWin;
+    const y = padT + ph / 2 - yAmp * Math.sin(c.w * t);
+    x ? ctx.lineTo(padL + x, y) : ctx.moveTo(padL + x, y);
+  }
+  ctx.stroke();
+
+  /* Strom i(t) = Î·sin(ωt − φ); bei Resonanz φ = 0 → phasengleich */
+  ctx.strokeStyle = getCss("--i-col"); ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let x = 0; x <= pw; x++) {
+    const t = tEnd - tWin + x / pw * tWin;
+    const y = padT + ph / 2 - yAmp * Math.sin(c.w * t - c.phi);
+    x ? ctx.lineTo(padL + x, y) : ctx.moveTo(padL + x, y);
+  }
+  ctx.stroke();
+
+  /* Momentanwert-Marker am rechten Rand */
+  ctx.strokeStyle = "#6e7681"; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(padL + pw, padT); ctx.lineTo(padL + pw, padT + ph); ctx.stroke();
+  ctx.setLineDash([]);
+
+  /* Beschriftung */
+  ctx.fillStyle = "#8b949e"; ctx.font = "12px Consolas, monospace"; ctx.textAlign = "left";
+  ctx.fillText(T.scopeTitle[lang], padL, 18);
+  ctx.fillStyle = getCss("--src-col");
+  ctx.fillText("— " + T.uTrace[lang] + "  (Û = " + si(Uh, "V") + ")", padL + 8, padT + 14);
+  ctx.fillStyle = getCss("--i-col");
+  ctx.fillText("— " + T.iTrace[lang] + "  (Î = " + si(c.I, "A") + ")", padL + 8, padT + 30);
+  ctx.fillStyle = "#8b949e"; ctx.textAlign = "right";
+  ctx.fillText("Δt = 3 T", padL + pw, padT + 14);
+  /* Hinweis Phasenlage */
+  const phaseDeg = c.phi * 180 / Math.PI;
+  ctx.fillText("φ(u,i) = " + phaseDeg.toFixed(0) + "°", padL + pw, padT + 30);
+}
+
+/* ---------- 8. Resonanzkurve I(f) ---------- */
+function drawResonance(c) {
+  const cssH = 230;
+  const { ctx, w, h } = fitCanvas(resoCv, cssH);
+  ctx.clearRect(0, 0, w, h);
+  const padL = 50, padR = 14, padT = 28, padB = 30;
+  const pw = w - padL - padR, ph = h - padT - padB;
+
+  const fMin = c.f0 * Math.pow(10, F_DEC_MIN);
+  const fMax = c.f0 * Math.pow(10, F_DEC_MAX);
+  const Imax = Uh / R;                                // Strommaximum bei f₀
+  const iDiv = niceCeil(Imax * 1.15 / 3);
+  const yMax = iDiv * 3;
+  const X  = f => padL + (Math.log10(f) - Math.log10(fMin)) / (Math.log10(fMax) - Math.log10(fMin)) * pw;
+  const Y  = i => padT + ph - i / yMax * ph;
+
+  /* Bandbreiten-Schirmung zwischen f₁ und f₂ */
+  const bx1 = Math.max(padL, X(Math.max(c.f1, fMin)));
+  const bx2 = Math.min(padL + pw, X(Math.min(c.f2, fMax)));
+  if (bx2 > bx1) {
+    ctx.fillStyle = "rgba(247,120,186,0.08)";
+    ctx.fillRect(bx1, padT, bx2 - bx1, ph);
+  }
+
+  /* Raster + logarithmische f-Achse */
+  ctx.strokeStyle = "#21262d"; ctx.lineWidth = 1; ctx.font = "11px Consolas, monospace";
+  for (let d = -2; d <= 2; d++) {
+    const f = c.f0 * Math.pow(10, d / 2);
+    if (f < fMin || f > fMax) continue;
+    ctx.beginPath(); ctx.moveTo(X(f), padT); ctx.lineTo(X(f), padT + ph); ctx.stroke();
+    ctx.fillStyle = "#8b949e"; ctx.textAlign = "center";
+    ctx.fillText(si(f, "Hz"), X(f), padT + ph + 16);
+  }
+  ctx.textAlign = "right";
+  for (let i = 0; i <= 3; i++) {
+    ctx.beginPath(); ctx.moveTo(padL, padT + ph - i * ph / 3); ctx.lineTo(padL + pw, padT + ph - i * ph / 3); ctx.stroke();
+    ctx.fillText(si(iDiv * i, "A"), padL - 5, padT + ph - i * ph / 3 + 4);
+  }
+
+  /* Kurve I(f) = Û / √ (R² + (ωL − 1/ωC)²) */
+  ctx.strokeStyle = getCss("--i-col"); ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  let started = false;
+  for (let x = 0; x <= pw; x++) {
+    const f = Math.pow(10, Math.log10(fMin) + x / pw * (Math.log10(fMax) - Math.log10(fMin)));
+    const w = TWO_PI * f;
+    const I = Uh / Math.sqrt(R * R + (w * L - 1 / (w * C)) ** 2);
+    const y = Y(I);
+    started ? ctx.lineTo(padL + x, y) : ctx.moveTo(padL + x, y);
+    started = true;
+  }
+  ctx.stroke();
+
+  /* Markierungen: f₀ oben, f₁/f₂ unten; bei zu geringem Abstand
+     (hohe Güte) werden die f₁/f₂-Beschriftungen weggelassen */
+  ctx.lineWidth = 1.5;
+  const mark = (f, col, lbl, below) => {
+    if (f < fMin || f > fMax) return;
+    ctx.strokeStyle = col; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(X(f), padT); ctx.lineTo(X(f), padT + ph); ctx.stroke();
+    ctx.setLineDash([]);
+    if (!lbl) return;
+    ctx.fillStyle = col; ctx.textAlign = "center";
+    ctx.fillText(lbl, X(f), below ? padT + ph + 28 : padT - 6);
+  };
+  const tight = Math.abs(X(c.f2) - X(c.f1)) < 24;
+  mark(c.f1, "#8b949e", tight ? "" : "f₁", true);
+  mark(c.f0, getCss("--res-col"), "f₀", false);
+  mark(c.f2, "#8b949e", tight ? "" : "f₂", true);
+
+  /* Cursor an der aktuellen Frequenz */
+  const curI = c.I;
+  const cx = X(c.f), cy = Y(curI);
+  ctx.strokeStyle = getCss("--src-col"); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(cx, padT); ctx.lineTo(cx, padT + ph); ctx.stroke();
+  ctx.fillStyle = getCss("--src-col");
+  ctx.beginPath(); ctx.arc(cx, cy, 5, 0, TWO_PI); ctx.fill();
+  ctx.textAlign = cx > padL + pw * 0.75 ? "right" : "left";
+  ctx.fillText("I = " + si(curI, "A"), cx + (ctx.textAlign === "left" ? 8 : -8), cy - 8);
+
+  ctx.fillStyle = "#8b949e"; ctx.textAlign = "left";
+  ctx.fillText(T.resoTitle[lang], padL, 18);
+}
+
+/* ---------- 9. Zeigerdiagramm ---------- */
+function drawPhasor(c) {
+  const cssH = 260;
+  const { ctx, w, h } = fitCanvas(phasorCv, cssH);
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2 + 6;
+  const maxU = Math.max(c.UR, c.UL, c.UC, Uh, 1e-9);
+  const scale = Math.min(w, h) * 0.34 / maxU;
+
+  /* Achsenkreuz */
+  ctx.strokeStyle = "#21262d"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(20, cy); ctx.lineTo(w - 20, cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx, 30); ctx.lineTo(cx, h - 20); ctx.stroke();
+
+  /* Hilfe: Pfeil mit Beschriftung; lblDy verschiebt das Label senkrecht */
+  const arrow = (x1, y1, x2, y2, col, lbl, lblDy) => {
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    const a = Math.atan2(y2 - y1, x2 - x1);
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - 10 * Math.cos(a - 0.42), y2 - 10 * Math.sin(a - 0.42));
+    ctx.lineTo(x2 - 10 * Math.cos(a + 0.42), y2 - 10 * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+    ctx.font = "600 13px Consolas, monospace"; ctx.textAlign = "left";
+    ctx.fillText(lbl, x2 + 8 * Math.cos(a), y2 + 14 * Math.sin(a) + 4 + (lblDy || 0));
+  };
+  /* Strom-Zeiger als Referenz entlang +x (gedacht), U_R phasengleich zum Strom */
+  arrow(cx, cy, cx + c.UR * scale, cy, getCss("--r-col"), "U_R");
+  arrow(cx, cy, cx, cy - c.UL * scale, getCss("--l-col"), "U_L");
+  arrow(cx, cy, cx, cy + c.UC * scale, getCss("--c-col"), "U_C", 14);
+  /* Resultierende Quellspannung (gestricheltes Kräfteparallelogramm) */
+  const resY = cy + (c.UC - c.UL) * scale;
+  ctx.save();
+  ctx.strokeStyle = getCss("--src-col");
+  ctx.setLineDash([6, 4]); ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy); ctx.lineTo(cx + c.UR * scale, cy);
+  ctx.lineTo(cx + c.UR * scale, resY); ctx.lineTo(cx, resY);
+  ctx.stroke();
+  ctx.restore();
+  arrow(cx, cy, cx + c.UR * scale, resY, getCss("--src-col"), "U", 14);
+
+  /* Erläuterung */
+  ctx.fillStyle = "#8b949e"; ctx.font = "12px Consolas, monospace"; ctx.textAlign = "left";
+  ctx.fillText(T.phasorTitle[lang], 12, 18);
+  ctx.fillStyle = getCss("--res-col");
+  ctx.fillText(T.resHint[lang], 12, h - 7);
+}
+
+/* ---------- 10. CSS-Farbwert lesen ---------- */
+function getCss(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/* ---------- 11. Sprachumschaltung DE/EN ---------- */
+$("langBtn").addEventListener("click", () => {
+  lang = lang === "de" ? "en" : "de";
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-de]").forEach(el => { el.textContent = el.dataset[lang]; });
+  $("langBtn").textContent = lang === "de" ? "EN" : "DE";
+  updateLabels();
+});
+
+/* ---------- 12. Haupt-Schleife (ca. 60 FPS) ---------- */
+let lastTs = performance.now(), uiAcc = 0;
+function frame(ts) {
+  const dt = Math.min(0.05, (ts - lastTs) / 1000);   // s, gegen Tab-Rücksprung gedrosselt
+  lastTs = ts;
+  simT += dt;
+  const c = computeCircuit();
+
+  drawCircuit(c);
+  drawScope(c);
+  drawResonance(c);
+  drawPhasor(c);
+
+  /* Momentanwerte in den Instrumenten + Bildunterschriften (20×/s) */
+  uiAcc += dt;
+  if (uiAcc > 0.05) {
+    uiAcc = 0;
+    const wt = c.w * simT;
+    $("instR").textContent = trim3(c.UR * Math.sin(wt)) + " V";
+    $("instL").textContent = trim3(c.UL * Math.sin(wt + Math.PI / 2)) + " V";
+    $("instC").textContent = trim3(c.UC * Math.sin(wt - Math.PI / 2)) + " V";
+    $("instI").textContent = trim3(c.I * Math.sin(wt - c.phi)) + " A";
+    setCap("scopeLbl",  T.scopeCap[lang](si(Uh, "V"), si(c.I, "A")));
+    setCap("resoLbl",   T.resoCap[lang](si(c.B, "Hz"), si(c.f1, "Hz"), si(c.f2, "Hz")));
+    setCap("phasorLbl", T.phasorCap[lang](si(Math.max(c.UR, c.UL, c.UC), "V")));
+  }
+  requestAnimationFrame(frame);
+}
+
+/* Beschriftung nur bei Änderung austauschen (vermeidet DOM-Churn) */
+function setCap(id, txt) {
+  const el = $(id);
+  if (el.textContent !== txt) el.textContent = txt;
+}
+
+/* Start */
+updateLabels();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

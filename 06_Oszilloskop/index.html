@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSO-Simulation – Digitales Speicheroszilloskop</title>
+<style>
+  /* ============ Grunddesign (Palette wie 04_Kondensator_Wechselstrom) ============ */
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel2: #1c2330;
+    --grid: #30363d;
+    --text: #c9d1d9;
+    --text-dim: #8b949e;
+    --yellow: #e3b341;
+    --cyan: #58a6ff;
+    --magenta: #bc8cff;
+    --green: #3fb950;
+    --red: #f85149;
+    --border: #30363d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px; }
+  body { padding: 10px; max-width: 1900px; margin: 0 auto; }
+
+  header {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 12px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 10px;
+  }
+  header h1 { font-size: 17px; font-weight: 600; color: var(--yellow); margin-right: auto; }
+  header .hint { color: var(--text-dim); font-size: 12px; }
+
+  button {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 13px;
+  }
+  button:hover { border-color: var(--yellow); }
+  button.active { background: var(--yellow); color: #0d1117; font-weight: 600; }
+  button.danger.active { background: var(--red); color: #fff; }
+
+  select, input[type="number"] {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 3px 6px; font-size: 12px; max-width: 100%;
+  }
+  input[type="range"] { accent-color: var(--yellow); width: 100%; }
+  input[type="checkbox"] { accent-color: var(--yellow); }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px; margin-bottom: 10px;
+  }
+  .card h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-dim); margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 5px;
+  }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .row label { flex: 0 0 96px; color: var(--text-dim); font-size: 12px; }
+  .row select, .row input[type="number"] { flex: 1; min-width: 0; }
+  .row .val { flex: 0 0 64px; text-align: right; font-family: Consolas, monospace; font-size: 12px; color: var(--yellow); }
+  .row input[type="range"] { flex: 1; min-width: 0; }
+  .chk { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); margin-right: 12px; }
+
+  /* ============ Haupt-Grid: 3 Spalten ============ */
+  #mainGrid {
+    display: grid; grid-template-columns: 300px minmax(0, 1fr) 300px; gap: 10px;
+    align-items: start;
+  }
+  canvas { display: block; width: 100%; background: #0a0e14; border-radius: 6px; }
+  #scopeCanvas { aspect-ratio: 10 / 8; }
+  #fftCanvas  { aspect-ratio: 10 / 3.2; margin-top: 8px; }
+  #blockCanvas{ aspect-ratio: 10 / 2.6; margin-top: 8px; }
+  #electronCanvas { aspect-ratio: 10 / 3.4; margin-top: 8px; }
+  #lissaCanvas{ aspect-ratio: 1 / 1; }
+
+  /* Messwerte-Tabelle */
+  table.meas { width: 100%; border-collapse: collapse; font-family: Consolas, monospace; font-size: 12px; }
+  table.meas td { padding: 3px 4px; border-bottom: 1px solid #21262d; }
+  table.meas td:first-child { color: var(--text-dim); }
+  table.meas td:last-child { text-align: right; color: var(--yellow); }
+  .ch1c { color: var(--yellow) !important; }
+  .ch2c { color: var(--cyan) !important; }
+
+  #aliasWarn {
+    display: none; color: #fff; background: var(--red); border-radius: 5px;
+    padding: 4px 8px; font-size: 12px; font-weight: 600; margin-top: 6px; text-align: center;
+  }
+  #aliasWarn.on { display: block; animation: blink 0.6s step-start infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+
+  /* ============ Bedienfeld ============ */
+  #ctrlPanel {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px;
+    margin-bottom: 10px;
+  }
+  .btnrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  /* ============ Erklärbereich ============ */
+  #explain h2 { color: var(--yellow); font-size: 15px; margin: 14px 0 6px; }
+  #explain p { line-height: 1.55; margin-bottom: 8px; color: var(--text); }
+  #explain .lead { color: var(--text-dim); font-size: 12px; }
+
+  footer { color: var(--text-dim); font-size: 11px; text-align: center; padding: 10px; }
+
+  @media (max-width: 1200px) {
+    #mainGrid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="uiTitle">Digitales Speicheroszilloskop (DSO) – Simulation</h1>
+  <span class="hint" id="uiSpaceHint">Leertaste = Run/Stop</span>
+  <button id="btnRun" class="active">■ Run</button>
+  <button id="btnSingle">Single</button>
+  <button id="btnAutoset">Autoset</button>
+  <button id="langToggle">EN</button>
+</header>
+
+<!-- ==================== Hauptbereich: 3 synchronisierte Szenen ==================== -->
+<div id="mainGrid">
+
+  <!-- ---------- Links: Signalquelle & Messobjekt ---------- -->
+  <div>
+    <div class="card">
+      <h2 id="uiGenTitle">Signalgenerator</h2>
+      <div class="btnrow" style="margin-bottom:8px">
+        <button id="genTarget1" class="active">CH1</button>
+        <button id="genTarget2">CH2</button>
+        <span style="color:var(--text-dim);font-size:11px" id="uiGenHint">Quelle für Kanal wählen</span>
+      </div>
+      <div class="row"><label id="uiWave">Signalform</label>
+        <select id="genWave">
+          <option value="sine">Sinus</option>
+          <option value="square">Rechteck</option>
+          <option value="triangle">Dreieck</option>
+          <option value="sawtooth">Sägezahn</option>
+          <option value="noise">Rauschen</option>
+          <option value="pulse">Puls</option>
+        </select>
+      </div>
+      <div class="row"><label id="uiFreq">Frequenz</label>
+        <input type="range" id="genFreq" min="0" max="1" step="0.0001" value="0.35">
+        <span class="val" id="genFreqVal">1 kHz</span>
+      </div>
+      <div class="row"><label id="uiAmp">Amplitude</label>
+        <input type="range" id="genAmp" min="0" max="1" step="0.0001" value="0.5">
+        <span class="val" id="genAmpVal">1 V</span>
+      </div>
+      <div class="row"><label id="uiOff">Offset</label>
+        <input type="range" id="genOff" min="-5" max="5" step="0.05" value="0">
+        <span class="val" id="genOffVal">0 V</span>
+      </div>
+      <div class="row" id="genDutyRow"><label id="uiDuty">Tastverhältnis</label>
+        <input type="range" id="genDuty" min="10" max="90" step="1" value="50">
+        <span class="val" id="genDutyVal">50 %</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 id="uiProbeTitle">Tastkopf, Leitung &amp; Eingang</h2>
+      <div class="row"><label class="ch1c">CH1</label>
+        <select id="probe1"><option value="10">10:1</option><option value="1">1:1</option></select>
+        <select id="imp1"><option value="1e6">1 MΩ</option><option value="50">50 Ω</option></select>
+      </div>
+      <div class="row"><label class="ch2c">CH2</label>
+        <select id="probe2"><option value="10">10:1</option><option value="1">1:1</option></select>
+        <select id="imp2"><option value="1e6">1 MΩ</option><option value="50">50 Ω</option></select>
+      </div>
+      <div class="row"><label id="uiCable">Leitungskapazität</label>
+        <input type="range" id="cableC" min="10" max="500" step="5" value="50">
+        <span class="val" id="cableCVal">50 pF</span>
+      </div>
+      <div class="row"><label id="uiCmess">C-Messung</label>
+        <button id="btnCMeas" style="flex:1" >C messen (τ = R·C)</button>
+        <span class="val" id="cMeasVal" style="flex:1">–</span>
+      </div>
+      <canvas id="electronCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- ---------- Mitte: Oszilloskop-Display ---------- -->
+  <div>
+    <div class="card">
+      <canvas id="scopeCanvas"></canvas>
+      <canvas id="fftCanvas"></canvas>
+      <canvas id="blockCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- ---------- Rechts: Messwerte & Phasenansicht ---------- -->
+  <div>
+    <div class="card">
+      <h2 id="uiMeasTitle">Messwerte (CH1)</h2>
+      <table class="meas">
+        <tr><td>Vpp</td><td id="mVpp">–</td></tr>
+        <tr><td>Vrms</td><td id="mVrms">–</td></tr>
+        <tr><td>Vmean</td><td id="mVmean">–</td></tr>
+        <tr><td>Vmax</td><td id="mVmax">–</td></tr>
+        <tr><td>Vmin</td><td id="mVmin">–</td></tr>
+        <tr><td id="uiMFreq">Frequenz</td><td id="mFreq">–</td></tr>
+        <tr><td id="uiMPeriod">Periode</td><td id="mPeriod">–</td></tr>
+        <tr><td>Duty</td><td id="mDuty">–</td></tr>
+        <tr><td id="uiMRise">Anstiegszeit</td><td id="mRise">–</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h2 id="uiCursorTitle">Cursor &amp; Bandbreite</h2>
+      <table class="meas">
+        <tr><td>Δt</td><td id="curDt">–</td></tr>
+        <tr><td>ΔV</td><td id="curDv">–</td></tr>
+        <tr><td>1/Δt</td><td id="curF">–</td></tr>
+        <tr><td id="uiBwLimit">BW-Grenze (−3 dB)</td><td id="bwLimit">–</td></tr>
+      </table>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:6px" id="uiCursorHint">
+        Cursor im Display mit der Maus ziehen (2× vertikal, 2× horizontal).
+      </div>
+    </div>
+    <div class="card">
+      <h2 id="uiLissaTitle">Zeigerdiagramm (Lissajous)</h2>
+      <label class="chk"><input type="checkbox" id="lissaToggle"> <span id="uiLissaHint">CH1 = X, CH2 = Y einblenden</span></label>
+      <div id="lissaBox" style="display:none">
+        <canvas id="lissaCanvas"></canvas>
+        <table class="meas" style="margin-top:6px">
+          <tr><td id="uiPhi">Phasenwinkel φ</td><td id="lissaPhi">–</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== Bedienfeld ==================== -->
+<div id="ctrlPanel">
+
+  <div class="card">
+    <h2 class="ch1c">Kanal 1</h2>
+    <div class="row"><label class="chk"><input type="checkbox" id="ch1On" checked> <span id="uiChOn">Ein</span></label>
+      <label class="chk"><input type="checkbox" id="inv1"> <span id="uiInv">Invertieren</span></label></div>
+    <div class="row"><label>Volt/Div</label><select id="voltsDiv1"></select></div>
+    <div class="row"><label id="uiPos">Position</label>
+      <input type="range" id="pos1" min="-4" max="4" step="0.1" value="0"><span class="val" id="pos1Val">0.0 Div</span></div>
+    <div class="row"><label id="uiCpl">Kopplung</label>
+      <select id="cpl1"><option value="dc">DC</option><option value="ac">AC</option><option value="gnd">GND</option></select></div>
+  </div>
+
+  <div class="card">
+    <h2 class="ch2c">Kanal 2</h2>
+    <div class="row"><label class="chk"><input type="checkbox" id="ch2On"> <span>Ein</span></label>
+      <label class="chk"><input type="checkbox" id="inv2"> <span>Invertieren</span></label></div>
+    <div class="row"><label>Volt/Div</label><select id="voltsDiv2"></select></div>
+    <div class="row"><label>Position</label>
+      <input type="range" id="pos2" min="-4" max="4" step="0.1" value="0"><span class="val" id="pos2Val">0.0 Div</span></div>
+    <div class="row"><label>Kopplung</label>
+      <select id="cpl2"><option value="dc">DC</option><option value="ac">AC</option><option value="gnd">GND</option></select></div>
+  </div>
+
+  <div class="card">
+    <h2 id="uiTimeTitle">Zeitbasis &amp; Erfassung</h2>
+    <div class="row"><label>Time/Div</label><select id="timeDiv"></select></div>
+    <div class="row"><label id="uiMode">Modus</label>
+      <select id="modeRoll"><option value="yt">Y-T</option><option value="roll">Roll</option></select></div>
+    <div class="row"><label id="uiFs">Abtastrate</label>
+      <input type="range" id="acqFs" min="0" max="1" step="0.001" value="0.3"><span class="val" id="acqFsVal">–</span></div>
+    <div class="row"><label id="uiBits">ADC-Auflösung</label>
+      <select id="adcBits"><option value="8">8 Bit</option><option value="12">12 Bit</option></select></div>
+    <div class="row"><label id="uiMem">Speichertiefe</label>
+      <select id="memDepth"><option value="1000">1 k</option><option value="10000" selected>10 k</option><option value="100000">100 k</option></select></div>
+    <div id="aliasWarn">⚠ ALIASING – Abtastrate zu niedrig (fs &lt; 2·fmax)</div>
+  </div>
+
+  <div class="card">
+    <h2 id="uiTrigTitle">Trigger</h2>
+    <div class="row"><label id="uiTMode">Modus</label>
+      <select id="trigMode"><option value="auto">Auto</option><option value="normal">Normal</option><option value="single">Single</option></select></div>
+    <div class="row"><label id="uiTSrc">Quelle</label>
+      <select id="trigSrc"><option value="ch1">CH1</option><option value="ch2">CH2</option><option value="ext">Ext</option></select></div>
+    <div class="row"><label id="uiTSlope">Flanke</label>
+      <select id="trigSlope"><option value="rise" id="uiRise">steigend</option><option value="fall" id="uiFallOpt">fallend</option></select></div>
+    <div class="row"><label id="uiTCpl">Kopplung</label>
+      <select id="trigCpl"><option value="dc">DC</option><option value="ac">AC</option><option value="hf">HF-Reject</option></select></div>
+    <div class="row"><label id="uiTLevel">Pegel</label>
+      <input type="range" id="trigLevel" min="-4" max="4" step="0.05" value="0"><span class="val" id="trigLevelVal">0 V</span></div>
+  </div>
+
+  <div class="card">
+    <h2 id="uiMathTitle">Mathematik</h2>
+    <div class="row"><label>f(t)</label>
+      <select id="mathSel">
+        <option value="off">Aus</option>
+        <option value="plus">CH1 + CH2</option>
+        <option value="minus">CH1 − CH2</option>
+        <option value="mult">CH1 × CH2</option>
+        <option value="fft">FFT(CH1)</option>
+        <option value="int">∫ CH1 dt</option>
+        <option value="diff">d/dt CH1</option>
+      </select></div>
+    <div class="row"><label id="uiPers">Nachleuchten</label>
+      <input type="range" id="persistence" min="0" max="5" step="0.1" value="0"><span class="val" id="persVal">0 s</span></div>
+    <div class="row"><label class="chk"><input type="checkbox" id="sampleHold"> <span id="uiSH">Sample &amp; Hold-Punkte</span></label></div>
+  </div>
+</div>
+
+<!-- ==================== Erklärbereich ==================== -->
+<div class="card" id="explain">
+  <h2 data-i18n="ex1h">Grundprinzip</h2>
+  <p data-i18n="ex1">Ein Oszilloskop zeigt die Spannung über der Zeit als Graphen. Der Elektronenstrahl (historisch) bzw. die Abtastung (digital) zeichnet die Kurve. Der Trigger sorgt für ein stehendes Bild, indem er die Darstellung immer am gleichen Punkt des Signals startet.</p>
+  <h2 data-i18n="ex2h">Abtastung und Nyquist-Theorem</h2>
+  <p data-i18n="ex2">Das digitale Oszilloskop nimmt diskrete Werte (Samples) auf. Nach Shannon/Nyquist muss die Abtastrate mindestens doppelt so hoch sein wie die Signalfrequenz. Bei Unterschreitung entsteht Aliasing – das Signal erscheint mit einer falschen, niedrigeren Frequenz (Unterabtastung). Hochwertige Oszilloskope verwenden eine Abtastrate von 2,5× bis 5× der Bandbreite.</p>
+  <h2 data-i18n="ex3h">AC/DC-Kopplung und Bandbreite</h2>
+  <p data-i18n="ex3">DC-Kopplung zeigt das Signal wie es ist (inkl. Gleichspannungsanteil). AC-Kopplung blockiert den Gleichanteil über einen Kondensator – wichtig, um kleine Wechselanteile auf großem DC-Offset zu sehen. Die Bandbreite (z. B. 100 MHz) begrenzt die höchste darstellbare Frequenz; darüber wird das Signal gedämpft (Amplitude zu klein, Flanken verschliffen).</p>
+  <h2 data-i18n="ex4h">Triggerung</h2>
+  <p data-i18n="ex4">Ohne Trigger wandert das Bild. Der Trigger vergleicht das Signal mit einem Schwellenwert (Level) und startet die Darstellung bei einer definierten Flanke (steigend/fallend). Normal-Trigger zeigt nur bei einem Ereignis, Auto-Trigger zeigt auch ohne Trigger-Signal (für DC-Einstellung). Single-Shot erfasst einmalige Ereignisse.</p>
+  <h2 data-i18n="ex5h">Messungen und Cursor</h2>
+  <p data-i18n="ex5">Automatische Messungen (Vpp, Vrms, Frequenz) basieren auf Algorithmen über den gespeicherten Datenpunkten. Cursor erlauben manuelle Differenzmessungen: Δt für Zeit (und daraus Frequenz), ΔV für Spannung. Die Genauigkeit hängt von der vertikalen Auflösung (ADC-Bits) und der Zeitbasis ab.</p>
+  <h2 data-i18n="ex6h">Praxis und Fallstricke</h2>
+  <p data-i18n="ex6">Tastköpfe (1:1 vs. 10:1) und ihre Bandbreite; Erdung (Sicherheit, Masseschleifen); Aliasing-Erkennung (Verändern der Zeitbasis sollte das Bild nicht verändern); Eingangsimpedanz (1 MΩ vs. 50 Ω) und deren Einfluss auf das Messobjekt; Verwendung von Oszilloskopen in der Fehlersuche (Logik-Analyse, Signalintegrität, EMV).</p>
+</div>
+
+<footer>DSO-Simulation · vollständig clientseitig · eine einzige HTML-Datei · Canvas-Rendering</footer>
+
+<script>
+"use strict";
+/* =========================================================================
+   DSO-Simulation – einzelne HTML-Datei, kein Framework
+   Physikalischer Kern: echte diskrete Abtastung (Unterabtastung erzeugt
+   echtes Aliasing), Treppen-Quantisierung des ADC, Tiefpässe 1. Ordnung
+   für Bandbreite/Leitungskapazität, Hochpass für AC-Kopplung, Trigger-
+   Komparator, Cooley-Tukey-FFT über die gespeicherten Samples.
+   ========================================================================= */
+
+/* ==================== 1. Sprachwörterbuch (de/en) ==================== */
+let LANG = "de";
+const I18N = {
+  de: {
+    title: "Digitales Speicheroszilloskop (DSO) – Simulation",
+    spaceHint: "Leertaste = Run/Stop",
+    run: "■ Run", stop: "▶ Stopp", single: "Single", autoset: "Autoset",
+    genTitle: "Signalgenerator", genHint: "Quelle für Kanal wählen",
+    wave: "Signalform", freq: "Frequenz", amp: "Amplitude", off: "Offset", duty: "Tastverhältnis",
+    probeTitle: "Tastkopf, Leitung & Eingang", cable: "Leitungskapazität",
+    cmess: "C-Messung", cmessBtn: "C messen (τ = R·C)", cmessOn: "C-Messung AUS",
+    measTitle: "Messwerte (CH1)", cursorTitle: "Cursor & Bandbreite",
+    bwLimit: "BW-Grenze (−3 dB)", cursorHint: "Cursor im Display mit der Maus ziehen (2× vertikal, 2× horizontal).",
+    lissaTitle: "Zeigerdiagramm (Lissajous)", lissaHint: "CH1 = X, CH2 = Y einblenden", phi: "Phasenwinkel φ",
+    chOn: "Ein", inv: "Invertieren", pos: "Position", cpl: "Kopplung",
+    timeTitle: "Zeitbasis & Erfassung", mode: "Modus", yt: "Y-T", roll: "Roll",
+    fs: "Abtastrate", bits: "ADC-Auflösung", mem: "Speichertiefe",
+    aliasWarn: "⚠ ALIASING – Abtastrate zu niedrig (fs < 2·fmax)",
+    trigTitle: "Trigger", tMode: "Modus", tSrc: "Quelle", tSlope: "Flanke",
+    rise: "steigend", fall: "fallend", tCpl: "Kopplung", tLevel: "Pegel",
+    auto: "Auto", normal: "Normal", trigSingle: "Single",
+    mathTitle: "Mathematik", pers: "Nachleuchten", sh: "Sample & Hold-Punkte",
+    ex1h: "Grundprinzip",
+    ex1: "„Ein Oszilloskop zeigt die Spannung über der Zeit als Graphen. Der Elektronenstrahl (historisch) bzw. die Abtastung (digital) zeichnet die Kurve. Der Trigger sorgt für ein stehendes Bild, indem er die Darstellung immer am gleichen Punkt des Signals startet.“",
+    ex2h: "Abtastung und Nyquist-Theorem",
+    ex2: "„Das digitale Oszilloskop nimmt diskrete Werte (Samples) auf. Nach Shannon/Nyquist muss die Abtastrate mindestens doppelt so hoch sein wie die Signalfrequenz. Bei Unterschreitung entsteht Aliasing – das Signal erscheint mit einer falschen, niedrigeren Frequenz (Unterabtastung). Hochwertige Oszilloskope verwenden eine Abtastrate von 2,5× bis 5× der Bandbreite.“",
+    ex3h: "AC/DC-Kopplung und Bandbreite",
+    ex3: "„DC-Kopplung zeigt das Signal wie es ist (inkl. Gleichspannungsanteil). AC-Kopplung blockiert den Gleichanteil über einen Kondensator – wichtig, um kleine Wechselanteile auf großem DC-Offset zu sehen. Die Bandbreite (z. B. 100 MHz) begrenzt die höchste darstellbare Frequenz; darüber wird das Signal gedämpft (Amplitude zu klein, Flanken verschliffen).“",
+    ex4h: "Triggerung",
+    ex4: "„Ohne Trigger wandert das Bild. Der Trigger vergleicht das Signal mit einem Schwellenwert (Level) und startet die Darstellung bei einer definierten Flanke (steigend/fallend). Normal-Trigger zeigt nur bei einem Ereignis, Auto-Trigger zeigt auch ohne Trigger-Signal (für DC-Einstellung). Single-Shot erfasst einmalige Ereignisse.“",
+    ex5h: "Messungen und Cursor",
+    ex5: "„Automatische Messungen (Vpp, Vrms, Frequenz) basieren auf Algorithmen über den gespeicherten Datenpunkten. Cursor erlauben manuelle Differenzmessungen: Δt für Zeit (und daraus Frequenz), ΔV für Spannung. Die Genauigkeit hängt von der vertikalen Auflösung (ADC-Bits) und der Zeitbasis ab.“",
+    ex6h: "Praxis und Fallstricke",
+    ex6: "„Tastköpfe (1:1 vs. 10:1) und ihre Bandbreite; Erdung (Sicherheit, Masseschleifen); Aliasing-Erkennung (Verändern der Zeitbasis sollte das Bild nicht verändern); Eingangsimpedanz (1 MΩ vs. 50 Ω) und deren Einfluss auf das Messobjekt; Verwendung von Oszilloskopen in der Fehlersuche (Logik-Analyse, Signalintegrität, EMV).“",
+    fftTitle: "FFT(CH1) – Betrag, logarithmische Frequenzachse",
+    thd: "THD", peak: "Peak",
+    waiting: "Warte auf Trigger …", armed: "Armiert – warte auf Triggerereignis",
+    memLimit: "Speicherlimit", trigd: "getriggert",
+    extSrc: "Ext (1 kHz)", gndHint: "GND-Kopplung: 0-V-Bezug",
+    blockIn: "Eingang", blockCpl: "Kopplung", blockAmp: "Verstärker", blockADC: "ADC",
+    blockMem: "Speicher", blockDisp: "Display", blockTrig: "Trigger-Komparator",
+    electronHint: "Elektronen: Geschwindigkeit ∝ momentaner Strom",
+    cResult: "C ≈", cFail: "keine Flanke gefunden",
+    riseLabel: "Anstiegszeit", freqLabel: "Frequenz", periodLabel: "Periode",
+    dutyLabel: "Duty"
+  },
+  en: {
+    title: "Digital Storage Oscilloscope (DSO) – Simulation",
+    spaceHint: "Space = Run/Stop",
+    run: "■ Run", stop: "▶ Stop", single: "Single", autoset: "Autoset",
+    genTitle: "Signal Generator", genHint: "Select source for channel",
+    wave: "Waveform", freq: "Frequency", amp: "Amplitude", off: "Offset", duty: "Duty cycle",
+    probeTitle: "Probe, Cable & Input", cable: "Cable capacitance",
+    cmess: "C measurement", cmessBtn: "Measure C (τ = R·C)", cmessOn: "C measurement OFF",
+    measTitle: "Measurements (CH1)", cursorTitle: "Cursors & Bandwidth",
+    bwLimit: "BW limit (−3 dB)", cursorHint: "Drag cursors in the display (2 vertical, 2 horizontal).",
+    lissaTitle: "Phasor View (Lissajous)", lissaHint: "Show CH1 = X, CH2 = Y", phi: "Phase angle φ",
+    chOn: "On", inv: "Invert", pos: "Position", cpl: "Coupling",
+    timeTitle: "Timebase & Acquisition", mode: "Mode", yt: "Y-T", roll: "Roll",
+    fs: "Sample rate", bits: "ADC resolution", mem: "Memory depth",
+    aliasWarn: "⚠ ALIASING – sample rate too low (fs < 2·fmax)",
+    trigTitle: "Trigger", tMode: "Mode", tSrc: "Source", tSlope: "Slope",
+    rise: "rising", fall: "falling", tCpl: "Coupling", tLevel: "Level",
+    auto: "Auto", normal: "Normal", trigSingle: "Single",
+    mathTitle: "Math", pers: "Persistence", sh: "Sample & hold dots",
+    ex1h: "Basic Principle",
+    ex1: "“An oscilloscope shows voltage versus time as a graph. The electron beam (historically) or the sampling process (digitally) draws the curve. The trigger produces a stable image by always starting the acquisition at the same point of the signal.”",
+    ex2h: "Sampling and the Nyquist Theorem",
+    ex2: "“A digital oscilloscope records discrete values (samples). According to Shannon/Nyquist the sample rate must be at least twice the signal frequency. If it is lower, aliasing occurs – the signal appears at a false, lower frequency (undersampling). High-quality scopes use a sample rate of 2.5× to 5× the bandwidth.”",
+    ex3h: "AC/DC Coupling and Bandwidth",
+    ex3: "“DC coupling shows the signal as it is (including its DC component). AC coupling blocks the DC component via a capacitor – important for seeing small AC ripple on a large DC offset. The bandwidth (e.g. 100 MHz) limits the highest displayable frequency; beyond it the signal is attenuated (amplitude too small, edges smeared).”",
+    ex4h: "Triggering",
+    ex4: "“Without a trigger the image drifts. The trigger compares the signal with a threshold (level) and starts the acquisition on a defined edge (rising/falling). Normal trigger only displays on an event, auto trigger displays even without a trigger signal (for DC adjustment). Single-shot captures one-time events.”",
+    ex5h: "Measurements and Cursors",
+    ex5: "“Automatic measurements (Vpp, Vrms, frequency) are based on algorithms over the stored data points. Cursors allow manual difference measurements: Δt for time (and frequency from it), ΔV for voltage. Accuracy depends on the vertical resolution (ADC bits) and the timebase.”",
+    ex6h: "Practice and Pitfalls",
+    ex6: "“Probes (1:1 vs. 10:1) and their bandwidth; grounding (safety, ground loops); aliasing detection (changing the timebase should not change the image); input impedance (1 MΩ vs. 50 Ω) and its influence on the device under test; using oscilloscopes for troubleshooting (logic analysis, signal integrity, EMC).”",
+    fftTitle: "FFT(CH1) – magnitude, logarithmic frequency axis",
+    thd: "THD", peak: "Peak",
+    waiting: "Waiting for trigger …", armed: "Armed – waiting for trigger event",
+    memLimit: "memory limit", trigd: "triggered",
+    extSrc: "Ext (1 kHz)", gndHint: "GND coupling: 0 V reference",
+    blockIn: "Input", blockCpl: "Coupling", blockAmp: "Amplifier", blockADC: "ADC",
+    blockMem: "Memory", blockDisp: "Display", blockTrig: "Trigger comparator",
+    electronHint: "Electrons: velocity ∝ instantaneous current",
+    cResult: "C ≈", cFail: "no edge found",
+    riseLabel: "Rise time", freqLabel: "Frequency", periodLabel: "Period",
+    dutyLabel: "Duty"
+  }
+};
+function t(k) { return I18N[LANG][k] || k; }
+
+/* Alle statischen UI-Texte über data-i18n-Attribute (ID-Key-Map) */
+const UI_KEYS = {
+  uiTitle: "title", uiSpaceHint: "spaceHint",
+  uiGenTitle: "genTitle", uiGenHint: "genHint", uiWave: "wave", uiFreq: "freq",
+  uiAmp: "amp", uiOff: "off", uiDuty: "duty",
+  uiProbeTitle: "probeTitle", uiCable: "cable", uiCmess: "cmess",
+  uiMeasTitle: "measTitle", uiCursorTitle: "cursorTitle", uiBwLimit: "bwLimit",
+  uiCursorHint: "cursorHint", uiLissaTitle: "lissaTitle", uiLissaHint: "lissaHint",
+  uiPhi: "phi", uiChOn: "chOn", uiInv: "inv", uiPos: "pos", uiCpl: "cpl",
+  uiTimeTitle: "timeTitle", uiMode: "mode", uiFs: "fs", uiBits: "bits", uiMem: "mem",
+  uiTrigTitle: "trigTitle", uiTMode: "tMode", uiTSrc: "tSrc", uiTSlope: "tSlope",
+  uiRise: "rise", uiFallOpt: "fall", uiTCpl: "tCpl", uiTLevel: "tLevel",
+  uiMathTitle: "mathTitle", uiPers: "pers", uiSH: "sh",
+  uiMFreq: "freqLabel", uiMPeriod: "periodLabel", uiMRise: "riseLabel"
+};
+
+function applyLang() {
+  document.documentElement.lang = LANG;
+  for (const id in UI_KEYS) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = t(UI_KEYS[id]);
+  }
+  document.querySelectorAll("#explain [data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.getElementById("langToggle").textContent = LANG === "de" ? "EN" : "DE";
+  document.getElementById("aliasWarn").textContent = t("aliasWarn");
+  document.getElementById("btnCMeas").textContent = cModeActive ? t("cmessOn") : t("cmessBtn");
+  updateRunButton();
+  /* Select-Optionen mit Übersetzung (Trigger-Modus) */
+  const tm = document.getElementById("trigMode");
+  tm.options[0].textContent = t("auto"); tm.options[1].textContent = t("normal"); tm.options[2].textContent = t("trigSingle");
+  const mr = document.getElementById("modeRoll");
+  mr.options[0].textContent = t("yt"); mr.options[1].textContent = t("roll");
+}
+
+
+/* ==================== 2. Hilfsfunktionen: Formatierung, 1-2-5-Reihen ==================== */
+const $ = id => document.getElementById(id);
+const logToLin = (v, min, max) => min * Math.pow(max / min, v);
+
+function fmtV(v) {
+  if (v === 0) return "0 V";
+  const a = Math.abs(v);
+  if (a >= 1) return v.toFixed(2) + " V";
+  if (a >= 1e-3) return (v * 1e3).toFixed(1) + " mV";
+  return (v * 1e6).toFixed(0) + " µV";
+}
+function fmtT(v) {
+  const a = Math.abs(v);
+  if (a >= 1) return v.toFixed(2) + " s";
+  if (a >= 1e-3) return (v * 1e3).toFixed(2) + " ms";
+  if (a >= 1e-6) return (v * 1e6).toFixed(2) + " µs";
+  if (a >= 1e-9) return (v * 1e9).toFixed(2) + " ns";
+  return (v * 1e12).toFixed(1) + " ps";
+}
+function fmtF(v) {
+  const a = Math.abs(v);
+  if (a >= 1e6) return (v / 1e6).toFixed(2) + " MHz";
+  if (a >= 1e3) return (v / 1e3).toFixed(2) + " kHz";
+  return v.toFixed(2) + " Hz";
+}
+/* Abtastrate in S/s ausgeben */
+function fmtFs(v) { return v >= 1e9 ? (v / 1e9).toFixed(2) + " GS/s" : (v / 1e6).toFixed(0) + " MS/s"; }
+/* 1-2-5-Reihen für Volt/Div und Time/Div */
+const VDIVS = [1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 5e-2, 1e-1, 2e-1, 5e-1, 1, 2, 5, 10];
+const TDIVS = [1e-9, 2e-9, 5e-9, 1e-8, 2e-8, 5e-8, 1e-7, 2e-7, 5e-7, 1e-6,
+  2e-6, 5e-6, 1e-5, 2e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3,
+  1e-2, 2e-2, 5e-2, 1e-1, 2e-1, 5e-1, 1, 2, 5, 10];
+function fillSelect(sel, arr, fmt) {
+  sel.innerHTML = "";
+  arr.forEach((v, i) => {
+    const o = document.createElement("option");
+    o.value = i; o.textContent = fmt(v) + "/div";
+    sel.appendChild(o);
+  });
+}
+function snapIndex(arr, val) { /* Index des nächstliegenden Werts (log) */
+  let best = 0, bd = 1e30;
+  arr.forEach((v, i) => { const d = Math.abs(Math.log10(v / val)); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+
+/* ==================== 3. Zustand der Simulation ==================== */
+const MAX_PER_FRAME = 150000;       // max. neue Samples pro Frame (Performance)
+const SCOPE_BW = 100e6;             // Bandbreite des Oszilloskops: 100 MHz
+const PROBE_BW = { 1: 20e6, 10: 200e6 };  // Tastkopf-Bandbreiten
+const SRC_R = 50;                   // Quellen-Innenwiderstand 50 Ω
+const CABLE_LEN = 2, CABLE_V = 2e8; // 2 m Koax, v ≈ 2·10^8 m/s
+
+const S = {
+  running: true, t: 0,
+  timeDiv: 1e-3, roll: false,
+  fs: 1e9, fsEff: 1e9, bits: 8, memDepth: 10000,
+  trig: { mode: "auto", src: "ch1", slope: 1, level: 0, cpl: "dc" },
+  persist: 0, sampleHold: false, math: "off", cMode: false
+};
+/* Effektive Abtastrate: Ein echter DSO begrenzt fs wegen fester Speichertiefe.
+   Das Bild nutzt 80 % des Speichers, 20 % Reserve erlauben die Positionierung
+   des getriggerten Fensters mit fester Triggerposition (25 %). Dadurch
+   entsteht bei grober Zeitbasis echte Unterabtastung, wie am echten Gerät. */
+function updateFsEff() {
+  const f = Math.min(S.fs, Math.floor(0.8 * S.memDepth / (10 * S.timeDiv)));
+  if (f !== S.fsEff) { S.fsEff = f; F[0] = newFilt(); F[1] = newFilt(); }
+}
+let cModeActive = false;
+const C_MEAS = { R: 1e3, C: 100e-9 };  // Mess-Fixture: Reihen-R + unbekannter C
+
+/* Signalquellen für CH1 und CH2 */
+function newSrc() { return { wave: "sine", freq: 1000, amp: 1, off: 0, duty: 0.5 }; }
+const src = [newSrc(), newSrc()];
+src[1].freq = 3000; src[1].wave = "square"; src[1].amp = 0.5;
+
+/* Kanal-Einstellungen (Anzeige) */
+const CH = [
+  { on: true,  vdiv: 0.5, pos: 0,   cpl: "dc", inv: false, probe: 10, imp: 1e6, cableC: 50e-12 },
+  { on: false, vdiv: 0.5, pos: -1.5, cpl: "dc", inv: false, probe: 10, imp: 1e6, cableC: 50e-12 }
+];
+
+/* Zustandsgrößen der analoge Kette pro Kanal (IIR-Filter) */
+function newFilt() { return { lpC: 0, lpBW: 0, lpR: 0, hp: 0, delay: null, dIdx: 0 }; }
+const F = [newFilt(), newFilt()];
+
+/* ==================== 4. Signalgeneratoren (kontinuierliche Funktionen) ==================== */
+function genSignal(s, t) {
+  const ph = (t * s.freq) % 1; if (ph < 0) ph += 1;
+  let v;
+  switch (s.wave) {
+    case "sine":     v = Math.sin(2 * Math.PI * ph); break;
+    case "square":   v = ph < s.duty ? 1 : -1; break;
+    case "triangle": v = ph < 0.5 ? 4 * ph - 1 : 3 - 4 * ph; break;
+    case "sawtooth": v = 2 * ph - 1; break;
+    case "noise":    v = Math.random() * 2 - 1; break;
+    case "pulse":    v = ph < s.duty ? 1 : 0; break;
+    default:         v = 0;
+  }
+  return v * s.amp + s.off;
+}
+/* Externer Trigger-Eingang: festes 1-kHz-Rechteck, ±0,5 V */
+function extSignal(t) { const ph = (t * 1000) % 1; return ph < 0.5 ? 0.5 : -0.5; }
+
+/* ==================== 5. Abtastkette pro Sample (Physik-Kern) ==================== */
+function systemBW(ch) { return Math.min(SCOPE_BW, PROBE_BW[ch.probe]); }
+function bwInfo() { /* kleinste -3-dB-Grenze des aktiven CH1-Pfads (für Anzeige) */
+  const ch = CH[0];
+  const f1 = 1 / (2 * Math.PI * SRC_R * ch.cableC);
+  return Math.min(systemBW(ch), f1);
+}
+/* Ein Analog-Digital-Schritt für Kanal chn zum Zeitpunkt t.
+   Reihenfolge: Quelle → Spannungsteiler (Eingangsimpedanz) → Reflexion (verzögert)
+   → Leitungskapazität (TP 1. Ordnung) → Systembandbreite (TP 1. Ordnung)
+   → AC-Kopplung (HP) → Invertierung → ADC-Quantisierung (Treppenfunktion). */
+function sampleChannel(chn, t) {
+  const ch = CH[chn], f = F[chn], s = src[chn];
+  const x = genSignal(s, t);
+  /* Leitung als Koaxialkabel (Z0 = 50 Ω): Die hinlaufende Welle ist
+     v+ = x·Z0/(Rs+Z0) = x/2 (Generatoranpassung). Am Leitungsende reflektiert
+     sie mit Γ = (Rin − Z0)/(Rin + Z0) und kommt nach 2·l/v zurück. */
+  const vPlus = x * (50 / (SRC_R + 50));
+  const gamma = (ch.imp - 50) / (ch.imp + 50);
+  const delayN = Math.max(1, Math.min(100000, Math.round(S.fsEff * 2 * CABLE_LEN / CABLE_V)));
+  if (!f.delay || f.delay.length !== delayN) { f.delay = new Float32Array(delayN); f.dIdx = 0; }
+  /* rücklaufende Welle durchläuft das Kabel doppelt: Dämpfung ~30 MHz
+     (Skin-Effekt-Näherung) als TP 1. Ordnung vor der Reflexion */
+  const dR = f.delay[f.dIdx];
+  f.lpR += (dR - f.lpR) * (1 - Math.exp(-2 * Math.PI * 30e6 / S.fsEff));
+  let u = vPlus + gamma * f.lpR;
+  f.delay[f.dIdx] = vPlus;
+  f.dIdx = (f.dIdx + 1) % delayN;
+  /* Leitungskapazität: RC-Tiefpass mit Quellenwiderstand (C-Mess-Fixture nutzt Reihen-R) */
+  const C = cModeActive ? C_MEAS.C : ch.cableC;
+  const R = cModeActive ? C_MEAS.R : SRC_R;
+  const fcCable = 1 / (2 * Math.PI * R * C);
+  f.lpC += (u - f.lpC) * (1 - Math.exp(-2 * Math.PI * fcCable / S.fsEff));
+  u = f.lpC;
+  /* Begrenzung der Systembandbreite (Oszilloskop + Tastkopf) */
+  f.lpBW += (u - f.lpBW) * (1 - Math.exp(-2 * Math.PI * systemBW(ch) / S.fsEff));
+  u = f.lpBW;
+  /* AC-Kopplung: Kondensator blockiert Gleichanteil (untere Grenzfrequenz 10 Hz) */
+  if (ch.cpl === "ac") {
+    const out = u - f.hp;
+    f.hp += out * (1 - Math.exp(-2 * Math.PI * 10 / S.fsEff));
+    u = out;
+  } else { f.hp = u; }
+  if (ch.inv) u = -u;
+  /* ADC-Quantisierung: mathematisch korrekte Treppenfunktion über ±4 Div.
+     Volt/Div bezieht sich auf den Tastkopf-Eingang; der 10:1-Tastkopf wirkt
+     sich bereits über seine Bandbreite (PROBE_BW) aus. */
+  const lsb = 8 * ch.vdiv / Math.pow(2, S.bits);
+  return lsb * Math.round(u / lsb);
+}
+
+/* ==================== 6. Speicher (Ringpuffer der abgetasteten Werte) ==================== */
+let buf = [new Float32Array(S.memDepth), new Float32Array(S.memDepth)];
+let wIdx = 0, bufCount = 0;   // gemeinsamer Takt: beide Kanäle gleich phasig
+function allocBuffers() {
+  buf = [new Float32Array(S.memDepth), new Float32Array(S.memDepth)];
+  wIdx = 0; bufCount = 0;
+  F[0] = newFilt(); F[1] = newFilt();
+}
+function bufAt(chn, i) { /* Lesezugriff mit linearem Index (0 = ältestes) */
+  return buf[chn][(wIdx + S.memDepth + (i - bufCount)) % S.memDepth];
+}
+/* Samples erzeugen – in Blöcken, damit die UI nicht blockiert */
+function acquire(dtWall) {
+  updateFsEff();
+  const n = Math.max(1, Math.min(Math.round(S.fsEff * dtWall), MAX_PER_FRAME));
+  const dt = 1 / S.fsEff;
+  let done = 0;
+  while (done < n) {
+    const chunk = Math.min(8192, n - done);
+    for (let k = 0; k < chunk; k++) {
+      S.t += dt;
+      buf[0][wIdx] = sampleChannel(0, S.t);
+      buf[1][wIdx] = sampleChannel(1, S.t);
+      wIdx = (wIdx + 1) % S.memDepth;
+      if (bufCount < S.memDepth) bufCount++;
+    }
+    done += chunk;
+  }
+  return n * dt;   // tatsächlich simulierte Zeit (kann < dtWall sein)
+}
+
+/* ==================== 7. Trigger-Suche und Bildfenster ==================== */
+const PRE_FRAC = 0.25;   // Triggerpunkt bei 25 % der Bildbreite (Pre-Trigger)
+let trigFlashT = -1e9;   // Zeitstempel für Trigger-LED
+let lastWindow = null;   // gespeichertes Fenster (Normal/Single ohne neues Ereignis)
+let singleArmed = true;
+
+/* Trigger-Signal aus dem Puffer holen + Trigger-Kopplung anwenden */
+function trigValueAt(i) {
+  let v;
+  if (S.trig.src === "ch2") v = bufAt(1, i);
+  else if (S.trig.src === "ext") v = extSignal(S.t - (bufCount - 1 - i) / S.fsEff);
+  else v = bufAt(0, i);
+  return v;
+}
+function findTrigger(dispN) {
+  /* Gültiger Triggerbereich: Flanke muss alt genug sein, dass das Fenster
+     [trg−25 %, trg+75 %] vollständig im Puffer liegt; gesucht wird die
+     NEUESTE Flanke in diesem Bereich (Rückwärtssuche mit korrekter
+     Richtungslogik: cur = älterer Sample, prev = neuerer). */
+  const pre = Math.floor(dispN * PRE_FRAC);
+  const preMin = Math.max(2, pre);
+  const n = bufCount;
+  if (n < 4) return -1;
+  const j0 = Math.max(preMin, preMin);            // älteste zulässige Flanke
+  const j1 = Math.min(n - 2, n - (dispN - pre) - 1); // neueste zulässige (75 % danach passen)
+  if (S.trig.src === "ext") {
+    /* externes Signal liegt nicht im Puffer: Flanke direkt in der Zeit suchen */
+    const lvl = S.trig.level, dt = 1 / S.fsEff;
+    const tOldest = S.t - (n - 1) / S.fsEff;
+    for (let i2 = j1 + 1; i2 > j0; i2--) {
+      const t2 = tOldest + i2 * dt, t1 = t2 - dt;
+      const a = extSignal(t1) - lvl, b = extSignal(t2) - lvl;
+      if (S.trig.slope > 0 ? (a < 0 && b >= 0) : (a > 0 && b <= 0)) return i2;
+    }
+    return -1;
+  }
+  const lvl = S.trig.level;
+  /* Trigger-Kopplung: AC = Gleichanteil im Triggerpfad entfernen,
+     HF-Reject = 5er-Mittelung (Tiefpass ~50 kHz) */
+  let mean = 0;
+  if (S.trig.cpl === "ac") {
+    let s = 0, c = 0;
+    for (let i = 0; i < n; i++) { s += trigValueAt(i); c++; }
+    mean = c ? s / c : 0;
+  }
+  const tv = i => {
+    let v = trigValueAt(i) - mean;
+    if (S.trig.cpl === "hf") {
+      v = (trigValueAt(Math.max(0, i - 2)) + trigValueAt(Math.max(0, i - 1)) + trigValueAt(i)
+         + trigValueAt(Math.min(n - 1, i + 1)) + trigValueAt(Math.min(n - 1, i + 2))) / 5 - mean;
+    }
+    return v;
+  };
+  let prev = tv(j1 + 1);
+  for (let i = j1; i >= j0; i--) {   /* neueste zulässige Flanke zuerst */
+    const cur = tv(i);
+    /* steigend: älteres Sample (cur) unter dem Pegel, neueres (prev) darüber;
+       strikte Form vermeidet Fehlauslösung durch Quantisierungsplateaus */
+    const hit = S.trig.slope > 0 ? (cur < lvl && prev >= lvl) : (cur > lvl && prev <= lvl);
+    if (hit) return i + 1;   /* Triggerpunkt = erstes Sample jenseits des Pegels */
+    prev = cur;
+  }
+  return -1;
+}
+/* Bildfenster konstruieren: Float32Arrays der Länge dispN (0 = links).
+   Der Trigger darf irgendwo im linken Viertel liegen; das Fenster wird so
+   gelegt, dass die Flanke bevorzugt bei 25 % steht (variable Triggerposition). */
+function buildWindow() {
+  updateFsEff();
+  const dispN = Math.min(S.memDepth, Math.max(2, Math.ceil(S.timeDiv * 10 * S.fsEff)));
+  const screenT = dispN / S.fsEff;
+  let start = Math.max(0, bufCount - dispN);   // Default: neueste Werte (Auto/Roll)
+  let trigPos = -1;
+  if (!S.roll && S.trig.mode !== "off") {
+    const trg = findTrigger(dispN);
+    if (trg >= 0) {
+      start = trg - Math.floor(dispN * PRE_FRAC);
+      if (start < 0) start = 0;
+      if (start + dispN > bufCount) start = Math.max(0, bufCount - dispN);
+      trigPos = trg - start;
+      trigFlashT = performance.now();
+      if (S.trig.mode === "single") { singleArmed = false; S.running = false; updateRunButton(); }
+    } else if (S.trig.mode === "normal" || (S.trig.mode === "single" && !singleArmed)) {
+      return lastWindow;          // kein Ereignis: altes Bild beibehalten
+    }
+  }
+  const d1 = new Float32Array(dispN), d2 = new Float32Array(dispN);
+  for (let i = 0; i < dispN; i++) { d1[i] = bufAt(0, start + i); d2[i] = bufAt(1, start + i); }
+  lastWindow = { d1, d2, n: dispN, screenT, triggered: trigPos >= 0, trigPos, start };
+  return lastWindow;
+}
+
+/* ==================== 8. Messungen über dem Bildfenster ==================== */
+function measure(d) {
+  const n = d.n, x = d.d1;
+  if (n < 8) return null;
+  let vmin = 1e30, vmax = -1e30, sum = 0;
+  for (let i = 0; i < n; i++) { const v = x[i]; if (v < vmin) vmin = v; if (v > vmax) vmax = v; sum += v; }
+  const mean = sum / n;
+  let sq = 0; for (let i = 0; i < n; i++) sq += x[i] * x[i];
+  const vrms = Math.sqrt(sq / n);
+  /* Frequenz über Nulldurchgänge des AC-Anteils */
+  let crossings = [];
+  for (let i = 1; i < n; i++) {
+    const a = x[i - 1] - mean, b = x[i] - mean;
+    if (a <= 0 && b > 0) crossings.push(i);
+  }
+  /* Anstiegszeit 10 % → 90 %: erste steigende Flanke im Fenster – unabhängig
+     von der Periodizität (wichtig für Single-Shot-Flanken, z. B. C-Messung) */
+  let rise = 0;
+  const lo = vmin + 0.1 * (vmax - vmin), hi2 = vmin + 0.9 * (vmax - vmin);
+  let iLo = -1;
+  for (let i = 1; i < n; i++) if (x[i - 1] < lo && x[i] >= lo) { iLo = i; break; }
+  if (iLo >= 0) for (let i = iLo; i < n; i++) if (x[i] >= hi2) { rise = (i - iLo) / S.fsEff; break; }
+  let freq = 0, duty = 0;
+  if (crossings.length >= 2) {
+    freq = (crossings.length - 1) / ((crossings[crossings.length - 1] - crossings[0]) / S.fsEff);
+    /* Duty-Cycle: Anteil oberhalb des Mittelwerts zwischen zwei Flanken */
+    let hi = 0, tot = 0;
+    for (let k = 1; k < crossings.length; k++) {
+      for (let i = crossings[k - 1]; i < crossings[k]; i++) { tot++; if (x[i] > mean) hi++; }
+    }
+    if (tot > 0) duty = hi / tot;
+  }
+  return { vmin, vmax, vpp: vmax - vmin, mean, vrms, freq, duty, rise };
+}
+
+/* ==================== 9. FFT (Cooley-Tukey, radix-2, keine Libraries) ==================== */
+function fft(re, im) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {          /* Bit-Umkehr-Permutation */
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) { const tr = re[i]; re[i] = re[j]; re[j] = tr; const ti = im[i]; im[i] = im[j]; im[j] = ti; }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cwr = 1, cwi = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const ur = re[i + k], ui = im[i + k];
+        const vr = re[i + k + len / 2] * cwr - im[i + k + len / 2] * cwi;
+        const vi = re[i + k + len / 2] * cwi + im[i + k + len / 2] * cwr;
+        re[i + k] = ur + vr; im[i + k] = ui + vi;
+        re[i + k + len / 2] = ur - vr; im[i + k + len / 2] = ui - vi;
+        const nwr = cwr * wr - cwi * wi; cwi = cwr * wi + cwi * wr; cwr = nwr;
+      }
+    }
+  }
+}
+let fftMag = null, fftN = 0, fftPeak = { f: 0, db: 0, thd: 0 };
+function computeFFT() {
+  fftN = Math.min(4096, 1 << Math.floor(Math.log2(Math.max(16, bufCount))));
+  if (fftN < 16) { fftMag = null; return; }
+  const re = new Float32Array(fftN), im = new Float32Array(fftN);
+  for (let i = 0; i < fftN; i++) {
+    const w = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (fftN - 1));   /* Hann-Fenster */
+    re[i] = bufAt(0, bufCount - fftN + i) * w;
+  }
+  fft(re, im);
+  fftMag = new Float32Array(fftN / 2);
+  for (let k = 0; k < fftN / 2; k++) fftMag[k] = Math.hypot(re[k], im[k]) / fftN;
+  /* Grundfrequenz = größter Bin; THD aus den Oberschwingungen 2..5 */
+  let pk = 1; for (let k = 2; k < fftN / 4; k++) if (fftMag[k] > fftMag[pk]) pk = k;
+  let hPow = 0;
+  for (let h = 2; h <= 5; h++) {
+    const c = pk * h; if (c + 1 >= fftN / 2) break;
+    hPow += fftMag[c] * fftMag[c] + 0.5 * (fftMag[c - 1] * fftMag[c - 1] + fftMag[c + 1] * fftMag[c + 1]);
+  }
+  const f0 = pk * S.fsEff / fftN;
+  fftPeak = { f: f0, db: 20 * Math.log10(fftMag[pk] + 1e-12), thd: fftMag[pk] > 0 ? 100 * Math.sqrt(hPow) / fftMag[pk] : 0 };
+  /* Aliasing-Warnung: echte Generatorfrequenzen (inkl. Oberschwingungen bei
+     Rechteck/Puls ≈ 7. Harmonische) gegen die Nyquistgrenze der effektiven Rate */
+  const fmaxSig = Math.max(
+    src[0].freq * (src[0].wave === "square" || src[0].wave === "pulse" ? 7 : 1),
+    src[1].freq * (src[1].wave === "square" || src[1].wave === "pulse" ? 7 : 1));
+  $("aliasWarn").classList.toggle("on", fmaxSig > S.fsEff / 2);
+}
+
+/* ==================== 10. Mathematik-Spuren ==================== */
+/* Erzeugt aus dem Fenster die Math-Spur (Magenta); Rückgabe {arr, scale} */
+function mathTrace(d) {
+  const n = d.n, a = d.d1, b = d.d2, out = new Float32Array(n);
+  let scale = 1;
+  switch (S.math) {
+    case "plus":  for (let i = 0; i < n; i++) out[i] = a[i] + b[i]; break;
+    case "minus": for (let i = 0; i < n; i++) out[i] = a[i] - b[i]; break;
+    case "mult":  for (let i = 0; i < n; i++) out[i] = a[i] * b[i]; break;
+    case "int": {                                  /* Integral: kumulative Summe · dt */
+      let acc = 0; const dt = d.screenT / n;
+      for (let i = 0; i < n; i++) { acc += a[i] * dt; out[i] = acc; }
+      let m = 0; for (let i = 0; i < n; i++) m = Math.max(m, Math.abs(out[i]));
+      scale = m > 0 ? 3 * CH[0].vdiv / m : 1;      /* Normierung auf ±3 Div */
+      break;
+    }
+    case "diff": {                                 /* Differential: Δu/Δt */
+      const dt = d.screenT / n;
+      for (let i = 1; i < n; i++) out[i] = (a[i] - a[i - 1]) / dt;
+      out[0] = out[1];
+      let m = 0; for (let i = 0; i < n; i++) m = Math.max(m, Math.abs(out[i]));
+      scale = m > 0 ? 3 * CH[0].vdiv / m : 1;
+      break;
+    }
+    default: return null;
+  }
+  return { arr: out, scale };
+}
+
+/* ==================== 11. Autoset: 2–3 Perioden sichtbar machen ==================== */
+function autoset() {
+  CH[0].on = true; $("ch1On").checked = true;
+  S.trig.src = "ch1"; $("trigSrc").value = "ch1";
+  S.trig.mode = "auto"; $("trigMode").value = "auto";
+  /* Frequenz aus dem aktuellen Fenster schätzen, sonst Generator-Frequenz */
+  const w = buildWindow();
+  const m = w && measure(w);
+  const f = m && m.freq > 0 ? m.freq : src[0].freq;
+  const td = 2.5 / (f * 10);                        /* 2,5 Perioden über 10 Div */
+  const ti = snapIndex(TDIVS, td);
+  S.timeDiv = TDIVS[ti]; $("timeDiv").value = ti;
+  const vpp = m ? Math.max(m.vpp, 1e-4) : 2 * src[0].amp;
+  const vi = snapIndex(VDIVS, vpp / 6);             /* 6 Div Spitze-Spitze */
+  CH[0].vdiv = VDIVS[vi]; $("voltsDiv1").value = vi;
+  CH[0].pos = 0; $("pos1").value = 0;
+  S.trig.level = m ? m.mean : 0; $("trigLevel").value = S.trig.level;
+  lastWindow = null; S.running = true; updateRunButton();
+}
+
+/* ==================== 12. Canvas-Setup (HiDPI, responsiv) ==================== */
+const CANVASES = {};
+function setupCanvas(id) {
+  const c = $(id), ctx = c.getContext("2d");
+  const o = { c, ctx, w: 0, h: 0,
+    resize() {
+      const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+      c.width = Math.max(50, Math.round(r.width * dpr));
+      c.height = Math.max(30, Math.round(r.height * dpr));
+      o.w = c.width; o.h = c.height;
+    } };
+  CANVASES[id] = o; o.resize(); return o;
+}
+["scopeCanvas", "fftCanvas", "blockCanvas", "electronCanvas", "lissaCanvas"].forEach(setupCanvas);
+window.addEventListener("resize", () => {
+  for (const k in CANVASES) CANVASES[k].resize();
+  initPersistence();
+});
+
+/* Nachleucht-Speicher (Offscreen) */
+let pers = null;
+function initPersistence() {
+  const sc = CANVASES.scopeCanvas;
+  pers = { c: document.createElement("canvas"), ctx: null };
+  pers.c.width = sc.w; pers.c.height = sc.h;
+  pers.ctx = pers.c.getContext("2d");
+}
+
+/* ==================== 13. Haupt-Display ==================== */
+const COL = { ch1: "#e3b341", ch2: "#58a6ff", math: "#bc8cff", grid: "#30363d", txt: "#c9d1d9" };
+const cur = { v1: 0.35, v2: 0.65, h1: 0.30, h2: 0.70 };   // Cursor (Bildanteile 0..1)
+
+function yToPx(v, ch, H) { return H / 2 - (v / ch.vdiv + ch.pos) * (H / 8); }
+function pxToV(y, ch, H) { return ((H / 2 - y) / (H / 8) - ch.pos) * ch.vdiv; }
+
+function drawTrace(ctx, arr, n, ch, W, H, color, scale) {
+  const s = scale || 1;
+  ctx.strokeStyle = color; ctx.lineWidth = 2 * (window.devicePixelRatio || 1);
+  ctx.lineJoin = "round"; ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = i / (n - 1) * W, y = yToPx(arr[i] * s, ch, H);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  if (S.sampleHold) {                        /* diskrete Abtastwerte markieren */
+    ctx.fillStyle = color;
+    const step = Math.max(1, Math.floor(n / 400));
+    for (let i = 0; i < n; i += step) {
+      ctx.beginPath();
+      ctx.arc(i / (n - 1) * W, yToPx(arr[i] * s, ch, H), 2.2 * (window.devicePixelRatio || 1), 0, 6.283);
+      ctx.fill();
+    }
+  }
+}
+function drawMain(w, dtWall) {
+  const { ctx, w: W, h: H } = CANVASES.scopeCanvas;
+  const dpr = window.devicePixelRatio || 1;
+  ctx.clearRect(0, 0, W, H);
+  /* Raster 10 × 8 Div, mittige Achsen hervorgehoben */
+  ctx.strokeStyle = COL.grid; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i <= 10; i++) { const x = i / 10 * W; ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+  for (let j = 0; j <= 8; j++) { const y = j / 8 * H; ctx.moveTo(0, y); ctx.lineTo(W, y); }
+  ctx.stroke();
+  ctx.strokeStyle = "#484f58"; ctx.beginPath();
+  ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+  if (!w) return;
+  /* Nachleuchten: alte Spuren mit abklingender Helligkeit */
+  if (S.persist > 0 && pers) {
+    const decay = Math.min(1, dtWall / S.persist);
+    pers.ctx.globalCompositeOperation = "destination-in";
+    pers.ctx.fillStyle = "rgba(255,255,255," + (1 - decay).toFixed(3) + ")";
+    pers.ctx.fillRect(0, 0, W, H);
+    pers.ctx.globalCompositeOperation = "source-over";
+    if (CH[0].on) drawTrace(pers.ctx, w.d1, w.n, CH[0], W, H, COL.ch1);
+    if (CH[1].on) drawTrace(pers.ctx, w.d2, w.n, CH[1], W, H, COL.ch2);
+    ctx.drawImage(pers.c, 0, 0);
+  }
+  /* Signalspuren (GND-Kopplung zeigt die 0-V-Linie des Kanals) */
+  if (CH[0].on) {
+    if (CH[0].cpl === "gnd") { const a = new Float32Array(w.n); drawTrace(ctx, a, w.n, CH[0], W, H, COL.ch1); }
+    else drawTrace(ctx, w.d1, w.n, CH[0], W, H, COL.ch1);
+  }
+  if (CH[1].on) {
+    if (CH[1].cpl === "gnd") { const a = new Float32Array(w.n); drawTrace(ctx, a, w.n, CH[1], W, H, COL.ch2); }
+    else drawTrace(ctx, w.d2, w.n, CH[1], W, H, COL.ch2);
+  }
+  /* Mathematik (Magenta) */
+  if (S.math !== "off" && S.math !== "fft") {
+    const mt = mathTrace(w);
+    if (mt) drawTrace(ctx, mt.arr, w.n, CH[0], W, H, COL.math, mt.scale);
+  }
+  /* Trigger-Markierung: T-Symbol am linken Rand + gestrichelte Linie am Triggerpunkt */
+  if (!S.roll && w.triggered) {
+    const lvlY = yToPx(S.trig.level, CH[S.trig.src === "ch2" ? 1 : 0], H);
+    ctx.fillStyle = COL.txt; ctx.font = (12 * dpr) + "px sans-serif";
+    ctx.fillText("T", 4 * dpr, lvlY - 4 * dpr);
+    const tx = (w.trigPos >= 0 ? w.trigPos / w.n : PRE_FRAC) * W;
+    ctx.strokeStyle = "#8b949e"; ctx.setLineDash([5 * dpr, 4 * dpr]); ctx.beginPath();
+    ctx.moveTo(tx, 0); ctx.lineTo(tx, H); ctx.stroke(); ctx.setLineDash([]);
+  }
+  /* Cursor: zwei vertikale (Zeit), zwei horizontale (Spannung an CH1) */
+  ctx.strokeStyle = "#6e7681"; ctx.setLineDash([6 * dpr, 4 * dpr]); ctx.beginPath();
+  ctx.moveTo(cur.v1 * W, 0); ctx.lineTo(cur.v1 * W, H);
+  ctx.moveTo(cur.v2 * W, 0); ctx.lineTo(cur.v2 * W, H);
+  ctx.moveTo(0, cur.h1 * H); ctx.lineTo(W, cur.h1 * H);
+  ctx.moveTo(0, cur.h2 * H); ctx.lineTo(W, cur.h2 * H);
+  ctx.stroke(); ctx.setLineDash([]);
+  /* Beschriftungen / Status */
+  ctx.font = (11 * dpr) + "px Consolas, monospace"; ctx.fillStyle = COL.txt;
+  let lx = 8 * dpr;
+  const label = (txt, color) => { ctx.fillStyle = color; ctx.fillText(txt, lx, 14 * dpr); lx += ctx.measureText(txt).width + 14 * dpr; };
+  if (CH[0].on) label("CH1 " + fmtV(CH[0].vdiv) + "/div", COL.ch1);
+  if (CH[1].on) label("CH2 " + fmtV(CH[1].vdiv) + "/div", COL.ch2);
+  label((S.roll ? t("roll") : "Y-T") + "  " + fmtT(S.timeDiv) + "/div", COL.txt);
+  if (S.fsEff < S.fs * 0.999) label(fmtF(S.fsEff) + " eff. fs", "#f85149");
+  if (w.triggered && !S.roll) label(t("trigd"), "#3fb950");
+  ctx.fillStyle = COL.txt; ctx.textAlign = "right";
+  ctx.fillText(fmtFs(S.fsEff) + "  ·  " + S.bits + " Bit  ·  " + (S.memDepth / 1000) + "k pts", W - 8 * dpr, 14 * dpr);
+  ctx.textAlign = "left";
+  if (CH[0].cpl === "gnd" && CH[0].on) { ctx.fillStyle = "#8b949e"; ctx.fillText(t("gndHint"), 8 * dpr, H - 8 * dpr); }
+  if ((S.trig.mode === "normal" || S.trig.mode === "single") && !w.triggered && S.running) {
+    ctx.fillStyle = "#f85149"; ctx.textAlign = "center";
+    ctx.fillText(S.trig.mode === "single" && singleArmed ? t("armed") : t("waiting"), W / 2, H / 2 - 8 * dpr);
+    ctx.textAlign = "left";
+  }
+}
+
+/* ==================== 14. FFT-Canvas (logarithmische Frequenzachse) ==================== */
+function drawFFT() {
+  const { ctx, w: W, h: H } = CANVASES.fftCanvas;
+  const dpr = window.devicePixelRatio || 1;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = COL.grid; ctx.lineWidth = 1; ctx.beginPath();
+  for (let j = 0; j <= 4; j++) { const y = j / 4 * H; ctx.moveTo(0, y); ctx.lineTo(W, y); }
+  ctx.stroke();
+  ctx.font = (10 * dpr) + "px Consolas, monospace"; ctx.fillStyle = "#8b949e";
+  ctx.fillText(t("fftTitle"), 6 * dpr, 12 * dpr);
+  if (!fftMag) return;
+  const fMin = S.fsEff / fftN, fMax = S.fsEff / 2;
+  const lx = f => Math.log(f / fMin) / Math.log(fMax / fMin) * W;
+  /* Dezenterraster bei 1-2-5-Frequenzen */
+  ctx.fillStyle = "#6e7681";
+  for (let f = 10; f < fMax; f *= 10) for (const m of [1, 2, 5]) {
+    const fm = f * m; if (fm < fMin || fm > fMax) continue;
+    ctx.fillRect(lx(fm), 0, 1, H); ctx.fillText(fmtF(fm), lx(fm) + 2 * dpr, H - 4 * dpr);
+  }
+  /* Spektrum als Linie, interpoliert in den Log-Bereich */
+  ctx.strokeStyle = S.math === "fft" ? COL.math : "#3fb950"; ctx.lineWidth = 1.5 * dpr;
+  ctx.beginPath();
+  let started = false;
+  for (let px = 0; px <= W; px += 2) {
+    const f = fMin * Math.pow(fMax / fMin, px / W);
+    const k = f / S.fsEff * fftN, k0 = Math.floor(k), k1 = Math.min(fftN / 2 - 1, k0 + 1), fr = k - k0;
+    const mag = fftMag[k0] * (1 - fr) + fftMag[k1] * fr;
+    const db = Math.max(-80, 20 * Math.log10(mag + 1e-9));
+    const y = H - (db + 80) / 80 * H;
+    if (!started) { ctx.moveTo(px, y); started = true; } else ctx.lineTo(px, y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = COL.txt;
+  ctx.fillText(t("peak") + ": " + fmtF(fftPeak.f) + "  ·  THD: " + fftPeak.thd.toFixed(1) + " %", 6 * dpr, 24 * dpr);
+}
+
+/* ==================== 15. Blockschaltbild (Signalfluss + Trigger-LED) ==================== */
+function drawBlock(now) {
+  const { ctx, w: W, h: H } = CANVASES.blockCanvas;
+  const dpr = window.devicePixelRatio || 1;
+  ctx.clearRect(0, 0, W, H);
+  const labels = [t("blockIn"), t("blockCpl") + " " + CH[0].cpl.toUpperCase(),
+    t("blockAmp") + " " + fmtV(CH[0].vdiv) + "/div", t("blockADC") + " " + S.bits + " Bit",
+    t("blockMem") + " " + S.memDepth / 1000 + "k", t("blockDisp")];
+  const bh = H * 0.42, by = H * 0.12, bw = W / 7.2;
+  ctx.font = (10 * dpr) + "px sans-serif"; ctx.textAlign = "center";
+  labels.forEach((lb, i) => {
+    const x = W * 0.03 + i * (bw + W * 0.028);
+    ctx.fillStyle = "#1c2330"; ctx.strokeStyle = "#58a6ff"; ctx.lineWidth = 1 * dpr;
+    ctx.beginPath(); ctx.roundRect(x, by, bw, bh, 5 * dpr); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = COL.txt; ctx.fillText(lb, x + bw / 2, by + bh / 2 + 3 * dpr);
+    if (i < labels.length - 1) {
+      ctx.strokeStyle = "#8b949e"; ctx.beginPath();
+      const ax = x + bw, ay = by + bh / 2;
+      ctx.moveTo(ax, ay); ctx.lineTo(ax + W * 0.028, ay);
+      ctx.lineTo(ax + W * 0.028 - 4 * dpr, ay - 3 * dpr); ctx.moveTo(ax + W * 0.028, ay);
+      ctx.lineTo(ax + W * 0.028 - 4 * dpr, ay + 3 * dpr); ctx.stroke();
+    }
+  });
+  /* Trigger-Komparator mit LED, die bei einem Triggerereignis blinkt */
+  const tx = W * 0.2, ty = H * 0.72, tw = W * 0.3, th = H * 0.2;
+  ctx.fillStyle = "#1c2330"; ctx.strokeStyle = "#e3b341";
+  ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 5 * dpr); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = COL.txt; ctx.fillText(t("blockTrig") + "  " + fmtV(S.trig.level), tx + tw / 2, ty + th / 2 + 3 * dpr);
+  const ledOn = now - trigFlashT < 180;
+  ctx.fillStyle = ledOn ? "#3fb950" : "#21262d";
+  ctx.beginPath(); ctx.arc(tx + tw + 12 * dpr, ty + th / 2, 5 * dpr, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = "#484f58"; ctx.stroke();
+  ctx.strokeStyle = "#e3b341"; ctx.beginPath();
+  ctx.moveTo(tx + W * 0.028 * 0.5, by + bh); ctx.lineTo(tx + W * 0.028 * 0.5, ty + th / 2); ctx.lineTo(tx, ty + th / 2); ctx.stroke();
+  ctx.textAlign = "left";
+}
+
+/* ==================== 16. Elektronen-Animation (Leitung) ==================== */
+const electrons = [];
+for (let i = 0; i < 40; i++) electrons.push({ x: Math.random(), y: Math.random() });
+function drawElectrons(dtWall) {
+  const { ctx, w: W, h: H } = CANVASES.electronCanvas;
+  ctx.clearRect(0, 0, W, H);
+  const dpr = window.devicePixelRatio || 1;
+  ctx.font = (10 * dpr) + "px sans-serif"; ctx.fillStyle = "#8b949e";
+  ctx.fillText(t("electronHint"), 6 * dpr, 12 * dpr);
+  const wy = H * 0.55;
+  /* Leiter als Draht */
+  ctx.strokeStyle = "#484f58"; ctx.lineWidth = 6 * dpr;
+  ctx.beginPath(); ctx.moveTo(W * 0.05, wy); ctx.lineTo(W * 0.95, wy); ctx.stroke();
+  /* momentaner Strom aus dem letzten abgespeicherten Sample von CH1 */
+  const last = buf[0][(wIdx - 1 + S.memDepth) % S.memDepth];
+  const i = last / (SRC_R + (cModeActive ? C_MEAS.R : 0));
+  const v = Math.max(-1, Math.min(1, i / 0.02));      /* Normierung: ±20 mA → volle Geschwindigkeit */
+  for (const e of electrons) {
+    e.x += v * dtWall * 0.8;
+    if (e.x > 0.97) e.x = 0.05; if (e.x < 0.04) e.x = 0.96;
+    ctx.fillStyle = COL.ch2;
+    ctx.beginPath(); ctx.arc(e.x * W, wy + (e.y - 0.5) * 8 * dpr, 2.5 * dpr, 0, 6.283); ctx.fill();
+  }
+  ctx.fillStyle = COL.txt;
+  ctx.fillText("i = " + (i * 1000).toFixed(2) + " mA", 6 * dpr, H - 8 * dpr);
+}
+
+/* ==================== 17. Lissajous / Zeigerdiagramm ==================== */
+function drawLissa() {
+  const { ctx, w: W, h: H } = CANVASES.lissaCanvas;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = COL.grid; ctx.beginPath();
+  ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+  const m = Math.min(bufCount, 4096);
+  if (m < 16) return;
+  /* Mittelwerte für die Phasenwinkel-Berechnung φ = arcsin(B/A) */
+  let mx = 0, my = 0;
+  for (let i = 0; i < m; i++) { mx += bufAt(0, bufCount - m + i); my += bufAt(1, bufCount - m + i); }
+  mx /= m; my /= m;
+  let A = 0, crossY = 0, found = false, prevX = bufAt(0, bufCount - m) - mx;
+  ctx.strokeStyle = COL.math; ctx.lineWidth = 1.5 * (window.devicePixelRatio || 1);
+  ctx.beginPath();
+  for (let i = 0; i < m; i++) {
+    const vx = bufAt(0, bufCount - m + i) - mx, vy = bufAt(1, bufCount - m + i) - my;
+    const px = W / 2 + (vx / (4 * CH[0].vdiv)) * W / 2, py = H / 2 - (vy / (4 * CH[1].vdiv)) * H / 2;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    A = Math.max(A, Math.abs(vy));
+    if (!found && prevX <= 0 && vx > 0) { crossY = vy; found = true; }
+    prevX = vx;
+  }
+  ctx.stroke();
+  const phi = found && A > 0 ? Math.asin(Math.min(1, Math.abs(crossY) / A)) * 180 / Math.PI : 0;
+  $("lissaPhi").textContent = phi.toFixed(1) + "°";
+}
+
+/* ==================== 18. Cursor-Interaktion (Maus/Touch) ==================== */
+let dragTarget = null;   // 'v1','v2','h1','h2'
+function cursorHitTest(px, py) {
+  const { w: W, h: H } = CANVASES.scopeCanvas, dpr = window.devicePixelRatio || 1;
+  const tol = 10 * dpr;
+  if (Math.abs(px - cur.v1 * W) < tol) return "v1";
+  if (Math.abs(px - cur.v2 * W) < tol) return "v2";
+  if (Math.abs(py - cur.h1 * H) < tol) return "h1";
+  if (Math.abs(py - cur.h2 * H) < tol) return "h2";
+  return null;
+}
+$("scopeCanvas").addEventListener("pointerdown", e => {
+  const r = $("scopeCanvas").getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  dragTarget = cursorHitTest((e.clientX - r.left) * dpr, (e.clientY - r.top) * dpr);
+  if (dragTarget) $("scopeCanvas").setPointerCapture(e.pointerId);
+});
+$("scopeCanvas").addEventListener("pointermove", e => {
+  if (!dragTarget) return;
+  const r = $("scopeCanvas").getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const fx = Math.min(1, Math.max(0, (e.clientX - r.left) * dpr / CANVASES.scopeCanvas.w));
+  const fy = Math.min(1, Math.max(0, (e.clientY - r.top) * dpr / CANVASES.scopeCanvas.h));
+  if (dragTarget[0] === "v") cur[dragTarget] = fx; else cur[dragTarget] = fy;
+});
+$("scopeCanvas").addEventListener("pointerup", () => { dragTarget = null; });
+
+/* ==================== 19. Messwerte-Panel aktualisieren ==================== */
+function updateMeasurements(w) {
+  const m = w && CH[0].cpl !== "gnd" ? measure(w) : null;
+  const set = (id, v) => { $(id).textContent = v; };
+  if (m) {
+    set("mVpp", fmtV(m.vpp)); set("mVrms", fmtV(m.vrms)); set("mVmean", fmtV(m.mean));
+    set("mVmax", fmtV(m.vmax)); set("mVmin", fmtV(m.vmin));
+    set("mFreq", m.freq > 0 ? fmtF(m.freq) : "–");
+    set("mPeriod", m.freq > 0 ? fmtT(1 / m.freq) : "–");
+    set("mDuty", m.freq > 0 ? (m.duty * 100).toFixed(1) + " %" : "–");
+    set("mRise", m.rise > 0 ? fmtT(m.rise) : "–");
+    if (cModeActive) {
+      if (m.rise > 0) {
+        const tau = m.rise / Math.log(9);          /* t_r = τ·ln 9 */
+        set("cMeasVal", t("cResult") + " " + fmtC(tau / C_MEAS.R));
+      } else set("cMeasVal", t("cFail"));
+    }
+  } else { ["mVpp", "mVrms", "mVmean", "mVmax", "mVmin", "mFreq", "mPeriod", "mDuty", "mRise"].forEach(id => set(id, "–")); }
+  /* Cursor-Deltas */
+  const dt = Math.abs(cur.v2 - cur.v1) * w.screenT;
+  const dv = (cur.h1 - cur.h2) * 8 * CH[0].vdiv;
+  set("curDt", fmtT(dt)); set("curDv", fmtV(dv));
+  set("curF", dt > 0 ? fmtF(1 / dt) : "–");
+  set("bwLimit", fmtF(bwInfo()));
+}
+function fmtC(c) {
+  if (c >= 1e-6) return (c * 1e6).toFixed(1) + " µF";
+  if (c >= 1e-9) return (c * 1e9).toFixed(1) + " nF";
+  return (c * 1e12).toFixed(0) + " pF";
+}
+
+/* ==================== 20. Haupt-Loop (~60 FPS, Messungen gedrosselt) ==================== */
+let lastFrameT = performance.now(), fftTimer = 0, measTimer = 0;
+function frame(now) {
+  const dtWall = Math.min(0.05, (now - lastFrameT) / 1000);
+  lastFrameT = now;
+  if (S.running) acquire(dtWall);
+  const w = buildWindow();
+  drawMain(w, dtWall);
+  fftTimer -= dtWall; if (fftTimer <= 0) { computeFFT(); fftTimer = 0.25; }
+  drawFFT(); drawBlock(now); drawElectrons(dtWall);
+  if ($("lissaToggle").checked) drawLissa();
+  measTimer -= dtWall; if (measTimer <= 0 && w) { updateMeasurements(w); measTimer = 0.15; }
+  requestAnimationFrame(frame);
+}
+
+/* ==================== 21. Bedienelemente ==================== */
+function updateRunButton() {
+  const b = $("btnRun");
+  b.textContent = S.running ? t("run") : t("stop");
+  b.classList.toggle("active", S.running);
+  b.classList.toggle("danger", !S.running);
+}
+$("btnRun").addEventListener("click", () => { S.running = !S.running; updateRunButton(); });
+$("btnSingle").addEventListener("click", () => {
+  S.trig.mode = "single"; $("trigMode").value = "single";
+  singleArmed = true; lastWindow = null; S.running = true; updateRunButton();
+});
+$("btnAutoset").addEventListener("click", autoset);
+$("langToggle").addEventListener("click", () => { LANG = LANG === "de" ? "en" : "de"; applyLang(); });
+window.addEventListener("keydown", e => {
+  if (e.code === "Space" && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) {
+    e.preventDefault(); S.running = !S.running; updateRunButton();
+  }
+});
+
+/* Kanal 1 / Kanal 2 */
+$("ch1On").addEventListener("change", e => { CH[0].on = e.target.checked; });
+$("ch2On").addEventListener("change", e => { CH[1].on = e.target.checked; });
+$("voltsDiv1").addEventListener("change", e => { CH[0].vdiv = VDIVS[+e.target.value]; });
+$("voltsDiv2").addEventListener("change", e => { CH[1].vdiv = VDIVS[+e.target.value]; });
+$("pos1").addEventListener("input", e => { CH[0].pos = +e.target.value; $("pos1Val").textContent = (+e.target.value).toFixed(1) + " Div"; });
+$("pos2").addEventListener("input", e => { CH[1].pos = +e.target.value; $("pos2Val").textContent = (+e.target.value).toFixed(1) + " Div"; });
+$("cpl1").addEventListener("change", e => { CH[0].cpl = e.target.value; });
+$("cpl2").addEventListener("change", e => { CH[1].cpl = e.target.value; });
+$("inv1").addEventListener("change", e => { CH[0].inv = e.target.checked; });
+$("inv2").addEventListener("change", e => { CH[1].inv = e.target.checked; });
+
+/* Zeitbasis & Erfassung */
+$("timeDiv").addEventListener("change", e => { S.timeDiv = TDIVS[+e.target.value]; lastWindow = null; });
+$("modeRoll").addEventListener("change", e => { S.roll = e.target.value === "roll"; });
+$("acqFs").addEventListener("input", e => {
+  S.fs = logToLin(+e.target.value, 1e8, 1e10);
+  $("acqFsVal").textContent = fmtFs(S.fs);
+});
+$("adcBits").addEventListener("change", e => { S.bits = +e.target.value; });
+$("memDepth").addEventListener("change", e => { S.memDepth = +e.target.value; allocBuffers(); });
+
+/* Trigger */
+$("trigMode").addEventListener("change", e => { S.trig.mode = e.target.value; if (e.target.value === "single") { singleArmed = true; S.running = true; updateRunButton(); } });
+$("trigSrc").addEventListener("change", e => { S.trig.src = e.target.value; });
+$("trigSlope").addEventListener("change", e => { S.trig.slope = e.target.value === "rise" ? 1 : -1; });
+$("trigCpl").addEventListener("change", e => { S.trig.cpl = e.target.value; });
+$("trigLevel").addEventListener("input", e => { S.trig.level = +e.target.value; $("trigLevelVal").textContent = fmtV(S.trig.level); });
+
+/* Mathematik & Anzeige */
+$("mathSel").addEventListener("change", e => { S.math = e.target.value; });
+$("persistence").addEventListener("input", e => { S.persist = +e.target.value; $("persVal").textContent = (+e.target.value).toFixed(1) + " s"; });
+$("sampleHold").addEventListener("change", e => { S.sampleHold = e.target.checked; });
+$("lissaToggle").addEventListener("change", e => { $("lissaBox").style.display = e.target.checked ? "block" : "none"; if (e.target.checked) CANVASES.lissaCanvas.resize(); });
+
+/* Signalgenerator (bearbeitet jeweils CH1 oder CH2) */
+let genCh = 0;
+function syncGeneratorUI() {
+  const s = src[genCh];
+  $("genTarget1").classList.toggle("active", genCh === 0);
+  $("genTarget2").classList.toggle("active", genCh === 1);
+  $("genWave").value = s.wave;
+  $("genFreq").value = Math.log10(s.freq / 0.1) / Math.log10(10e6 / 0.1);
+  $("genAmp").value = Math.log10(s.amp / 1e-3) / Math.log10(10 / 1e-3);
+  $("genOff").value = s.off; $("genDuty").value = s.duty * 100;
+  $("genDutyRow").style.display = (s.wave === "square" || s.wave === "pulse") ? "flex" : "none";
+  updateGenLabels();
+}
+function updateGenLabels() {
+  const s = src[genCh];
+  $("genFreqVal").textContent = fmtF(s.freq);
+  $("genAmpVal").textContent = fmtV(s.amp);
+  $("genOffVal").textContent = fmtV(s.off);
+  $("genDutyVal").textContent = Math.round(s.duty * 100) + " %";
+}
+$("genTarget1").addEventListener("click", () => { genCh = 0; syncGeneratorUI(); });
+$("genTarget2").addEventListener("click", () => { genCh = 1; syncGeneratorUI(); });
+$("genWave").addEventListener("change", e => { src[genCh].wave = e.target.value; syncGeneratorUI(); });
+$("genFreq").addEventListener("input", e => { src[genCh].freq = logToLin(+e.target.value, 0.1, 10e6); updateGenLabels(); });
+$("genAmp").addEventListener("input", e => { src[genCh].amp = logToLin(+e.target.value, 1e-3, 10); updateGenLabels(); });
+$("genOff").addEventListener("input", e => { src[genCh].off = +e.target.value; updateGenLabels(); });
+$("genDuty").addEventListener("input", e => { src[genCh].duty = +e.target.value / 100; updateGenLabels(); });
+
+/* Tastkopf, Eingangsimpedanz, Leitung */
+$("probe1").addEventListener("change", e => { CH[0].probe = +e.target.value; });
+$("probe2").addEventListener("change", e => { CH[1].probe = +e.target.value; });
+$("imp1").addEventListener("change", e => { CH[0].imp = +e.target.value; });
+$("imp2").addEventListener("change", e => { CH[1].imp = +e.target.value; });
+$("cableC").addEventListener("input", e => {
+  const c = +e.target.value * 1e-12;
+  CH[0].cableC = c; CH[1].cableC = c;
+  $("cableCVal").textContent = e.target.value + " pF";
+});
+
+/* Kapazitätsmessung: Einzelschuss auf die Lade-Stufe (Halbperiode ≫ τ,
+   dadurch exakt eine RC-Aufladung 0 → 2 V im getriggerten Fenster) */
+$("btnCMeas").addEventListener("click", () => {
+  cModeActive = !cModeActive;
+  if (cModeActive) {
+    Object.assign(src[0], { wave: "square", freq: 100, amp: 1, off: 1, duty: 0.5 });
+    genCh = 0; syncGeneratorUI();
+    CH[0].on = true; $("ch1On").checked = true;
+    CH[0].cpl = "dc"; $("cpl1").value = "dc";
+    CH[0].vdiv = 0.5; $("voltsDiv1").value = snapIndex(VDIVS, 0.5);
+    S.timeDiv = 5e-5; $("timeDiv").value = snapIndex(TDIVS, 5e-5);
+    S.trig.mode = "single"; $("trigMode").value = "single";
+    S.trig.slope = 1; $("trigSlope").value = "rise";
+    S.trig.level = 1; $("trigLevel").value = 1; $("trigLevelVal").textContent = fmtV(1);
+    singleArmed = true; lastWindow = null; S.running = true; updateRunButton();
+    $("cMeasVal").textContent = "…";
+  } else { $("cMeasVal").textContent = "–"; S.running = true; updateRunButton(); }
+  $("btnCMeas").textContent = cModeActive ? t("cmessOn") : t("cmessBtn");
+  lastWindow = null;
+});
+
+/* ==================== 22. Initialisierung ==================== */
+fillSelect($("voltsDiv1"), VDIVS, fmtV); fillSelect($("voltsDiv2"), VDIVS, fmtV);
+fillSelect($("timeDiv"), TDIVS, fmtT);
+$("voltsDiv1").value = snapIndex(VDIVS, CH[0].vdiv);
+$("voltsDiv2").value = snapIndex(VDIVS, CH[1].vdiv);
+$("timeDiv").value = snapIndex(TDIVS, S.timeDiv);
+$("acqFs").value = Math.log10(S.fs / 1e8) / 2;
+$("acqFsVal").textContent = fmtFs(S.fs);
+$("trigLevelVal").textContent = fmtV(S.trig.level);
+$("pos1Val").textContent = "0.0 Div"; $("pos2Val").textContent = CH[1].pos.toFixed(1) + " Div";
+$("pos2").value = CH[1].pos;
+syncGeneratorUI();
+applyLang();
+updateRunButton();
+initPersistence();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

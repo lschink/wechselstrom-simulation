@@ -1,0 +1,67 @@
+ To resume this session: kimi -r session_708d3509-6df5-43ee-b1c8-063281068aa2
+
+
+KIMI-CODE-PROMPT – Simulation: Digitales Oszilloskop (DSO)
+Ziel: Eine vollständig clientseitige, eigenständige Website (eine einzelne HTML-Datei, Canvas-Rendering), die die grundlegenden Funktionen eines digitalen Speicheroszilloskops (DSO) simuliert: Signalaufnahme, Triggerung, Zeitbasis, Spannungsmessung, AC/DC-Kopplung und mathematische Funktionen – im gleichen Stil und mit dem gleichen Funktionsumfang wie die Simulation 04_Kondensator_Wechselstrom. GitHub-Pages-tauglich.
+Physikalischer/Technischer Kern (Abweichungen zur Spulen-Simulation beachten!)
+Das Oszilloskop zeigt Spannung über Zeit (u(t)) als abgetastete Werte (Sampling) an, nicht als kontinuierliche Kurve.
+Abtasttheorem (Nyquist): Die Abtastrate f_s muss mindestens doppelt so hoch sein wie die höchste Signalfrequenz f_max (f_s ≥ 2·f_max). Bei Unterschreitung entsteht Aliasing (Scheinfrequenzen).
+Triggerung: Ein definiertes Ereignis (Steigende Flanke, Spannungspegel) startet die Darstellung, um ein stehendes Bild zu erzeugen. Ohne Trigger driftet das Bild.
+AC/DC-Kopplung: DC zeigt das Signal mit Gleichanteil; AC blockiert den Gleichanteil über einen internen Kondensator (untere Grenzfrequenz).
+Zeitbasis (Time/Div): Bestimmt die horizontale Skalierung (Zeit pro Kästchen). Volt/Div: Vertikale Skalierung.
+Bandbreite (BW): Das Oszilloskop hat eine obere Grenzfrequenz; Signale darüber werden gedämpft dargestellt (simuliert als Tiefpass 1. Ordnung).
+Hauptszenen (Drei Canvas-Bereiche, synchronisiert)
+Signalquelle & Messobjekt (links)
+Virtueller Signalgenerator (Rechteck, Sinus, Dreieck, Sägezahn, Rauschen, Puls) mit einstellbarer Frequenz (0,1 Hz – 10 MHz, logarithmisch), Amplitude (1 mV – 10 V, logarithmisch), Offset (-5 V – +5 V, linear) und Tastverhältnis (nur bei Rechteck/Puls, 10 % – 90 %).
+Probes (Tastköpfe): 1:1 (keine Dämpfung, begrenzte Bandbreite) vs. 10:1 (10-fache Dämpfung, höhere Bandbreite, 10 MΩ Eingangswiderstand). Visueller Vergleich der Signalform bei hohen Frequenzen.
+Messleitung mit Kapazität (simuliert als RC-Glied): Bei langen Kabeln und hohen Frequenzen sichtbare Signalverformung (Rundung der Flanken).
+Elektronen-Animation: Blaue Punkte fließen im Leiter, Geschwindigkeit proportional zum momentanen Strom (nur bei DC sichtbar; bei AC pendeln sie).
+Oszilloskop-Display (Mitte, Haupt-Canvas)
+Raster: 10×8 Kästchen (Div), mittige horizontale und vertikale Achse hervorgehoben.
+Signalspur: Gelb (Kanal 1), Cyan (Kanal 2), Magenta (Mathematik). Linienstärke 2 px, anti-aliased.
+Abtastpunkte: Bei aktivierter "Sample & Hold"-Anzeige werden die diskreten Abtastwerte als Punkte auf der Kurve markiert (verdeutlicht das digitale Prinzip).
+Trigger-Markierung: Kleines "T"-Symbol am linken Rand auf Trigger-Pegel-Höhe; vertikale gestrichelte Linie am Triggerpunkt.
+Cursor: Zwei vertikale und zwei horizontale Cursor-Linien (gestrichelt) mit Delta-Anzeige (Δt, ΔV, 1/Δt = Frequenz).
+Autoset-Button: Algorithmus wählt automatisch optimale Volt/Div und Zeitbasis, um 2–3 Perioden sichtbar zu machen.
+Persistence (Nachleuchten): Optional alte Traces mit abklingender Helligkeit (0–5 s einstellbar).
+Blockschaltbild des Oszilloskops (rechts oder unten)
+Signalfluss: Eingang → AC/DC-Kopplung-Schalter → Verstärker (Volt/Div) → ADC (Analog-Digital-Wandler) → Speicher → Display.
+ADC-Darstellung: Bit-Tiefe einstellbar (8 Bit Standard, 12 Bit hochauflösend). Bei 8 Bit sichtbare Quantisierungsstufen (Treppenstufen im Signal).
+Speicher-Tiefe: Anzahl der Punkte (1k, 10k, 100k) – beeinflusst die maximale Zeitbasis-Auflösung.
+Trigger-Logik: Komparator-Symbol, der bei Überschreitung des Trigger-Pegels einen Impuls auslöst (LED blinkt).
+Oszilloskop-Diagramm (Detail-Canvas unter dem Hauptdisplay)
+FFT-Anzeige (Mathematik-Funktion): Spektrum des Signals (Frequency Domain) als Balken- oder Linien-Diagramm. Zeigt Grundfrequenz und Oberschwingungen (THD berechnen). Logarithmische Frequenzachse.
+Messwerte-Panel (rechts, Live-Werte):
+Vpp (Spitze-Spitze), Vrms (Effektivwert), Vmean (Gleichanteil), Vmax, Vmin.
+Frequenz (durch Zählung der Nulldurchgänge oder über Trigger), Periode, Duty-Cycle.
+Anstiegszeit (10 % – 90 %) bei Rechtecksignalen.
+Cursor-Messungen: Δt (Zeitdifferenz), ΔV (Spannungsdifferenz), 1/Δt (Frequenz aus Cursorn).
+Bandbreiten-Limit: Anzeige der aktuellen -3 dB Grenzfrequenz (abhängig von Probe und Einstellung).
+Zeigerdiagramm (Phasenansicht, optional einblendbar)
+Zeigt Lissajous-Figuren: Kanal 1 (X) vs. Kanal 2 (Y). Bei gleicher Frequenz und Phasenverschiebung φ entsteht eine Ellipse; bei 0° eine Gerade (positive Steigung), bei 90° ein Kreis (bei gleicher Amplitude).
+Messung: Automatische Berechnung des Phasenwinkels φ aus der Ellipsenform (φ = arcsin(B/A), wobei A = maximale vertikale Auslenkung, B = vertikale Auslenkung bei x=0).
+Impedanz- und Kapazitätsmessung (Erweiterung)
+Eingangsimpedanz: 1 MΩ (Standard) oder 50 Ω (HF-Anpassung). Bei 50 Ω: Anpassung an Koaxialkabel, Reflexionen bei Fehlanpassung sichtbar (simuliert als stehende Welle bei sehr hohen Frequenzen).
+Kapazitätsmessung: Messung von unbekannten Kondensatoren über die Anstiegszeit einer RC-Ladung (τ = R·C).
+Steuerung (Bedienfeld, sofortige Wirkung)
+Kanal 1 & 2: Ein/Aus, Volt/Div (1 mV – 10 V, 1-2-5-Reihe), Offset-Position, AC/DC/GND-Kopplung, Invertieren (180° Phasendrehung).
+Zeitbasis: Time/Div (1 ns – 10 s, 1-2-5-Reihe), Roll-Modus (bei sehr langsamen Signalen) vs. Y-T-Modus (Standard).
+Trigger: Modus (Auto, Normal, Single), Quelle (CH1, CH2, Ext), Flanke (steigend/fallend), Pegel (Level), Kopplung (DC, AC, HF-Reject).
+Mathematik: CH1+CH2, CH1-CH2, CH1×CH2, FFT(CH1), Integral(CH1), Differential(CH1).
+Abtastrate: Simulierte ADC-Rate (100 MS/s – 10 GS/s, logarithmisch). Bei zu niedriger Rate für das Signal: Aliasing-Warnung (rotes Blinken).
+Start/Stopp (zusätzlich Leertaste): Einfrieren der Aufnahme (Run/Stop).
+Single-Shot: Einmalige Aufnahme bei Trigger-Ereignis (für Transienten).
+Erklärbereich (6 Absätze, Deutsch mit EN-Umschalter)
+Grundprinzip: Ein Oszilloskop zeigt die Spannung über Zeit als Graphen. Der Elektronenstrahl (historisch) bzw. die Abtastung (digital) zeichnet die Kurve. Der Trigger sorgt für ein stehendes Bild, indem er die Darstellung immer am gleichen Punkt des Signals startet.
+Abtastung und Nyquist-Theorem: Das digitale Oszilloskop nimmt diskrete Werte (Samples) auf. Nach Shannon/Nyquist muss die Abtastrate mindestens doppelt so hoch sein wie die Signalfrequenz. Bei Unterschreitung entsteht Aliasing – das Signal erscheint mit einer falschen, niedrigeren Frequenz (Unterabtastung). Hochwertige Oszilloskope verwenden eine Abtastrate von 2,5× bis 5× der Bandbreite.
+AC/DC-Kopplung und Bandbreite: DC-Kopplung zeigt das Signal wie es ist (inkl. Gleichspannungsanteil). AC-Kopplung blockiert Gleichanteil über einen Kondensator – wichtig, um kleine Wechselanteile auf großem DC-Offset zu sehen. Die Bandbreite (z. B. 100 MHz) begrenzt die höchste darstellbare Frequenz; darüber wird das Signal gedämpft (Amplitude zu klein, Flanken verschliffen).
+Triggerung: Ohne Trigger wandert das Bild. Der Trigger vergleicht das Signal mit einem Schwellenwert (Level) und startet die Darstellung bei einer definierten Flanke (steigend/fallend). Normal-Trigger zeigt nur bei Ereignis, Auto-Trigger zeigt auch ohne Trigger-Signal (für DC-Einstellung). Single-Shot erfasst einmalige Ereignisse.
+Messungen und Cursor: Automatische Messungen (Vpp, Vrms, Frequenz) basieren auf Algorithmen über den gespeicherten Datenpunkten. Cursor erlauben manuelle Differenzmessungen: Δt für Zeit (und daraus Frequenz), ΔV für Spannung. Die Genauigkeit hängt von der vertikalen Auflösung (ADC-Bits) und der Zeitbasis ab.
+Praxis und Fallstricke: Tastköpfe (1:1 vs. 10:1) und ihre Bandbreite; Erdung (Sicherheit, Masseschleifen); Aliasing-Erkennung (Verändern der Zeitbasis sollte das Bild nicht verändern); Eingangsimpedanz (1 MΩ vs. 50 Ω) und deren Einfluss auf das Messobjekt; Verwendung von Oszilloskopen in der Fehlersuche (Logik-Analyse, Signalintegrität, EMV).
+Technische Anforderungen
+Eine einzige index.html, kein Framework, offline, ca. 60 FPS, responsiv (Canvas mit aspect-ratio, Design-Koordinaten skaliert, devicePixelRatio beachten).
+Übersichtlich kommentierter Code (deutsche Kommentare); deutsches UI mit EN-Umschalter (vollständiges Dictionary inkl. Erklärtexte und Canvas-Beschriftungen); dunkles Design im gleichen Stil wie 04_Kondensator_Wechselstrom (Farbpalette: Hintergrund #0d1117, Raster #30363d, Signal-Gelb #e3b341, Cyan #58a6ff, Magenta #bc8cff, Text #c9d1d9).
+Auf korrekte String-Quotes achten (typografische Anführungszeichen in Texten, keine ASCII-" in doppel-quotierten Strings).
+Performance-Optimierung: Signalberechnung in Web Worker oder aufgeteilt in Chunks, um UI-Blockaden zu vermeiden. FFT via Cooley-Tukey-Algorithmus implementiert (keine externen Libraries).
+Simulations-Genauigkeit: Die ADC-Quantisierung muss mathematisch korrekt als Treppenfunktion dargestellt werden; Aliasing muss durch echte Unterabtastung im Code entstehen (nicht nur visuell simuliert).
+

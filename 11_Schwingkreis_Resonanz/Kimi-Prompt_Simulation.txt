@@ -1,0 +1,40 @@
+ To resume this session: kimi -r session_4984010b-357b-4a9d-ac67-515fb31bb2c3
+
+
+KIMI-CODE-PROMPT – Simulation: Reihenschwingkreis und Resonanz
+=============================================================
+Ziel: Eine vollständig clientseitige, eigenständige Website (eine einzelne HTML-Datei,
+Canvas-Rendering), die den RLC-Reihenschwingkreis mit Resonanz, Spannungsüberhöhung
+und Güte interaktiv zeigt. GitHub-Pages-tauglich.
+
+Hauptszene
+- Schaltplan: AC-Quelle → R → L → C in Reihe; animierte Elektronen; Spulen- und
+  Kondensatorsymbol mit Pendel-Visualisierung (Fluss, Plattenladung).
+- Drei Spannungsmesspfeile/Instrumente an R, L, C mit Momentanwerten; bei Resonanz
+  leuchten U_L und U_C auf (Spannungsüberhöhung!) und heben sich am Bauteil gegenseitig
+  auf (gegensinnige Zeiger) – trotzdem fließt großer Strom.
+
+Diagramme
+- Oszilloskop: u(t) der Quelle und i(t) (phasengleich bei Resonanz!).
+- Resonanzkurve: I(f) über der Frequenz (log-Achse), mit Cursor an der aktuellen
+  Frequenz; markiere die Resonanzfrequenz f₀ = 1/(2π√(LC)), die Bandbreite
+  B = f₀/Q und die Grenzfrequenzen.
+- Zeigerdiagramm bei der aktuellen Frequenz: U_R, U_L, U_C (U_L und U_C gegenphasig).
+
+Steuerung (Schieberegler, sofortige Wirkung)
+- R (1–1000 Ω), L (1 µH – 1 H), C (1 pF – 1 µF), Frequenz f (logarithmisch um f₀
+  herum, z. B. drei Dekaden), Û der Quelle. Schnellauswahl-Preset: „Resonanz",
+  „unterhalb", „oberhalb".
+- Messwerte live: f₀, Q = (1/R)·√(L/C), Bandbreite B, I, U_R, U_L, U_C,
+  Serienscheinwiderstand Z.
+
+Erklärbereich
+- 3–5 Absätze auf Deutsch: Resonanzbedingung X_L = X_C (Kurzschluss der Blindanteile,
+  Z = R minimal, Strom maximal); Spannungsüberhöhung U_L = U_C = Q·U (Güte!);
+  Bandbreite und Güte; Anwendungen: Filterschaltungen, Sende-/Empfangstechnik,
+  NF-Entzerrung; Warnung vor Überspannungen an L/C in der Resonanz.
+
+Technische Anforderungen
+- Eine einzige index.html, kein Framework, offline, ca. 60 FPS, responsiv.
+- Übersichtlich kommentierter Code; deutsches UI mit EN-Umschalter; dunkles Design
+  im gleichen Stil wie die bisherigen Simulationen.

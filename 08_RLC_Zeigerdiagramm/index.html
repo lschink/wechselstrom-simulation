@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zeigerdiagramm RLC-Reihenschaltung – Simulation</title>
+<style>
+  /* ---------- Grundlayout (dunkles Labor-Design, Stil der bisherigen Sims) ---------- */
+  :root{
+    --bg:#0b1220; --panel:#141d33; --panel2:#1b2745; --text:#e5ecf7; --muted:#93a4c3;
+    --accent:#f59e0b; --green:#4ade80; --cyan:#22d3ee; --red:#f87171; --blue:#60a5fa;
+    --orange:#fb923c; --border:#26355a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--text);
+       font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+  header{display:flex;justify-content:space-between;align-items:center;gap:1rem;
+         padding:.8rem 1.2rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  h1{font-size:1.25rem}
+  .sub{color:var(--muted);font-size:.85rem}
+  button{background:var(--accent);color:#1a1206;border:0;border-radius:8px;
+         padding:.45rem .9rem;font-weight:700;font-size:.9rem;cursor:pointer}
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  button:hover{filter:brightness(1.12)}
+  main{max-width:1280px;margin:0 auto;padding:1rem}
+
+  /* ---------- Bühne: Zeigerdiagramm links, Schaltplan/Messwerte rechts ---------- */
+  .stage{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:1rem}
+  @media (max-width:920px){.stage{grid-template-columns:1fr}}
+  .canvas-wrap{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  canvas{display:block;width:100%;height:auto}
+  #scene{aspect-ratio:3/2}
+  #circuit{aspect-ratio:16/10}
+  .side{display:flex;flex-direction:column;gap:1rem}
+
+  /* ---------- Messwert-Chips ---------- */
+  h2.sec{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem}
+  .readouts{display:grid;grid-template-columns:repeat(auto-fill,minmax(106px,1fr));gap:.5rem}
+  .chip{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.45rem .6rem}
+  .chip .l{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+  .chip .v{font-size:1.02rem;font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* ---------- Steuerung ---------- */
+  section h2.sec{margin:1.2rem 0 .5rem}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.8rem}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:.8rem}
+  .card h3{font-size:.85rem;color:var(--muted);margin-bottom:.5rem;font-weight:600}
+  .row{display:flex;justify-content:space-between;align-items:baseline;font-size:.9rem;margin-bottom:.25rem;gap:.5rem}
+  .row output{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
+  .buttons{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+  .hint{color:var(--muted);font-size:.75rem;margin-top:.4rem}
+
+  /* ---------- Formelzeile und Erklärung ---------- */
+  .formulas{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+  .formula{background:var(--panel2);border:1px solid var(--border);border-radius:10px;
+           padding:.45rem .8rem;font-family:Georgia,serif;font-style:italic;white-space:nowrap;font-size:.95rem}
+  .explain{margin-top:1.2rem;background:var(--panel);border:1px solid var(--border);
+           border-radius:12px;padding:1rem 1.2rem}
+  .explain h2{font-size:1.05rem;margin-bottom:.4rem}
+  .explain p{margin:.55rem 0;font-size:.92rem;color:#cdd8ec}
+  .explain strong{color:var(--text)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 data-i18n="title">Zeigerdiagramm – RLC-Reihenschaltung</h1>
+    <div class="sub" data-i18n="subtitle">Spannungszeiger an R, L und C im Frequenzbereich – der Strom ist die Bezugsgröße</div>
+  </div>
+  <button id="btnLang" class="secondary">EN</button>
+</header>
+
+<main>
+  <!-- ============ Bühne ============ -->
+  <div class="stage">
+    <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+    <div class="side">
+      <div class="canvas-wrap"><canvas id="circuit"></canvas></div>
+      <div>
+        <h2 class="sec" data-i18n="readings">Messwerte</h2>
+        <div class="readouts">
+          <div class="chip"><div class="l" data-i18n="rF0">f<sub>0</sub> Resonanz</div><div class="v" id="vF0">–</div></div>
+          <div class="chip"><div class="l">X<sub>L</sub></div><div class="v" id="vXL">–</div></div>
+          <div class="chip"><div class="l">X<sub>C</sub></div><div class="v" id="vXC">–</div></div>
+          <div class="chip"><div class="l">Z</div><div class="v" id="vZ">–</div></div>
+          <div class="chip"><div class="l">φ</div><div class="v" id="vPhi">–</div></div>
+          <div class="chip"><div class="l">cos φ</div><div class="v" id="vCos">–</div></div>
+          <div class="chip"><div class="l">I</div><div class="v" id="vI">–</div></div>
+          <div class="chip"><div class="l">U<sub>R</sub></div><div class="v" id="vUR">–</div></div>
+          <div class="chip"><div class="l">U<sub>L</sub></div><div class="v" id="vUL">–</div></div>
+          <div class="chip"><div class="l">U<sub>C</sub></div><div class="v" id="vUC">–</div></div>
+          <div class="chip"><div class="l">u(t)</div><div class="v" id="vUinst">–</div></div>
+          <div class="chip"><div class="l">i(t)</div><div class="v" id="vIinst">–</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Steuerung ============ -->
+  <section>
+    <h2 class="sec" data-i18n="settings">Einstellungen</h2>
+    <div class="controls">
+      <div class="card">
+        <div class="row"><span data-i18n="rR">R – Widerstand</span><output id="oR"></output></div>
+        <input type="range" id="rR" min="10" max="1000" step="1" value="100">
+        <div class="hint" data-i18n="rRHint">Der Widerstand bestimmt den Wirkanteil: U_R = R·I liegt in Phase mit dem Strom (waagrecht).</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="rL">L – Induktivität</span><output id="oL"></output></div>
+        <input type="range" id="rL" min="1" max="1000" step="1" value="100">
+        <div class="hint" data-i18n="rLHint">X_L = 2π·f·L wächst mit der Frequenz; U_L steht senkrecht auf I (+90°).</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="rC">C – Kapazität</span><output id="oC"></output></div>
+        <input type="range" id="rC" min="1" max="500" step="1" value="50">
+        <div class="hint" data-i18n="rCHint">X_C = 1/(2π·f·C) fällt mit der Frequenz; U_C zeigt senkrecht nach unten (−90°).</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="rF">f – Frequenz</span><output id="oF"></output></div>
+        <input type="range" id="rF" min="0" max="1000" step="1" value="730">
+        <div class="hint" data-i18n="rFHint">Logarithmische Skala: 0,1 … 500 Hz. Bei f₀ = 1/(2π·√(L·C)) ist X_L = X_C. Kleine Frequenzen (≤ 1 Hz) mit ▶ Drehung zeigen die Rotation der Zeiger in Zeitlupe.</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="rU">U – Quellenspannung (Effektivwert)</span><output id="oU"></output></div>
+        <input type="range" id="rU" min="10" max="400" step="5" value="230">
+        <div class="hint" data-i18n="rUHint">I = U/Z. U ist die geometrische Summe aller Teilspannungen.</div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="opCard">Anzeige &amp; Betrieb</h3>
+        <div class="buttons">
+          <button id="btnRot" class="secondary"></button>
+          <button id="btnF0" data-i18n="resF0">f → f₀ (Resonanz)</button>
+        </div>
+        <div class="hint" data-i18n="opHint">Drehung: Alle Zeiger rotieren gemeinsam mit ω (Zeitlupe); ihre Projektion auf die senkrechte Achse liefert u(t) und i(t). Resonanz: stellt f = f₀ ein.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Formeln ============ -->
+  <h2 class="sec" data-i18n="formulas">Formeln</h2>
+  <div class="formulas">
+    <div class="formula">X<sub>L</sub> = 2π·f·L</div>
+    <div class="formula">X<sub>C</sub> = 1 / (2π·f·C)</div>
+    <div class="formula">Z = √(R² + (X<sub>L</sub> − X<sub>C</sub>)²)</div>
+    <div class="formula">I = U / Z</div>
+    <div class="formula">tan φ = (X<sub>L</sub> − X<sub>C</sub>) / R</div>
+    <div class="formula">U = √(U<sub>R</sub>² + (U<sub>L</sub> − U<sub>C</sub>)²)</div>
+    <div class="formula">f<sub>0</sub> = 1 / (2π·√(L·C))</div>
+  </div>
+
+  <!-- ============ Erklärung ============ -->
+  <article class="explain">
+    <h2 data-i18n="explanation">Erklärung</h2>
+    <p data-i18n-html="exp1"></p>
+    <p data-i18n-html="exp2"></p>
+    <p data-i18n-html="exp3"></p>
+    <p data-i18n-html="exp4"></p>
+    <p data-i18n-html="exp5"></p>
+  </article>
+</main>
+
+<script>
+"use strict";
+/* ==================================================================
+   Simulation: Zeigerdiagramm der RLC-Reihenschaltung (Frequenzbereich)
+   Reines JS + Canvas, keine externen Abhängigkeiten, offline lauffähig.
+
+   Physikmodell (Effektivwerte, Strom als Bezugszeiger):
+     X_L = 2πfL,  X_C = 1/(2πfC),  Z = √(R² + (X_L − X_C)²),  I = U/Z
+     U_R = R·I ∠0°,  U_L = X_L·I ∠+90°,  U_C = X_C·I ∠−90°
+     U = U_R + U_L + U_C  (Zeigersumme),  φ = atan2(X_L − X_C, R)
+     f₀ = 1/(2π√(LC))      (Resonanz: X_L = X_C, φ = 0)
+   ================================================================== */
+
+/* ---------------- 1. Sprachdatei (DE/EN) ---------------- */
+const I18N = {
+  de: {
+    title: "Zeigerdiagramm – RLC-Reihenschaltung",
+    subtitle: "Spannungszeiger an R, L und C im Frequenzbereich – der Strom ist die Bezugsgröße",
+    readings: "Messwerte",
+    rF0: "f₀ Resonanz",
+    settings: "Einstellungen",
+    rR: "R – Widerstand",
+    rRHint: "Der Widerstand bestimmt den Wirkanteil: U_R = R·I liegt in Phase mit dem Strom (waagrecht).",
+    rL: "L – Induktivität",
+    rLHint: "X_L = 2π·f·L wächst mit der Frequenz; U_L steht senkrecht auf I (+90°).",
+    rC: "C – Kapazität",
+    rCHint: "X_C = 1/(2π·f·C) fällt mit der Frequenz; U_C zeigt senkrecht nach unten (−90°).",
+    rF: "f – Frequenz",
+    rFHint: "Logarithmische Skala: 0,1 … 500 Hz. Bei f₀ = 1/(2π·√(L·C)) ist X_L = X_C. Kleine Frequenzen (≤ 1 Hz) mit ▶ Drehung zeigen die Rotation der Zeiger in Zeitlupe.",
+    rU: "U – Quellenspannung (Effektivwert)",
+    rUHint: "I = U/Z. U ist die geometrische Summe aller Teilspannungen.",
+    opCard: "Anzeige & Betrieb",
+    rotStart: "▶ Drehung", rotStop: "❚❚ Stopp", resF0: "f → f₀ (Resonanz)",
+    opHint: "Drehung: Alle Zeiger rotieren gemeinsam mit ω (Zeitlupe); ihre Projektion auf die senkrechte Achse liefert u(t) und i(t). Resonanz: stellt f = f₀ ein.",
+    tagInd: "(ind)", tagKap: "(kap)",
+    formulas: "Formeln", explanation: "Erklärung",
+    /* Zeigerdiagramm */
+    zdTitle: "Zeigerdiagramm – Effektivwerte",
+    zdRes: "Resonanz: U_L = U_C",
+    zdINote: "Stromzeiger I: eigene Skalierung",
+    lblRe: "Re", lblIm: "Im",
+    lblU: "U", lblUR: "UR", lblUL: "UL", lblUC: "UC", lblI: "I",
+    /* Schaltplan */
+    cTitle: "Reihenschaltung R–L–C",
+    exp1: `<strong>Zeiger statt Kurven:</strong> Jede Sinusschwingung lässt sich als rotierender Zeiger darstellen – die <strong>Länge</strong> entspricht dem Effektivwert, die <strong>Drehzahl</strong> der Frequenz, der <strong>Winkel</strong> der Nullphase. Das Zeigerdiagramm im <strong>Frequenzbereich</strong> ist das Standbild dieses rotierenden Sterns: Alle Zeiger drehen sich gemeinsam mit ω, ihr <strong>gegenseitiger Winkel</strong> (hier φ) bleibt dabei erhalten.`,
+    exp2: `<strong>Reihenschaltung – Strom als Bezug:</strong> Durch alle drei Bauelemente fließt derselbe Strom, deshalb zeichnet man den <strong>Stromzeiger I waagrecht</strong> als Bezugsgröße. Am Widerstand fällt <strong>U_R = R·I gleichphasig</strong> ab (parallel zu I). Die Spannung an der Spule <strong>eilt dem Strom um +90° voraus</strong> (U_L senkrecht nach oben), die am Kondensator <strong>hinkt um −90° hinterher</strong> (U_C senkrecht nach unten).`,
+    exp3: `<strong>Zeigersumme und Spannungsdreieck:</strong> Die Quellenspannung ist die <strong>geometrische Summe</strong> U = U_R + U_L + U_C: Die Zeiger werden aneinandergehängt (Polygon im Diagramm), vom Ursprung zur Endspitze zeigt U. Weil U_L und U_C in <strong>entgegengesetzte Richtungen</strong> zeigen, löschen sie sich teilweise; übrig bleibt ein <strong>rechtwinkliges Spannungsdreieck</strong> mit den Katheten U_R und U_L − U_C sowie der Hypotenuse U. Damit: tan φ = (X_L − X_C)/R.`,
+    exp4: `<strong>Resonanz:</strong> Bei <strong>f₀ = 1/(2π·√(L·C))</strong> ist X_L = X_C: U_L und U_C sind gleich groß und heben sich auf – es gilt U = U_R und φ = 0 (Spannungsresonanz). Achtung: Weil der Strom bei kleinem Z sehr groß wird, können <strong>U_L und U_C einzeln größer als die Quellenspannung U sein</strong> (Spannungsüberhöhung) – im Diagramm ragen ihre Zeiger weit über U hinaus.`,
+    exp5: `<strong>Abhängigkeit von der Frequenz:</strong> Unterhalb f₀ dominiert X_C – der Kreis ist <strong>kapazitiv</strong>, U zeigt unterhalb von I (φ < 0). Oberhalb f₀ dominiert X_L – der Kreis ist <strong>induktiv</strong>. Mit den Reglern R, L, C und f lässt sich jeder Betriebspunkt einstellen; die Taste <strong>f → f₀</strong> springt direkt in die Resonanz. Mit <strong>▶ Drehung</strong> rotieren die Zeiger in Zeitlupe, und die Projektion auf die senkrechte Achse liefert die Momentanwerte u(t) und i(t).`
+  },
+  en: {
+    title: "Phasor Diagram – Series RLC Circuit",
+    subtitle: "Voltage phasors across R, L and C in the frequency domain – current is the reference",
+    readings: "Readings",
+    rF0: "f₀ resonance",
+    settings: "Settings",
+    rR: "R – Resistance",
+    rRHint: "The resistance sets the active component: U_R = R·I is in phase with the current (horizontal).",
+    rL: "L – Inductance",
+    rLHint: "X_L = 2π·f·L grows with frequency; U_L is perpendicular to I (+90°).",
+    rC: "C – Capacitance",
+    rCHint: "X_C = 1/(2π·f·C) falls with frequency; U_C points straight down (−90°).",
+    rF: "f – Frequency",
+    rFHint: "Logarithmic scale: 0.1 … 500 Hz. X_L and X_C are equal at f₀ = 1/(2π·√(L·C)). Low frequencies (≤ 1 Hz) with ▶ Rotate show the phasor rotation in slow motion.",
+    rU: "U – Source voltage (RMS)",
+    rUHint: "I = U/Z. U is the geometric sum of all partial voltages.",
+    opCard: "Display & Operation",
+    rotStart: "▶ Rotate", rotStop: "❚❚ Stop", resF0: "f → f₀ (resonance)",
+    opHint: "Rotation: all phasors rotate together with ω (slow motion); their projection onto the vertical axis gives u(t) and i(t). Resonance: sets f = f₀.",
+    tagInd: "(ind)", tagKap: "(cap)",
+    formulas: "Formulas", explanation: "Explanation",
+    zdTitle: "Phasor diagram – RMS values",
+    zdRes: "Resonance: U_L = U_C",
+    zdINote: "Current phasor I: own scale",
+    lblRe: "Re", lblIm: "Im",
+    lblU: "U", lblUR: "UR", lblUL: "UL", lblUC: "UC", lblI: "I",
+    cTitle: "Series circuit R-L-C",
+    exp1: `<strong>Phasors instead of curves:</strong> Every sine wave can be represented as a rotating pointer – its <strong>length</strong> equals the RMS value, its <strong>spin</strong> the frequency, its <strong>angle</strong> the zero phase. A phasor diagram in the <strong>frequency domain</strong> is the frozen picture of that rotating star: all phasors rotate together with ω while their <strong>mutual angle</strong> (here φ) stays constant.`,
+    exp2: `<strong>Series circuit – current as reference:</strong> The same current flows through all three components, so the <strong>current phasor I is drawn horizontally</strong> as the reference. The resistor drops <strong>U_R = R·I in phase</strong> (parallel to I). The inductor voltage <strong>leads the current by +90°</strong> (U_L straight up), the capacitor voltage <strong>lags by −90°</strong> (U_C straight down).`,
+    exp3: `<strong>Phasor sum and voltage triangle:</strong> The source voltage is the <strong>geometric sum</strong> U = U_R + U_L + U_C: chain the phasors tip-to-tail (the polygon), and the arrow from the origin to the final tip is U. Because U_L and U_C point in <strong>opposite directions</strong>, they partially cancel; what remains is a <strong>right-angled voltage triangle</strong> with legs U_R and U_L − U_C and hypotenuse U. Hence: tan φ = (X_L − X_C)/R.`,
+    exp4: `<strong>Resonance:</strong> At <strong>f₀ = 1/(2π·√(L·C))</strong> we get X_L = X_C: U_L and U_C are equal and cancel – so U = U_R and φ = 0 (series resonance). Caution: since the current grows very large at small Z, <strong>U_L and U_C can individually exceed the source voltage U</strong> (voltage magnification) – in the diagram their phasors stick out far beyond U.`,
+    exp5: `<strong>Frequency dependence:</strong> Below f₀, X_C dominates – the circuit is <strong>capacitive</strong> and U points below I (φ < 0). Above f₀, X_L dominates – the circuit is <strong>inductive</strong>. The sliders R, L, C and f set any operating point; the <strong>f → f₀</strong> button jumps straight to resonance. With <strong>▶ Rotate</strong> the phasors spin in slow motion, and their projection onto the vertical axis yields the instantaneous values u(t) and i(t).`
+  }
+};
+let lang = "de";
+const T = k => (I18N[lang] && I18N[lang][k]) || I18N.de[k] || k;
+
+/* ---------------- 2. Zustand und Physik ---------------- */
+const TIMESCALE = 0.25;       // Zeitlupe für die Zeigerdrehung
+const state = { U: 230, f: 50, R: 100, LmH: 100, CuF: 50, rot: false, t: 0 };
+
+const XL = () => 2 * Math.PI * state.f * state.LmH / 1000;          // Ω
+const XC = () => 1 / (2 * Math.PI * state.f * state.CuF / 1e6);     // Ω
+const X  = () => XL() - XC();                                       // Ω
+const Z  = () => Math.hypot(state.R, X());                          // Ω
+const I  = () => state.U / Z();                                     // A
+const UR = () => state.R * I();                                     // V
+const UL = () => XL() * I();                                        // V
+const UC = () => XC() * I();                                        // V
+const phi = () => Math.atan2(X(), state.R);                         // rad, + induktiv
+const f0  = () => 1 / (2 * Math.PI * Math.sqrt(state.LmH / 1000 * state.CuF / 1e6)); // Hz
+const theta = () => 2 * Math.PI * state.f * state.t;                // Drehwinkel (Zeitlupe)
+const uInst = () => Math.SQRT2 * state.U * Math.sin(theta() + phi());
+const iInst = () => Math.SQRT2 * I() * Math.sin(theta());
+
+/* ---------------- 3. DOM und Canvas-Hilfen ---------------- */
+const $ = id => document.getElementById(id);
+const sceneCv = $("scene"), circCv = $("circuit");
+const sceneCtx = sceneCv.getContext("2d"), circCtx = circCv.getContext("2d");
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+// Canvas an CSS-Größe anpassen (Retina-scharf), gibt CSS-Größe zurück
+function fitCanvas(cv){
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (w > 0 && (cv.width !== Math.round(w * DPR) || cv.height !== Math.round(h * DPR))){
+    cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  }
+  return [w, h];
+}
+// Pfeil von (x1,y1) nach (x2,y2) mit Dreieckskopf
+function arrow2d(ctx, x1, y1, x2, y2, color, width = 2, head = 7){
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - head * Math.cos(a - 0.42), y2 - head * Math.sin(a - 0.42));
+  ctx.lineTo(x2 - head * Math.cos(a + 0.42), y2 - head * Math.sin(a + 0.42));
+  ctx.closePath(); ctx.fill();
+}
+const locale = () => lang === "de" ? "de-DE" : "en-US";
+const fmt = (x, d = 1) => x.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
+const colU = "#f87171", colUR = "#fbbf24", colUL = "#4ade80", colUC = "#e879f9", colI = "#60a5fa";
+
+/* ---------------- 4. Zeigerdiagramm: U_R, U_L, U_C, U mit Strom als Bezug ---------------- */
+function drawScene(){
+  const [w, h] = fitCanvas(sceneCv);
+  const ctx = sceneCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  // Hintergrund
+  const grd = ctx.createRadialGradient(w / 2, h * 0.45, 10, w / 2, h * 0.45, Math.max(w, h) * 0.75);
+  grd.addColorStop(0, "#17223d"); grd.addColorStop(1, "#0a1120");
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+
+  const fs = Math.max(11, Math.min(w, h) * 0.042);
+  const th = theta(), ph = phi();
+
+  // Titel + Resonanz-Hinweis
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#e5ecf7"; ctx.font = `bold ${fs}px system-ui`;
+  ctx.fillText(T("zdTitle"), 14, 24);
+  if (Math.abs(X()) <= 0.01 * Math.max(XL(), XC())){
+    ctx.textAlign = "right"; ctx.fillStyle = "#fbbf24"; ctx.font = `bold ${fs * 0.9}px system-ui`;
+    ctx.fillText("● " + T("zdRes"), w - 14, 24);
+    ctx.textAlign = "left";
+  }
+
+  // Geometrie: Ursprung, Skalierung automatisch auf die größte Teilspannung
+  const ox = w * 0.5, oy = h * 0.55;
+  const maxR = Math.max(UR(), UL(), UC(), state.U, 1e-9);
+  const avail = Math.min(w * 0.35, h * 0.37);
+  const sc = avail / maxR;
+  const px = (x, y) => [ox + x * sc, oy - y * sc];        // math (y aufwärts) → Canvas
+
+  // Rasterkreise (Hilfslinien)
+  ctx.strokeStyle = "rgba(148,163,184,.16)"; ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
+  for (const k of [0.25, 0.5, 0.75, 1]){ ctx.beginPath(); ctx.arc(ox, oy, avail * k, 0, 7); ctx.stroke(); }
+  ctx.setLineDash([]);
+
+  // Achsen (Re/Im) mit Skalenbeschriftung am äußeren Kreis
+  const ax = avail + 30;
+  arrow2d(ctx, ox - ax, oy, ox + ax, oy, "rgba(229,236,247,.45)", 1.2, 6);
+  arrow2d(ctx, ox, oy + ax * 0.92, ox, oy - ax * 0.92, "rgba(229,236,247,.45)", 1.2, 6);
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fs * 0.75}px system-ui`;
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText(T("lblRe"), ox + ax + 5, oy + 4);
+  ctx.fillText(T("lblIm"), ox + 7, oy - ax * 0.92 - 6);
+  ctx.textAlign = "right";
+  ctx.fillText(fmt(maxR, 0) + " V", ox - avail * Math.SQRT1_2 - 6, oy - avail * Math.SQRT1_2 - 6);
+
+  // Zeigerwinkel (Mathe-Konvention: +90° = entgegen Uhrzeigersinn = nach oben)
+  const angUR = th, angUL = th + Math.PI / 2, angUC = th - Math.PI / 2, angU = th + ph;
+  const v = (r, a) => [r * Math.cos(a), r * Math.sin(a)];
+  const vUR = v(UR(), angUR), vUL = v(UL(), angUL), vUC = v(UC(), angUC);
+  const P1 = vUR, P2 = [P1[0] + vUL[0], P1[1] + vUL[1]], P3 = [P2[0] + vUC[0], P2[1] + vUC[1]];
+
+  /* --- Einzelzeiger (gestrichelt, vom Ursprung) --- */
+  const dashArrow = (tipx, tipy, col) => {
+    ctx.setLineDash([6, 5]);
+    arrow2d(ctx, ox, oy, tipx, tipy, col, 2, 7);
+    ctx.setLineDash([]);
+  };
+  const pUR = px(...vUR), pUL = px(...vUL), pUC = px(...vUC), pU = px(...P3);
+  dashArrow(pUR[0], pUR[1], colUR);
+  dashArrow(pUL[0], pUL[1], colUL);
+  dashArrow(pUC[0], pUC[1], colUC);
+
+  /* --- Polygon der Zeigersumme U_R → +U_L → +U_C --- */
+  const q1 = px(...P1), q2 = px(...P2), q3 = px(...P3);
+  ctx.strokeStyle = "rgba(203,213,225,.8)"; ctx.lineWidth = 2; ctx.lineJoin = "round";
+  ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(q1[0], q1[1]); ctx.lineTo(q2[0], q2[1]); ctx.lineTo(q3[0], q3[1]); ctx.stroke();
+  for (const q of [q1, q2, q3]){
+    ctx.fillStyle = "rgba(203,213,225,.9)";
+    ctx.beginPath(); ctx.arc(q[0], q[1], 2.6, 0, 7); ctx.fill();
+  }
+  // Rechter Winkel bei P1 (zwischen U_R und dem senkrechten Rest U_L + U_C)
+  {
+    const u1 = [ox - q1[0], oy - q1[1]], u2 = [q3[0] - q1[0], q3[1] - q1[1]];
+    const n1 = Math.hypot(...u1), n2 = Math.hypot(...u2);
+    if (n1 > 8 && n2 > 8){
+      const a1 = [u1[0] / n1, u1[1] / n1], a2 = [u2[0] / n2, u2[1] / n2], s = 10;
+      ctx.strokeStyle = "rgba(147,164,195,.9)"; ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(q1[0] + a1[0] * s, q1[1] + a1[1] * s);
+      ctx.lineTo(q1[0] + (a1[0] + a2[0]) * s, q1[1] + (a1[1] + a2[1]) * s);
+      ctx.lineTo(q1[0] + a2[0] * s, q1[1] + a2[1] * s);
+      ctx.stroke();
+    }
+  }
+
+  /* --- Stromzeiger I (waagrecht, eigene Skalierung) --- */
+  const rI = avail * 0.5;
+  const tipI = [ox + rI * Math.cos(th), oy - rI * Math.sin(th)];
+  arrow2d(ctx, ox, oy, tipI[0], tipI[1], colI, 3, 8);
+
+  /* --- Resultierende Quellenspannung U (fett) --- */
+  arrow2d(ctx, ox, oy, pU[0], pU[1], colU, 3.2, 9);
+
+  /* --- φ-Bogen zwischen I und U --- */
+  if (Math.abs(ph) > 0.5 * Math.PI / 180){
+    ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ph > 0) ctx.arc(ox, oy, avail * 0.2, -th, -(th + ph), true);
+    else        ctx.arc(ox, oy, avail * 0.2, -(th + ph), -th, false);
+    ctx.stroke();
+    const am = th + ph / 2, lr = avail * 0.2 + 16;
+    ctx.fillStyle = "#f59e0b"; ctx.font = `italic bold ${fs * 0.95}px Georgia`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("φ", ox + Math.cos(am) * lr, oy - Math.sin(am) * lr);
+  }
+
+  /* --- Beschriftungen an den Zeigerspitzen --- */
+  // sideUp = Bild-„obere" Seite der Richtung a (Canvas-Koordinaten)
+  const sideUp = a => [-Math.sin(a), -Math.cos(a)];
+  const label = (tip, a, sym, val, col, side) => {
+    const d = [Math.cos(a), -Math.sin(a)], n = sideUp(a);
+    const lx = tip[0] + d[0] * 15 + n[0] * 11 * side;
+    const ly = tip[1] + d[1] * 15 + n[1] * 11 * side;
+    ctx.font = `bold ${fs * 0.82}px system-ui`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = col;
+    ctx.fillText(`${sym} = ${val}`, lx, ly);
+  };
+  label(pUR, angUR, T("lblUR"), fmt(UR(), 0) + " V", colUR, -1);   // unterhalb (U liegt dann auf der anderen Seite)
+  label(pUL, angUL, T("lblUL"), fmt(UL(), 0) + " V", colUL, +1);
+  label(pUC, angUC, T("lblUC"), fmt(UC(), 0) + " V", colUC, +1);
+  label(pU,  angU,  T("lblU"),  fmt(state.U, 0) + " V", colU, +1);
+  // Strombeschriftung mittig oberhalb des Zeigers (freiräumig zu U_R und φ)
+  {
+    const n = sideUp(th);
+    const mx = ox + (tipI[0] - ox) * 0.55 + n[0] * 15;
+    const my = oy + (tipI[1] - oy) * 0.55 + n[1] * 15;
+    ctx.font = `bold ${fs * 0.82}px system-ui`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = colI;
+    ctx.fillText(`${T("lblI")} = ${fmt(I(), 2)} A`, mx, my);
+  }
+
+  /* --- Projektion auf die senkrechte Achse (nur bei Drehung): Momentanwerte --- */
+  if (state.rot){
+    const dot = (y, col, lb) => {
+      ctx.save();
+      ctx.shadowColor = col; ctx.shadowBlur = 8;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(ox, y, 4.5, 0, 7); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = col; ctx.font = `italic bold ${fs * 0.8}px Georgia`;
+      ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillText(lb, ox + 9, y);
+    };
+    ctx.setLineDash([3, 4]); ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(248,113,113,.55)";
+    ctx.beginPath(); ctx.moveTo(pU[0], pU[1]); ctx.lineTo(ox, pU[1]); ctx.stroke();
+    ctx.strokeStyle = "rgba(96,165,250,.55)";
+    ctx.beginPath(); ctx.moveTo(tipI[0], tipI[1]); ctx.lineTo(ox, tipI[1]); ctx.stroke();
+    ctx.setLineDash([]);
+    dot(pU[1], colU, "u");
+    dot(tipI[1], colI, "i");
+  }
+
+  /* --- Legende + Skalahinweis --- */
+  const leg = [[T("lblU"), colU], [T("lblUR"), colUR], [T("lblUL"), colUL], [T("lblUC"), colUC], [T("lblI"), colI]];
+  let ly = 56;
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  for (const [t, c] of leg){
+    ctx.fillStyle = c; ctx.fillRect(14, ly - 6, 11, 11);
+    ctx.fillStyle = "#cdd8ec"; ctx.font = `bold ${fs * 0.8}px system-ui`;
+    ctx.fillText(t, 32, ly);
+    ly += 20;
+  }
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fs * 0.68}px system-ui`;
+  ctx.fillText(T("zdINote"), 14, ly + 2);
+}
+
+/* ---------------- 5. Schaltplan: Reihenschaltung mit Strompfeil und Flusspunkten ---------------- */
+function drawCircuit(){
+  const [w, h] = fitCanvas(circCv);
+  const ctx = circCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#0a1120"; ctx.fillRect(0, 0, w, h);
+
+  const fs = Math.max(10, Math.min(w, h) * 0.062);
+  ctx.fillStyle = "#e5ecf7"; ctx.font = `bold ${fs}px system-ui`;
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText(T("cTitle"), 12, 10 + fs * 0.6);
+
+  const x0 = w * 0.20, x1 = w * 0.80, y0 = h * 0.28, y1 = h * 0.72;
+  const midY = (y0 + y1) / 2, sr = h * 0.085;
+  const g = fs * 0.28;                                     // Kondensator-Plattenabstand/2
+  const xR0 = w * 0.30, xR1 = w * 0.42;                    // Widerstand
+  const xLc = w * 0.62, xL0 = xLc - w * 0.055, xL1 = xLc + w * 0.055; // Spule
+  const xCc = w * 0.60;                                    // Kondensator
+
+  /* --- Leitungen (Lücke an den Bauelementen) --- */
+  ctx.strokeStyle = "#8fa3c8"; ctx.lineWidth = 2.2; ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(x0, y0); ctx.lineTo(xR0, y0);
+  ctx.moveTo(xR1, y0); ctx.lineTo(xL0, y0);
+  ctx.moveTo(xL1, y0); ctx.lineTo(x1, y0);
+  ctx.moveTo(x1, y0); ctx.lineTo(x1, y1);
+  ctx.moveTo(x1, y1); ctx.lineTo(xCc + g, y1);
+  ctx.moveTo(xCc - g, y1); ctx.lineTo(x0, y1);
+  ctx.moveTo(x0, y1); ctx.lineTo(x0, midY + sr);
+  ctx.moveTo(x0, midY - sr); ctx.lineTo(x0, y0);
+  ctx.stroke();
+
+  /* --- Bauelemente --- */
+  ctx.strokeStyle = "#cbd5e1"; ctx.lineWidth = 2.2;
+  // Widerstand: Rechteck
+  ctx.fillStyle = "#1b2745";
+  ctx.fillRect(xR0, y0 - sr * 0.55, xR1 - xR0, sr * 1.1);
+  ctx.strokeRect(xR0, y0 - sr * 0.55, xR1 - xR0, sr * 1.1);
+  // Spule: 4 Halbbögen nach oben
+  ctx.beginPath();
+  const d = (xL1 - xL0) / 4;
+  for (let k = 0; k < 4; k++) ctx.arc(xL0 + d * (k + 0.5), y0, d / 2, Math.PI, 0);
+  ctx.stroke();
+  // Kondensator: zwei vertikale Platten
+  ctx.beginPath();
+  ctx.moveTo(xCc - g, y1 - sr * 0.55); ctx.lineTo(xCc - g, y1 + sr * 0.55);
+  ctx.moveTo(xCc + g, y1 - sr * 0.55); ctx.lineTo(xCc + g, y1 + sr * 0.55);
+  ctx.stroke();
+  // Quelle: Kreis mit Wechselstrom-Welle
+  ctx.beginPath(); ctx.arc(x0, midY, sr, 0, 7);
+  ctx.fillStyle = "#1b2745"; ctx.fill();
+  ctx.strokeStyle = "#8fa3c8"; ctx.lineWidth = 2.2; ctx.stroke();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x0, midY, sr - 3, 0, 7); ctx.clip();
+  ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let x = -sr; x <= sr; x += 1.5){
+    const y = Math.sin(x / sr * Math.PI * 1.5 + theta()) * sr * 0.45;
+    x === -sr ? ctx.moveTo(x0 + x, midY + y) : ctx.lineTo(x0 + x, midY + y);
+  }
+  ctx.stroke(); ctx.restore();
+
+  /* --- Strompfeil auf der oberen Zuleitung --- */
+  const xm = (x0 + xR0) / 2;
+  arrow2d(ctx, xm - fs * 0.7, y0, xm + fs * 0.7, y0, colI, 2.5, 7);
+  ctx.fillStyle = colI; ctx.font = `italic bold ${fs * 0.9}px Georgia`;
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  ctx.fillText("I", xm, y0 - 7);
+
+  /* --- Flusspunkte entlang des Kreises (nur in Bewegung bei Drehung) --- */
+  const Ltop = x1 - x0, Lside = y1 - y0, Ltot = 2 * (Ltop + Lside);
+  const loopPoint = u => {
+    let s = ((u % 1) + 1) % 1 * Ltot;
+    if (s < Lside)            return [x0, y1 - s];          // linke Seite: unten → oben
+    s -= Lside;
+    if (s < Ltop)             return [x0 + s, y0];          // oben: links → rechts
+    s -= Ltop;
+    if (s < Lside)            return [x1, y0 + s];          // rechte Seite: oben → unten
+    s -= Lside;
+    return [x1 - s, y1];                                     // unten: rechts → links
+  };
+  const N = 16, off = state.rot ? (theta() / (2 * Math.PI) * 0.5) % 1 : 0;
+  for (let k = 0; k < N; k++){
+    const [dx, dy] = loopPoint(k / N + off);
+    ctx.globalAlpha = state.rot ? 0.75 : 0.3;
+    ctx.fillStyle = colI;
+    ctx.beginPath(); ctx.arc(dx, dy, 2.8, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  /* --- Beschriftungen: Name (neutral) + Spannung (farbig, Effektivwert) --- */
+  const txt = (x, y, s, col, bold) => {
+    ctx.font = `${bold ? "bold " : ""}${fs * (bold ? 0.82 : 0.78)}px system-ui`;
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = col;
+    ctx.fillText(s, x, y);
+  };
+  txt((xR0 + xR1) / 2, y0 - sr * 0.7 - fs * 0.9, `R = ${fmt(state.R, 0)} Ω`, "#e5ecf7", true);
+  txt((xR0 + xR1) / 2, y0 - sr * 0.7, `UR = ${fmt(UR(), 0)} V`, colUR, false);
+  txt(xLc, y0 - sr * 0.7 - fs * 0.9, `L = ${fmt(state.LmH, 0)} mH`, "#e5ecf7", true);
+  txt(xLc, y0 - sr * 0.7, `UL = ${fmt(UL(), 0)} V`, colUL, false);
+  txt(xCc, y1 + sr * 0.7 + fs * 0.9, `C = ${fmt(state.CuF, 0)} µF`, "#e5ecf7", true);
+  txt(xCc, y1 + sr * 0.7 + fs * 0.9 + fs * 0.8, `UC = ${fmt(UC(), 0)} V`, colUC, false);
+  txt(x0, midY + sr + fs * 1.1, `U = ${fmt(state.U, 0)} V`, colU, true);
+}
+
+/* ---------------- 6. Messwerte ---------------- */
+// Frequenzanzeige: mehr Nachkommastellen im unteren Bereich
+const fmtFreq = x => fmt(x, x < 10 ? 2 : x < 100 ? 1 : 0);
+function updateReadouts(){
+  const phDeg = phi() * 180 / Math.PI;
+  const tag = X() > 1e-9 ? " " + T("tagInd") : X() < -1e-9 ? " " + T("tagKap") : "";
+  $("vF0").textContent = fmtFreq(f0()) + " Hz";
+  $("vXL").textContent = fmt(XL(), 1) + " Ω";
+  $("vXC").textContent = fmt(XC(), 1) + " Ω";
+  $("vZ").textContent  = fmt(Z(), 1) + " Ω";
+  $("vPhi").textContent = fmt(phDeg, 1) + "°" + tag;
+  $("vCos").textContent = fmt(Math.cos(phi()), 2);
+  $("vI").textContent  = fmt(I(), I() < 0.1 ? 3 : 2) + " A";
+  $("vUR").textContent = fmt(UR(), 0) + " V";
+  $("vUL").textContent = fmt(UL(), 0) + " V";
+  $("vUC").textContent = fmt(UC(), 0) + " V";
+  const u = uInst(), i = iInst();
+  $("vUinst").textContent = (u >= 0 ? "+" : "") + fmt(u, 1) + " V";
+  $("vIinst").textContent = (i >= 0 ? "+" : "") + fmt(i, 3) + " A";
+}
+
+/* ---------------- 7. Hauptschleife (≈60 FPS) ---------------- */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min((now - last) / 1000, 0.05);   // bei Tab-Wechsel clampen
+  last = now;
+  if (state.rot) state.t += dt * TIMESCALE;         // Zeitlupe
+  drawScene(); drawCircuit(); updateReadouts();
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- 8. Steuerung ---------------- */
+// Regler mit sofortiger Wirkung
+function bindRange(id, outId, key, digits, unit){
+  const el = $(id), out = $(outId);
+  const upd = () => { state[key] = parseFloat(el.value); out.textContent = fmt(state[key], digits) + " " + unit; };
+  el.addEventListener("input", upd); upd();
+}
+bindRange("rR", "oR", "R", 0, "Ω");
+bindRange("rL", "oL", "LmH", 0, "mH");
+bindRange("rC", "oC", "CuF", 0, "µF");
+bindRange("rU", "oU", "U", 0, "V");
+
+// Frequenz logarithmisch aufgetragen: 0,1 … 500 Hz (Reglerposition 0…1000).
+// Im unteren Bereich feine Auflösung – dort lässt sich die Zeigerdrehung gut verfolgen.
+const F_MIN = 0.1, F_MAX = 500, F_POS = 1000;
+const fFromPos = p => F_MIN * Math.pow(F_MAX / F_MIN, p / F_POS);
+const posFromF = f => F_POS * Math.log(f / F_MIN) / Math.log(F_MAX / F_MIN);
+{
+  const el = $("rF"), out = $("oF");
+  const upd = () => { state.f = fFromPos(parseFloat(el.value)); out.textContent = fmtFreq(state.f) + " Hz"; };
+  el.addEventListener("input", upd); upd();
+}
+
+// Drehung ein/aus
+const btnRot = $("btnRot");
+function refreshRotBtn(){ btnRot.textContent = T(state.rot ? "rotStop" : "rotStart"); }
+btnRot.addEventListener("click", () => { state.rot = !state.rot; refreshRotBtn(); });
+
+// Resonanz: Frequenz direkt auf f₀ setzen (auf Reglerbereich begrenzt)
+$("btnF0").addEventListener("click", () => {
+  const el = $("rF");
+  const f = Math.max(F_MIN, Math.min(F_MAX, f0()));
+  el.value = Math.round(posFromF(f));
+  el.dispatchEvent(new Event("input"));
+});
+
+/* ---------------- 9. Sprachumschalter ---------------- */
+function applyLang(){
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = T(el.dataset.i18nHtml); });
+  document.documentElement.lang = lang;
+  document.title = T("title") + " – Simulation";
+  $("btnLang").textContent = lang === "de" ? "EN" : "DE";
+  refreshRotBtn();
+}
+$("btnLang").addEventListener("click", () => { lang = lang === "de" ? "en" : "de"; applyLang(); });
+
+/* ---------------- 10. Start ---------------- */
+applyLang();
+refreshRotBtn();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

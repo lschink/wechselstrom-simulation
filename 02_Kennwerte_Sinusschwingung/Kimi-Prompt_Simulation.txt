@@ -1,0 +1,43 @@
+ To resume this session: kimi -r session_836524b1-3c23-418e-97a9-ed09cc0a0fb6
+
+
+KIMI-CODE-PROMPT – Simulation: Kennwerte der Sinusschwingung
+=============================================================
+Ziel: Eine vollständig clientseitige, eigenständige Website (eine einzelne HTML-Datei
+mit eingebettetem CSS und JavaScript, Canvas-Rendering), die die Kenngrößen einer
+sinusförmigen Wechselspannung interaktiv erklärt. Direkt auf GitHub Pages hochladbar.
+
+Hauptszene
+- Ein rotierender Zeiger (Zeigerdiagramm/Einheitskreis) mit der Länge Û dreht sich mit
+  konstanter Winkelgeschwindigkeit ω. Seine senkrechte Projektion auf die y-Achse
+  erzeugt live den Sinuswert – diese Projektion läuft als Punkt auf der y-Achse und als
+  gestrichelte Linie zum Funktionsgraphen.
+- Neben dem Einheitskreis ein oszilloskopartiges Diagramm, in dem u(t) = Û·sin(ωt + φ)
+  als laufende Kurve gezeichnet wird. Der aktuelle Kurvenpunkt ist mit dem Zeiger
+  synchron verbunden (gestrichelte Verbindungslinie).
+- Markiere in der Kurve: Scheitelwerte ±Û (gestrichelte Linien), Effektivwert-Linie
+  U = Û/√2, Periodendauer T (Markierung zwischen zwei Nullstellen mit gleicher
+  Steigung), Momentanwert u(t) mit Messpunkt.
+
+Physik-Anzeige (live, als Kacheln)
+- Periodendauer T, Frequenz f = 1/T, Kreisfrequenz ω = 2πf,
+  Scheitelwert Û, Effektivwert U = Û/√2, Momentanwert u(t), Nullphasenwinkel φ.
+- Formeln als statische Leiste: u(t) = Û·sin(ωt + φ), U = Û/√2, ω = 2πf, f = 1/T.
+
+Steuerung (Schieberegler, alle Eingaben wirken sofort)
+- Scheitelwert Û (z. B. 1–400 V), Frequenz f (0,1–100 Hz, log oder mit feiner Auflösung
+  im unteren Bereich), Nullphasenwinkel φ (−180° bis +180°), Start/Stopp der Drehung,
+  Reset des Zeigers auf φ = 0.
+- Optional: einstellbare Abtastung „eingefroren" (Stopp) zum Ablesen einzelner Werte.
+
+Erklärbereich
+- 3–5 Absätze auf Deutsch: Was ist ein Momentanwert; Zusammenhang T, f, ω; Herkunft des
+  Effektivwerts (gleiche Wärmeleistung, U = Û/√2); Bedeutung des Nullphasenwinkels
+  (Signalverschiebung, Vergleich zweier Signale später wichtig für Phasenverschiebung).
+
+Technische Anforderungen
+- Eine einzige index.html, keine externen Frameworks, offline lauffähig.
+- Flüssige Animation (ca. 60 FPS, requestAnimationFrame), responsiv für Smartphone
+  und Desktop. Übersichtlich kommentierter Code.
+- Deutsches UI mit optionalem Englisch-Umschalter (Texte als Dictionary, data-i18n).
+- Dunkles, klares Design wie eine Laborsimulation; Einheiten in den Anzeigen.

@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Interaktive Simulation: Spule im Wechselstromkreis – induktiver Widerstand, 90°-Phasenverschiebung, Blindleistung und Tiefpass-Wirkung.">
+<title>Spule im Wechselstromkreis – Simulation</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+<style>
+  /* ---------- Grundfarben (dunkles Design, wie 04_Kondensator) ---------- */
+  :root{
+    --bg:#0d1117;            /* Seitenhintergrund */
+    --panel:#161b22;         /* Panel-Hintergrund */
+    --panel2:#21262d;        /* etwas hellere Fläche */
+    --border:#30363d;        /* Rahmen */
+    --text:#e6edf3;          /* Haupttext */
+    --muted:#8b949e;         /* Nebentext */
+    --u:#ff5c5c;             /* Spannung u_L(t) – rot */
+    --i:#58a6ff;             /* Strom i(t) – blau */
+    --p:#3fb950;             /* Leistung p_L(t) – grün */
+    --r:#f0b429;             /* Widerstand u_R(t) – amber */
+    --b:#bb86fc;             /* Magnetfeld B – violett */
+    --accent:#58a6ff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:16px 20px; border-bottom:1px solid var(--border); flex-wrap:wrap;
+  }
+  h1{font-size:20px; margin:0}
+  .sub{color:var(--muted); font-size:13px; margin:2px 0 0}
+  .lang button{
+    background:var(--panel2); color:var(--muted); border:1px solid var(--border);
+    padding:6px 12px; cursor:pointer; font-weight:600;
+  }
+  .lang button:first-child{border-radius:8px 0 0 8px}
+  .lang button:last-child{border-radius:0 8px 8px 0; border-left:none}
+  .lang button.active{color:var(--text); background:var(--accent); border-color:var(--accent)}
+
+  main{max-width:1180px; margin:0 auto; padding:16px 20px 8px; display:grid; gap:14px}
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px;
+  }
+  .panel-head{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px}
+  h2{font-size:15px; margin:0; letter-spacing:.3px}
+  .row1{display:grid; grid-template-columns:7fr 5fr; gap:14px}
+  .row1 > div{display:grid; gap:14px; align-content:start}
+  canvas{display:block; width:100%; background:#0b0f14; border-radius:8px}
+  #cvCircuit{aspect-ratio:640/440}
+  #cvPhasor{aspect-ratio:1/1}
+  #cvImp{aspect-ratio:1/1}
+  #cvScope{aspect-ratio:1000/560}
+  .note{color:var(--muted); font-size:13px; margin:10px 2px 0}
+  .note strong{color:var(--text)}
+  .chiprow{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .chip{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted);
+        background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:3px 10px}
+  .dot{width:10px; height:10px; border-radius:50%; display:inline-block}
+
+  /* ---------- Messwerte ---------- */
+  .mgrid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .mrow{background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:10px 12px}
+  .mlab{font-size:12px; color:var(--muted)}
+  .mval{font:600 19px ui-monospace,SFMono-Regular,Menlo,monospace; margin-top:2px}
+  .mval small{font-size:12px; color:var(--muted); font-weight:400}
+
+  /* ---------- Steuerung ---------- */
+  .controls{display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:16px; align-items:end}
+  .ctrl label{display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:6px}
+  .ctrl label b{font-weight:600}
+  .ctrl output{font:600 13px ui-monospace,Menlo,monospace; color:var(--accent)}
+  input[type=range]{width:100%; accent-color:var(--accent); cursor:pointer}
+  .btn{
+    background:var(--accent); color:#0d1117; border:none; border-radius:10px;
+    padding:11px 22px; font-size:15px; font-weight:700; cursor:pointer; white-space:nowrap;
+  }
+  .btn:active{transform:translateY(1px)}
+  .callout{margin-top:12px; font-size:13px; color:var(--text); background:var(--panel2);
+           border:1px solid var(--border); border-left:3px solid var(--r); border-radius:8px; padding:9px 12px}
+  .callout code{font-family:ui-monospace,Menlo,monospace}
+
+  /* ---------- Erklärung ---------- */
+  .explain p{margin:0 0 12px; color:#c9d1d9; text-align:justify}
+  .explain p:last-child{margin-bottom:0}
+
+  footer{color:var(--muted); font-size:12.5px; text-align:center; padding:14px 20px 26px}
+
+  @media (max-width:940px){
+    .row1{grid-template-columns:1fr}
+    .controls{grid-template-columns:1fr 1fr}
+    .btn{grid-column:1 / -1}
+  }
+  @media (max-width:560px){
+    .controls{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 data-i18n="tTitle">Spule im Wechselstromkreis</h1>
+    <p class="sub" data-i18n="tSub">Induktiver Widerstand, 90°-Phasenverschiebung &amp; Tiefpass-Wirkung</p>
+  </div>
+  <div class="lang" role="group" aria-label="Sprache / language">
+    <button id="btnDE" class="active">DE</button><button id="btnEN">EN</button>
+  </div>
+</header>
+
+<main>
+  <!-- ========== Zeile 1: Stromkreis-Szene | Zeigerdiagramm + Messwerte ========== -->
+  <div class="row1">
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n="tCircuit">Stromkreis</h2></div>
+      <canvas id="cvCircuit"></canvas>
+      <p class="note" data-i18n-html="sceneNote"></p>
+    </section>
+
+    <div>
+      <section class="panel">
+        <div class="panel-head"><h2 data-i18n="tPhasor">Zeigerdiagramm</h2></div>
+        <canvas id="cvPhasor"></canvas>
+        <p class="note" data-i18n="phasorCaption"></p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2 data-i18n="tMeas">Messwerte</h2></div>
+        <div class="mgrid">
+          <div class="mrow"><div class="mlab" data-i18n-html="mU"></div><div class="mval" id="mU">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mI"></div><div class="mval" id="mI">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mX"></div><div class="mval" id="mX">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mQ"></div><div class="mval" id="mQ">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mP"></div><div class="mval" id="mP">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mCos"></div><div class="mval" id="mCos">–</div></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2 data-i18n="tImp">Impedanzdreieck</h2></div>
+        <canvas id="cvImp"></canvas>
+        <p class="note" data-i18n-html="impCaption"></p>
+      </section>
+    </div>
+  </div>
+
+  <!-- ========== Oszilloskop ========== -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2 data-i18n="tScope">Oszilloskop</h2>
+      <div class="chiprow">
+        <span class="chip"><span class="dot" style="background:var(--u)"></span><span data-i18n="lgU">u_L(t) Spule</span></span>
+        <span class="chip"><span class="dot" style="background:var(--i)"></span><span data-i18n="lgI">i(t) Strom</span></span>
+        <span class="chip"><span class="dot" style="background:var(--p)"></span><span data-i18n="lgP">p_L(t) Blindleistung</span></span>
+        <span class="chip"><span class="dot" style="background:var(--r)"></span><span data-i18n="lgR">u_R(t) Widerstand</span></span>
+        <span class="chip"><span class="dot" style="background:#fb8500"></span><span data-i18n="lgPR">p_R(t) Wirkleistung</span></span>
+        <span class="chip" data-i18n="scopeHint">Strom hinkt um 90° nach</span>
+      </div>
+    </div>
+    <canvas id="cvScope"></canvas>
+  </section>
+
+  <!-- ========== Steuerung ========== -->
+  <section class="panel">
+    <div class="panel-head"><h2 data-i18n="tCtrl">Steuerung</h2></div>
+    <div class="controls">
+      <div class="ctrl">
+        <label><b data-i18n="cInd">Induktivität L</b><output id="oL"></output></label>
+        <input id="sL" type="range" min="0" max="1000" step="1">
+      </div>
+      <div class="ctrl">
+        <label><b data-i18n="cFreq">Frequenz f</b><output id="oF"></output></label>
+        <input id="sF" type="range" min="0" max="1000" step="1">
+      </div>
+      <div class="ctrl">
+        <label><b data-i18n="cVolt">Scheitelwert Û</b><output id="oV"></output></label>
+        <input id="sV" type="range" min="1" max="325" step="0.5">
+      </div>
+      <button id="btnRun" class="btn"><span id="icRun">⏸</span> <span data-i18n="btnStop">Stopp</span></button>
+    </div>
+    <div class="callout" data-i18n-html="callout"></div>
+  </section>
+
+  <!-- ========== Erklärung ========== -->
+  <section class="panel explain">
+    <div class="panel-head"><h2 data-i18n="tExplain">Erklärung</h2></div>
+    <div id="expl" data-i18n-html="expl"></div>
+  </section>
+</main>
+
+<footer data-i18n="footer"></footer>
+
+<script>
+"use strict";
+/* =====================================================================
+   Simulation: Spule im Wechselstromkreis (Serienschaltung L + R)
+   ---------------------------------------------------------------------
+   Physik-Modell:
+     u_L(t) = Û_L·sin(φ)                    Spannung an der Spule
+     i(t)   = (1/L)∫u_L dt = −Î·cos(φ)      Strom HINKT u_L um 90° nach
+     p_L(t) = u_L·i = −(Û_L·Î/2)·sin(2φ)    Pendelleistung, Mittelwert 0
+   Mit Serienwiderstand R (Tiefpass):
+     X_L = ωL,  Z = √(R²+X_L²),  Î = Û/Z
+     Û_L = Î·X_L,   Û_R = Î·R             (u_R in Phase mit i)
+   → tiefe f: X_L klein, u_R ≈ Û (Signal kommt am R an)
+   → hohe f:  X_L groß, u_R ≈ 0 (Spule „schluckt" das Signal, I → 0)
+   Die Animation läuft aus Anschaulichkeitsgründen in Zeitlupe; ihre
+   Geschwindigkeit folgt logarithmisch der Frequenz (10 Hz ≈ 0,9 Hz
+   sichtbar … 10 kHz ≈ 12 Hz), die Phasenlage bleibt dabei exakt.
+   ===================================================================== */
+
+/* ---------- 1. Sprach-Dictionary (DE/EN) ---------- */
+const I18N = {
+de:{
+  tTitle:"Spule im Wechselstromkreis",
+  tSub:"Induktiver Widerstand, 90°-Phasenverschiebung & Tiefpass-Wirkung",
+  tCircuit:"Stromkreis", tPhasor:"Zeigerdiagramm", tScope:"Oszilloskop",
+  tMeas:"Messwerte", tCtrl:"Steuerung", tExplain:"Erklärung",
+  lgU:"u_L(t) Spule", lgI:"i(t) Strom", lgP:"p_L(t) Blindleistung", lgR:"u_R(t) Widerstand", lgPR:"p_R(t) Wirkleistung",
+  scopeHint:"Strom hinkt um 90° nach",
+  mU:"U<sub>eff</sub> = Û/√2 (Quelle)", mI:"I<sub>eff</sub> = U<sub>eff</sub>/√(R²+X<sub>L</sub>²)",
+  mX:"X<sub>L</sub> = ωL = 2πfL", mQ:"Q = I<sub>eff</sub>²·X<sub>L</sub> (Blindleistung)",
+  mP:"P = I<sub>eff</sub>²·R (Wirkleistung am R)", mCos:"cos φ = R/Z (Wirkanteil an R)",
+  cInd:"Induktivität L", cFreq:"Frequenz f", cVolt:"Scheitelwert Û",
+  btnStart:"Start", btnStop:"Stopp",
+  slowmo:"Zeitlupe",
+  markUMax:"u_L = Û bei i = 0", avgZero:"Mittelwert = 0",
+  rVal:"R = 1 kΩ",
+  lenz:"Gegenfeld (Lenz)",
+  stThrough:"Signal kommt durch", stPartial:"teilweise gekoppelt", stBlocked:"Signal wird geschluckt",
+  callout:"<code>cos φ = R/√(R²+X<sub>L</sub>²)</code> — der Anteil der Scheinleistung, der am Widerstand als <b>Wirkleistung P = I<sub>eff</sub>²·R</b> ankommt. "
+    +"X<sub>L</sub> ≪ R: cos φ ≈ 1, das Signal kommt durch. X<sub>L</sub> ≫ R: cos φ ≈ 0 — die Energie pendelt nur zwischen Quelle und "
+    +"Spulenfeld hin und her (Blindleistung) und der Widerstand bleibt kalt. <b>Tiefpass-Logik:</b> Je höher f (oder L), desto größer "
+    +"X<sub>L</sub> = ωL — der Strom sinkt.",
+  sceneNote:'<span class="chiprow" style="margin-right:6px">'
+    +'<span class="chip"><span class="dot" style="background:#79c0ff"></span>e⁻ Elektronen</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--i)"></span>i Strompfeil</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--b)"></span>B-Feld</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--b)"></span>W Feldenergie</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--r)"></span>R = 1 kΩ</span></span><br>'
+    +'<strong>Der Strom fließt durch die Wicklung:</strong> Die Elektronen pendeln durch alle Leitungen — auch durch die Windungen. '
+    +'Jede Stromänderung ruft nach der Lenzschen Regel ein induziertes Gegenfeld hervor, das die Änderung bremst (Selbstinduktion). '
+    +'Magnetfeld B und Feldenergie W = ½·L·i² pulsieren mit |i| — die Feldrichtung kehrt sich periodisch um. '
+    +'Hinter der Spule liegt der Widerstand R: Bei <b>tiefen Frequenzen</b> (kleines X_L) fließt viel Strom — er leuchtet auf und '
+    +'liefert Wirkleistung P = I_eff²·R. '
+    +'Bei <b>hohen Frequenzen</b> (großes X_L) wird das Signal geschluckt — R bleibt dunkel, die Energie pendelt als Blindleistung zurück.',
+  phasorCaption:"Der Stromzeiger I hinkt der Spulenspannung U_L um 90° nach (Drehung im Uhrzeigersinn; Zeigerlängen nicht maßstäblich zueinander).",
+  tImp:"Impedanzdreieck",
+  impCaption:"Z = √(R²+X_L²) aus Wirkwiderstand R (grün) und Blindwiderstand X_L (blau, induktiv nach oben). "
+    +"tan φ = X_L/R; <b>cos φ = R/Z</b> ist der Wirkleistungsanteil — derselbe Wert wie im Status am Schaltbild und bei P am Messwert-Panel. "
+    +"Winkel und Seitenverhältnisse maßstäblich, die Gesamtlänge ist fest.",
+  impCosHint:"= Wirkanteil am Widerstand",
+  expl:
+    '<p>Eine Spule ist nichts weiter als ein dünner Draht, gewickelt zu einer Wicklung — Gleichstrom fließt durch sie fast '
+    +'ungehindert, nur der kleine ohmsche Widerstand des Drahts bremst ihn. Erst bei Wechselstrom leistet sie Widerstand, und '
+    +'zwar umso mehr, je höher die Frequenz ist. Der Grund ist die <b>Selbstinduktion</b>: Jede Stromänderung erzeugt einen '
+    +'veränderten magnetischen Fluss durch die eigene Wicklung, und dieser Fluss induziert nach der Lenzschen Regel eine '
+    +'Gegenspannung, die der Änderung entgegenwirkt. Es gibt keine „Lücke" wie beim Kondensator — die Spule wehrt sich aktiv '
+    +'gegen jede Stromänderung und bremst sie.</p>'
+    +'<p>Mathematisch steckt das in <b>u_L = L·di/dt</b>: Die Spannung an der Spule hängt von der <em>Änderungsgeschwindigkeit</em> '
+    +'des Stroms ab, nicht vom Strom selbst. Eine Sinusfunktion ändert sich an ihren Nulldurchgängen am schnellsten — dort, bei '
+    +'<b>i = 0</b>, liegt die Spannungsspitze. An den Stromspitzen ist die Änderung null, dort ist u_L = 0. Deshalb hinkt der Strom '
+    +'der Spulenspannung um exakt eine Viertelperiode (<b>90°</b>) nach — bei jeder Frequenz und jeder Induktivität.</p>'
+    +'<p>Weil Strom und Spannung ständig gegeneinander verschoben sind, wirkt die Spule wie ein frequenzabhängiger Widerstand: '
+    +'der <b>induktive Blindwiderstand X<sub>L</sub> = ωL = 2πfL</b>. Er <em>wächst</em> mit der Frequenz und mit der Induktivität — '
+    +'das exakte Gegenstück zum Kondensator, dessen X<sub>C</sub> = 1/(ωC) fällt. Hohe Frequenzen werden stark gebremst, der Strom '
+    +'sinkt; man nennt das Drosselwirkung. Beim ohmschen Widerstand spielt die Frequenz dagegen keine Rolle.</p>'
+    +'<p>Wirkleistung verbraucht die ideale Spule keine. Die Leistung p_L(t) = u_L(t)·i(t) pendelt gleichmäßig zwischen positiv und '
+    +'negativ, ihr Mittelwert ist <b>null</b>: In einer Viertelperiode wird Energie aus dem Netz aufgenommen und im Magnetfeld '
+    +'gespeichert (W = ½·L·i²), in der nächsten wird sie vollständig zurückgegeben. Es wird Energie nur hin- und hergeschoben, '
+    +'nicht verbraucht — das ist <b>Blindleistung Q = I<sub>eff</sub>²·X<sub>L</sub></b>.</p>'
+    +'<p><b>Tiefpass hinter der Spule — und die umgekehrte Falle:</b> X<sub>L</sub> = ωL wächst mit der Frequenz. Beispiel '
+    +'L = 1 H, f = 10 Hz: X<sub>L</sub> = 63 Ω ≪ R = 1 kΩ → es fließen 229 mA und der Widerstand verwandelt <b>P ≈ 53 W</b> in '
+    +'Wärme — das Signal kommt durch. Bei f = 10 kHz: X<sub>L</sub> = 63 kΩ ≫ R → nur noch 3,7 mA, P ≈ 13 mW ≈ 0 — die Spule '
+    +'schluckt das Signal, der Widerstand bleibt kalt. Die Grenze liegt bei der <b>Grenzfrequenz f<sub>g</sub> = R/(2πL)</b> '
+    +'(hier ≈ 159 Hz), wo X<sub>L</sub> = R und gerade die halbe Maximalleistung ankommt. Achtung, Falle: X<sub>L</sub> wächst '
+    +'mit <em>größerer</em> Induktivität — im Gegensatz zum Kondensator, wo größeres C den Widerstand senkt.</p>'
+    +'<p><b>Praxis:</b> So arbeitet jede Drossel. Sieb- und Glättungsdrosseln bremsen Restwelligkeit in Netzteilen, Schaltnetzteile '
+    +'speichern Energie magnetisch und begrenzen Stromflanken, Tiefpässe in der Signaltechnik lassen nur tiefe Frequenzen passieren. '
+    +'Auch die EMV-Entstörung nutzt die Drosselwirkung: Hochfrequente Störsignale werden gebremst, bevor sie in das Netz oder in '
+    +'empfindliche Elektronik gelangen. Und jede Motorwicklung ist eine Spule — sie begrenzt den Motorstrom und erzeugt das Drehfeld.</p>',
+  footer:"Eine einzige HTML-Datei · kein Framework · offline nutzbar · bereit für GitHub Pages"
+},
+en:{
+  tTitle:"Inductor in an AC Circuit",
+  tSub:"Inductive reactance, 90° phase shift & low-pass action",
+  tCircuit:"Circuit", tPhasor:"Phasor diagram", tScope:"Oscilloscope",
+  tMeas:"Measurements", tCtrl:"Controls", tExplain:"Explanation",
+  lgU:"u_L(t) inductor", lgI:"i(t) current", lgP:"p_L(t) reactive", lgR:"u_R(t) resistor", lgPR:"p_R(t) real power",
+  scopeHint:"Current lags by 90°",
+  mU:"U<sub>rms</sub> = Û/√2 (source)", mI:"I<sub>rms</sub> = U<sub>rms</sub>/√(R²+X<sub>L</sub>²)",
+  mX:"X<sub>L</sub> = ωL = 2πfL", mQ:"Q = I<sub>rms</sub>²·X<sub>L</sub> (reactive)",
+  mP:"P = I<sub>rms</sub>²·R (real power at R)", mCos:"cos φ = R/Z (real-power share)",
+  cInd:"Inductance L", cFreq:"Frequency f", cVolt:"Peak voltage Û",
+  btnStart:"Start", btnStop:"Pause",
+  slowmo:"slow motion",
+  markUMax:"u_L = Û at i = 0", avgZero:"average = 0",
+  rVal:"R = 1 kΩ",
+  lenz:"counter-field (Lenz)",
+  stThrough:"Signal passes through", stPartial:"partially coupled", stBlocked:"Signal is swallowed",
+  callout:"<code>cos φ = R/√(R²+X<sub>L</sub>²)</code> — the share of the apparent power that reaches the resistor as "
+    +"<b>real power P = I<sub>rms</sub>²·R</b>. X<sub>L</sub> ≪ R: cos φ ≈ 1, everything passes. X<sub>L</sub> ≫ R: cos φ ≈ 0 — the "
+    +"energy only sloshes between source and coil field (reactive power) and the resistor stays cold. "
+    +"<b>Low-pass logic:</b> the higher f (or L), the larger X<sub>L</sub> = ωL — the current falls.",
+  sceneNote:'<span class="chiprow" style="margin-right:6px">'
+    +'<span class="chip"><span class="dot" style="background:#79c0ff"></span>e⁻ electrons</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--i)"></span>i current arrow</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--b)"></span>B field</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--b)"></span>W field energy</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--r)"></span>R = 1 kΩ</span></span><br>'
+    +'<strong>Current flows through the winding:</strong> the electrons shuttle through all conductors — including the turns '
+    +'of the coil. Every change in current produces an induced counter-field according to Lenz’s rule that brakes the change '
+    +'(self-induction). Magnetic field B and field energy W = ½·L·i² pulsate with |i| — the field direction reverses periodically. '
+    +'Behind the coil sits the resistor R: at <b>low frequencies</b> (small X_L) plenty of current flows — it lights up and '
+    +'delivers real power P = I_rms²·R. '
+    +'At <b>high frequencies</b> (large X_L) the signal is swallowed — R stays dark and the energy sloshes back as reactive power.',
+  phasorCaption:"The current phasor I lags the inductor voltage U_L by 90° (clockwise rotation; phasor lengths not to scale).",
+  tImp:"Impedance triangle",
+  impCaption:"Z = √(R²+X_L²) from resistance R (green) and reactance X_L (blue, inductive pointing up). "
+    +"tan φ = X_L/R; <b>cos φ = R/Z</b> is the real-power share — the same value as the circuit status and the P tile. "
+    +"Angle and side ratios true to scale, overall length fixed.",
+  impCosHint:"= real-power share at R",
+  expl:
+    '<p>An inductor is nothing more than a thin wire wound into a coil — direct current flows through it almost unimpeded; '
+    +'only the small ohmic resistance of the wire holds it back. Only alternating current meets resistance, and the higher the '
+    +'frequency, the stronger it is. The reason is <b>self-induction</b>: every change in current creates a changing magnetic '
+    +'flux through the winding itself, and according to Lenz’s rule this flux induces a counter-voltage that opposes the change. '
+    +'There is no “gap” as with the capacitor — the coil actively fights every change in current and brakes it.</p>'
+    +'<p>Mathematically this is captured by <b>u_L = L·di/dt</b>: the voltage across the coil depends on the '
+    +'<em>rate of change</em> of the current, not on the current itself. A sine changes fastest at its zero crossings — there, '
+    +'at <b>i = 0</b>, the voltage peaks. At the current peaks the change is zero, so u_L = 0. Therefore the current lags the '
+    +'inductor voltage by exactly one quarter period (<b>90°</b>) — at any frequency and any inductance.</p>'
+    +'<p>Because current and voltage are perpetually shifted against each other, the coil acts like a frequency-dependent '
+    +'resistor: the <b>inductive reactance X<sub>L</sub> = ωL = 2πfL</b>. It <em>grows</em> with frequency and with inductance — '
+    +'the exact counterpart of the capacitor, whose X<sub>C</sub> = 1/(ωC) falls. High frequencies are braked strongly and the '
+    +'current drops; this is called choke action. With an ohmmic resistor frequency plays no role.</p>'
+    +'<p>An ideal inductor consumes no real power. The power p_L(t) = u_L(t)·i(t) swings evenly between positive and negative; '
+    +'its average is <b>zero</b>: during one quarter period energy is drawn from the grid and stored in the magnetic field '
+    +'(W = ½·L·i²), and during the next it is returned in full. Energy is only pushed back and forth, never consumed — that is '
+    +'<b>reactive power Q = I<sub>rms</sub>²·X<sub>L</sub></b>.</p>'
+    +'<p><b>Low-pass behind the inductor — and the reversed trap:</b> X<sub>L</sub> = ωL grows with frequency. Example '
+    +'L = 1 H, f = 10 Hz: X<sub>L</sub> = 63 Ω ≪ R = 1 kΩ → 229 mA flow and the resistor converts <b>P ≈ 53 W</b> into heat — '
+    +'the signal passes. At f = 10 kHz: X<sub>L</sub> = 63 kΩ ≫ R → only 3.7 mA, P ≈ 13 mW ≈ 0 — the coil swallows the signal '
+    +'and the resistor stays cold. The boundary is the <b>cutoff frequency f<sub>g</sub> = R/(2πL)</b> (here ≈ 159 Hz), where '
+    +'X<sub>L</sub> = R and exactly half the maximum power arrives. Caution, trap: X<sub>L</sub> grows with a <em>larger</em> '
+    +'inductance — unlike the capacitor, where a larger C lowers the reactance.</p>'
+    +'<p><b>In practice:</b> this is how every choke works. Smoothing chokes brake residual ripple in power supplies, switch-mode '
+    +'supplies store energy magnetically and limit current slopes, low-pass filters in signal technology let only low frequencies '
+    +'pass. EMC suppression uses choke action too: high-frequency interference is braked before it reaches the grid or sensitive '
+    +'electronics. And every motor winding is an inductor — it limits the motor current and creates the rotating field.</p>',
+  footer:"A single HTML file · no framework · works offline · ready for GitHub Pages"
+}};
+
+/* ---------- 2. Zustand der Simulation ---------- */
+const R_FIX = 1000;   // Serienwiderstand in Ω (zeigt „kommt durch / geschluckt" an)
+const state = {
+  L: 1,        // Induktivität in H   (1 mH … 10 H, logarithmisch)
+  f: 50,       // Frequenz in Hz      (10 Hz … 10 kHz, logarithmisch)
+  Uhat: 325,   // Scheitelwert der Quelle in V (1 … 325 V, linear)
+  phi: 0,      // laufende Phase der Animation (Rad)
+  running: true
+};
+let lang = "de";
+
+/* Abgeleitete Größen (recompute()) */
+const M = { w:0, XL:0, Z:0, Ihat:0, Ueff:0, Ieff:0, ULA:0, UrA:0, Qb:0, Phat:0, PR:0, Cos:0 };
+
+function recompute(){
+  M.w   = 2*Math.PI*state.f;            // ω
+  M.XL  = M.w*state.L;                  // X_L = ωL  (wächst mit f und L!)
+  M.Z   = Math.hypot(R_FIX, M.XL);      // Z = √(R²+X_L²)
+  M.Ueff= state.Uhat/Math.SQRT2;        // U_eff der Quelle
+  M.Ihat= state.Uhat/M.Z;               // Î = Û/Z
+  M.Ieff= M.Ueff/M.Z;                   // I_eff
+  M.ULA = M.Ihat*M.XL;                  // Û_L = Î·X_L  (Anteil an der Spule)
+  M.UrA = M.Ihat*R_FIX;                 // Û_R = Î·R    (Anteil am Widerstand → Tiefpass-Ausgang)
+  M.Qb  = M.Ieff*M.Ieff*M.XL;           // Blindleistung der Spule
+  M.Phat= M.ULA*M.Ihat/2;               // Scheitel der Pendelleistung p_L
+  M.PR  = M.Ieff*M.Ieff*R_FIX;          // Wirkleistung am Widerstand: P = I_eff²·R
+  M.Cos = R_FIX/M.Z;                    // cos φ = R/Z = Anteil, der als Wirkleistung ankommt
+}
+
+/* Sichtbare Animationsfrequenz: folgt f logarithmisch, damit der Regler
+   über den ganzen Bereich spürbar die Drehgeschwindigkeit ändert. */
+function visFreq(){ return Math.min(12, 0.9*Math.sqrt(state.f/10)); }
+
+/* ---------- 3. Formatier-Helfer ---------- */
+function fmtNum(x, sig=3){
+  return x.toLocaleString(lang==="de"?"de-DE":"en-US",{maximumSignificantDigits:sig});
+}
+function fmtSI(v, unit, sig=3){
+  if(v===0) return "0 "+unit;
+  const a=Math.abs(v);
+  const U=[[1e9,"G"],[1e6,"M"],[1e3,"k"],[1,""],[1e-3,"m"],[1e-6,"µ"],[1e-9,"n"],[1e-12,"p"]];
+  for(const [f,p] of U) if(a>=f) return fmtNum(v/f,sig)+" "+p+unit;
+  return fmtNum(v/1e-12,sig)+" p"+unit;
+}
+function mod(n,m){ return ((n%m)+m)%m; }
+
+/* ---------- 4. Canvas-Hilfsfunktionen ---------- */
+function fit(cv){
+  const dpr=window.devicePixelRatio||1, r=cv.getBoundingClientRect();
+  const W=Math.max(1,Math.round(r.width)), H=Math.max(1,Math.round(r.height));
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){
+    cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+  }
+  const ctx=cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx,W,H};
+}
+function arrowHead(ctx,x,y,ang,len=9){
+  ctx.beginPath();
+  ctx.moveTo(x,y);
+  ctx.lineTo(x-len*Math.cos(ang-0.45), y-len*Math.sin(ang-0.45));
+  ctx.moveTo(x,y);
+  ctx.lineTo(x-len*Math.cos(ang+0.45), y-len*Math.sin(ang+0.45));
+  ctx.stroke();
+}
+
+/* ---------- 5. Hauptszene: Quelle → Spule → Widerstand ---------- */
+/* Design-Koordinaten 640×440, werden skaliert gezeichnet. */
+const BCOL = "#bb86fc";   // Magnetfeld / Feldenergie
+const EL = { topA:[], topB:[], bot:[], src:[], res:[] };
+for(let x=112;x<=256;x+=16) EL.topA.push(x);      // Zuleitung vor der Spule
+for(let x=344;x<=508;x+=16) EL.topB.push(x);      // Zuleitung hinter der Spule
+for(let x=112;x<=508;x+=16) EL.bot.push(x);       // Rückleitung
+for(let y=182;y<=244;y+=14) EL.src.push(y);       // hinter der Quelle
+for(let y=184;y<=240;y+=14) EL.res.push(y);       // durch den Widerstand
+
+function drawCircuit(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const s=Math.min(W/640,H/440);
+  ctx.save();
+  ctx.translate((W-640*s)/2,(H-440*s)/2); ctx.scale(s,s);
+
+  const sn=Math.sin(state.phi);            // Phasenlage von u_L
+  const cs=Math.cos(state.phi);            // Phasenlage von u_L abgeleitet
+  const iNow=-M.Ihat*cs;                   // i(t) = −Î·cos(φ)  (hinkt u_L um 90° nach)
+  const iRatio=iNow/M.Ihat;                // i/Î ∈ [−1,1]
+  const ucNow=M.ULA*sn;                    // u_L(t)
+  const ulRatio=M.ULA/state.Uhat;          // Anteil der Spannung an der Spule (0…1)
+  const urRatio=M.UrA/state.Uhat;          // Anteil am Widerstand = „Durchkommen" (0…1)
+
+  const CX=300;                            // Spulen-Mitte auf der oberen Leitung
+  const yTop=180, yBot=260;                // y der oberen/unteren Leitung
+
+  /* --- Leitungen (Rechteckschleife) --- */
+  ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=3; ctx.lineCap="round";
+  ctx.beginPath();
+  ctx.moveTo(100,yTop); ctx.lineTo(264,yTop);        // oben: Quelle → Spule
+  ctx.moveTo(336,yTop); ctx.lineTo(520,yTop);        // oben: Spule → Widerstand
+  ctx.moveTo(520,yTop); ctx.lineTo(520,yBot);        // rechts: durch den Widerstand
+  ctx.moveTo(520,yBot); ctx.lineTo(100,yBot);        // unten: Rückweg zur Quelle
+  ctx.stroke();
+
+  /* --- Magnetfeld der Spule: geschlossene B-Linien durch und um die Wicklung ---
+     Dichte/Leuchtstärke ∝ |i|, Richtung der Pfeile kehrt sich mit i um.       */
+  const bi=Math.abs(iRatio);
+  if(bi>0.03){
+    ctx.strokeStyle=BCOL; ctx.lineWidth=1.6;
+    for(let k=0;k<4;k++){
+      const rx=46+k*16, ry=30+k*12;
+      ctx.globalAlpha=(0.07+0.55*bi)*(1-k*0.13);
+      ctx.beginPath(); ctx.ellipse(CX,yTop,rx,ry,0,0,7); ctx.stroke();
+      /* Pfeil oben auf der Linie: außerhalb kehrt das Feld zur anderen Seite zurück */
+      arrowHead(ctx, CX, yTop-ry, iRatio>=0?Math.PI:0, 8);
+    }
+    ctx.globalAlpha=1;
+  }
+  ctx.font="italic 600 15px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.globalAlpha=0.25+0.6*bi; ctx.fillStyle=BCOL;
+  ctx.fillText("B", CX, 110);
+  ctx.globalAlpha=1;
+
+  /* --- Elektronen: pendeln in ALLEN Leitungen, auch durch die Wicklung --- */
+  const D=22;
+  ctx.fillStyle="#79c0ff";
+  for(const x of EL.topA){ ctx.beginPath(); ctx.arc(x-iRatio*D, yTop, 3.4, 0, 7); ctx.fill(); }
+  for(const x of EL.topB){ ctx.beginPath(); ctx.arc(x-iRatio*D, yTop, 3.4, 0, 7); ctx.fill(); }
+  for(const x of EL.bot ){ ctx.beginPath(); ctx.arc(x+iRatio*D, yBot, 3.4, 0, 7); ctx.fill(); }
+  for(const y of EL.src ){ ctx.beginPath(); ctx.arc(100, y+iRatio*13, 3.4, 0, 7); ctx.fill(); }
+  for(const y of EL.res ){ ctx.beginPath(); ctx.arc(520, y-iRatio*11, 3.4, 0, 7); ctx.fill(); }
+
+  /* --- Spule: Zylinder mit sichtbaren Windungen im Schnitt --- */
+  ctx.fillStyle="rgba(187,134,252,0.07)";
+  ctx.strokeStyle="#3d444d"; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.roundRect(CX-36,156,72,48,12); ctx.fill(); ctx.stroke();
+  for(let k=0;k<7;k++){                              // Windungen (Ellipsen im Schnitt)
+    const x=CX-28+k*10;
+    ctx.strokeStyle="rgba(201,209,217,0.75)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.ellipse(x,yTop,3.8,20,0,0,7); ctx.stroke();
+  }
+  /* Induziertes Gegenfeld (Lenz): bremst jede Stromänderung, ∝ |u_L| = L·|di/dt| */
+  const la=Math.min(1, Math.abs(ucNow)/(M.ULA||1));
+  if(la>0.04){
+    const dir=ucNow>=0?-1:1;                         // wirkt der Änderung entgegen
+    ctx.strokeStyle="#ff6b6b"; ctx.fillStyle="#ff6b6b";
+    ctx.globalAlpha=0.15+0.85*la; ctx.lineWidth=2.2;
+    const x0=CX+10, x1=CX+10+dir*26;
+    ctx.beginPath(); ctx.moveTo(x0,yTop); ctx.lineTo(x1,yTop); ctx.stroke();
+    arrowHead(ctx,x1,yTop,dir>=0?0:Math.PI,8);
+    ctx.font="10.5px system-ui";
+    ctx.fillText(I18N[lang].lenz, CX, 140);
+    ctx.globalAlpha=1;
+  }
+  ctx.font="italic 600 15px system-ui"; ctx.textAlign="center";
+  ctx.fillStyle="#8b949e"; ctx.fillText("L", CX, 222);
+
+  /* --- Widerstand: Glühen ∝ u_R („Signal kommt durch") --- */
+  const glow=0.05+0.55*Math.abs(urRatio*iRatio);     // urRatio·iRatio = u_R/Û im Zeitverlauf
+  const grad=ctx.createRadialGradient(520,220,4,520,220,44);
+  grad.addColorStop(0,`rgba(240,180,41,${glow})`);
+  grad.addColorStop(1,"rgba(240,180,41,0)");
+  ctx.fillStyle=grad;
+  ctx.beginPath(); ctx.arc(520,220,44,0,7); ctx.fill();
+  ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=3;       // Zickzack des Widerstands
+  ctx.beginPath();
+  ctx.moveTo(520,188); ctx.lineTo(509,198); ctx.lineTo(531,210);
+  ctx.lineTo(509,222); ctx.lineTo(531,234); ctx.lineTo(520,244);
+  ctx.stroke();
+  ctx.font="600 13px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillStyle="#8b949e";
+  ctx.fillText(I18N[lang].rVal, 520, 284);
+  /* Status: geschluckt / teilweise / kommt durch — mit cos φ als Beleg (Tiefpass!) */
+  let st=I18N[lang].stPartial, stCol="#f0b429";
+  if(urRatio<0.25){ st=I18N[lang].stBlocked; stCol="#ff6b6b"; }
+  else if(urRatio>0.75){ st=I18N[lang].stThrough; stCol="#3fb950"; }
+  ctx.font="700 13px system-ui";
+  ctx.fillStyle=stCol;
+  ctx.fillText(st+"  (cos φ = "+fmtNum(urRatio,2)+")", 520, 306);
+
+  /* --- Strompfeile i(t): Richtung = Stromrichtung, Sichtbarkeit ∝ |i| --- */
+  const shift=iRatio*48, alpha=0.2+0.8*Math.abs(iRatio);
+  ctx.strokeStyle="#58a6ff"; ctx.lineWidth=2.4; ctx.globalAlpha=alpha;
+  const chev=(x,y,a)=>{
+    ctx.beginPath();
+    ctx.moveTo(x-7*Math.cos(a-0.5), y-7*Math.sin(a-0.5));
+    ctx.lineTo(x,y);
+    ctx.lineTo(x-7*Math.cos(a+0.5), y-7*Math.sin(a+0.5));
+    ctx.stroke();
+  };
+  const aPos=iNow>=0;                                  // Stromrichtung bei i>0 (im Uhrzeigersinn)
+  for(const b of [140,212]) chev(100+mod(b+shift,164), yTop, aPos?0:Math.PI);
+  for(const b of [390,470]) chev(336+mod(b+shift,184), yTop, aPos?0:Math.PI);
+  for(const b of [200,336]) chev(520-mod(b+shift,420), yBot, aPos?Math.PI:0);
+  for(const b of [200,232]) chev(100, 186+mod(b+shift,64), aPos?-Math.PI/2:Math.PI/2);
+  for(const b of [200,232]) chev(520, 186+mod(b+shift,64), aPos?Math.PI/2:-Math.PI/2);
+  ctx.globalAlpha=1;
+  ctx.font="italic 600 15px system-ui"; ctx.textAlign="left";
+  ctx.fillStyle="#58a6ff"; ctx.fillText("i", 196, yTop-14);
+
+  /* --- W-Balken unter der Spule: Feldenergie W = ½·L·i² (immer ≥ 0) --- */
+  const bx=372, bTop=296, bBot=396, bMid=346;
+  ctx.fillStyle="#21262d"; ctx.strokeStyle="#30363d"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect(bx-8,bTop,16,bBot-bTop,4); ctx.fill(); ctx.stroke();
+  const h=48*iRatio*iRatio;
+  ctx.fillStyle=BCOL;
+  ctx.fillRect(bx-8, bBot-h, 16, h||0.5);
+  ctx.strokeStyle="#8b949e"; ctx.beginPath(); ctx.moveTo(bx-11,bMid); ctx.lineTo(bx+11,bMid); ctx.stroke();
+  ctx.font="italic 600 15px system-ui"; ctx.textAlign="center"; ctx.fillStyle="#8b949e";
+  ctx.fillText("W", bx, 284);
+  ctx.font="600 12px ui-monospace,monospace";
+  ctx.fillStyle=BCOL;
+  ctx.fillText(fmtSI(0.5*state.L*iNow*iNow,"J",3), bx, 412);
+
+  /* --- AC-Quelle (Elektronen pendeln dahinter) --- */
+  ctx.fillStyle="#0b0f14";
+  ctx.beginPath(); ctx.arc(100,220,40,0,7); ctx.fill();
+  ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=3; ctx.stroke();
+  ctx.lineWidth=2; ctx.beginPath();                       // ~-Symbol
+  for(let x=76;x<=124;x+=2){
+    const y=220-9*Math.sin((x-76)/48*2*Math.PI*1.15);
+    x===76?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.font="600 13px system-ui"; ctx.textAlign="center"; ctx.fillStyle="#8b949e";
+  ctx.fillText("AC", 100, 296);
+
+  /* --- Zeitlupen-Hinweis --- */
+  const slow=state.f/visFreq();
+  if(slow>1.02){
+    ctx.font="12px system-ui"; const txt="⏱ "+I18N[lang].slowmo+" ×"+fmtNum(slow,2);
+    const tw=ctx.measureText(txt).width+18;
+    ctx.fillStyle="#21262d"; ctx.strokeStyle="#30363d"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.roundRect(14,14,tw,24,7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#8b949e"; ctx.textAlign="left"; ctx.fillText(txt,23,31);
+  }
+  ctx.restore();
+}
+
+/* ---------- 6. Zeigerdiagramm: U_L und I (I um 90° HINTER U_L, Uhrzeigersinn) ---------- */
+function drawPhasor(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const s=Math.min(W,H)/360;
+  ctx.save(); ctx.translate(W/2,H/2); ctx.scale(s,s);
+  const R=140, RU=118, RI=84;
+
+  ctx.strokeStyle="#30363d"; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke();
+  ctx.setLineDash([5,5]); ctx.strokeStyle="#3d444d";
+  ctx.beginPath(); ctx.moveTo(-R,0); ctx.lineTo(R,0); ctx.moveTo(0,-R); ctx.lineTo(0,R);
+  ctx.moveTo(0,0); ctx.lineTo(R+14,0);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  /* ω-Drehpfeil im Uhrzeigersinn */
+  ctx.strokeStyle="#8b949e"; ctx.fillStyle="#8b949e"; ctx.lineWidth=1.6;
+  const a1=-1.25, a2=-0.42;
+  ctx.beginPath(); ctx.arc(0,0,R+16,a1,a2); ctx.stroke();
+  arrowHead(ctx,(R+16)*Math.cos(a2),(R+16)*Math.sin(a2),a2+Math.PI/2,8);
+  ctx.font="italic 13px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText("ω",(R+30)*Math.cos((a1+a2)/2),(R+30)*Math.sin((a1+a2)/2));
+
+  const aU=state.phi, aI=state.phi-Math.PI/2;      // I HINKT um 90° nach
+  for(const [len,ang,col,name] of [[RU,aU,"#ff5c5c","U_L"],[RI,aI,"#58a6ff","I"]]){
+    ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=3;
+    const tx=len*Math.cos(ang), ty=len*Math.sin(ang);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(tx,ty); ctx.stroke();
+    arrowHead(ctx,tx,ty,ang,11);
+    ctx.beginPath(); ctx.arc(tx,ty,4,0,7); ctx.fill();
+    ctx.font="italic 700 16px system-ui";
+    ctx.fillText(name, tx+22*Math.cos(ang), ty+22*Math.sin(ang));
+  }
+
+  /* 90°-Bogen von U_L rückwärts (gegen den Drehsinn) zu I = „hinkt nach" */
+  const rA=52;
+  ctx.strokeStyle="#8b949e"; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.arc(0,0,rA,aU,aU-Math.PI/2,true); ctx.stroke();
+  arrowHead(ctx,rA*Math.cos(aI),rA*Math.sin(aI),aI-Math.PI/2,7);
+  ctx.font="13px system-ui"; ctx.fillStyle="#8b949e";
+  ctx.fillText("90°", rA*0.62*Math.cos(aU-Math.PI/4), rA*0.62*Math.sin(aU-Math.PI/4));
+
+  ctx.restore();
+}
+
+/* ---------- 6b. Impedanzdreieck: Z aus R und X_L, mit φ und cos φ ---------- */
+function drawImp(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const s=Math.min(W,H)/360;
+  ctx.save(); ctx.translate(W/2,H/2); ctx.scale(s,s);
+
+  const phi=Math.atan2(M.XL,R_FIX);          // Verschiebungswinkel zwischen Quelle und Strom
+  const cos=Math.cos(phi), sin=Math.sin(phi);
+  const L=152;                               // Hypotenuse (Länge fest, Verhältnisse maßstäblich)
+  const O=[-L*cos/2, -L*sin/2+16],           // Ursprung (zentriert)
+        A=[O[0]+L*cos, O[1]],                // Ecke mit rechtem Winkel
+        B=[A[0], A[1]-L*sin];                // Spitze (induktiv: X_L zeigt nach OBEN)
+
+  /* Schenkel: R grün (Wirkanteil), X_L blau nach oben, Z weiß als Hypotenuse */
+  ctx.lineWidth=3; ctx.lineCap="round";
+  ctx.strokeStyle="#3fb950";
+  ctx.beginPath(); ctx.moveTo(O[0],O[1]); ctx.lineTo(A[0],A[1]); ctx.stroke();
+  ctx.strokeStyle="#58a6ff";
+  ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
+  ctx.strokeStyle="#e6edf3";
+  ctx.beginPath(); ctx.moveTo(O[0],O[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
+
+  /* rechter Winkel an Ecke A */
+  ctx.strokeStyle="#8b949e"; ctx.lineWidth=1.4;
+  ctx.strokeRect(A[0]-8, A[1]-8, 8, 8);
+
+  /* Winkel φ mit Sektor am Ursprung */
+  ctx.fillStyle="rgba(240,180,41,0.12)";
+  ctx.beginPath(); ctx.moveTo(O[0],O[1]); ctx.arc(O[0],O[1],30,-phi,0); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle="#f0b429"; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.arc(O[0],O[1],30,-phi,0); ctx.stroke();
+  arrowHead(ctx,O[0]+30,O[1],Math.PI/2,7);
+  ctx.font="italic 700 14px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillStyle="#f0b429";
+  ctx.fillText("φ", O[0]+20*Math.cos(-phi/2), O[1]+20*Math.sin(-phi/2));
+
+  /* Beschriftung der Schenkel mit Live-Werten */
+  ctx.font="600 13px system-ui";
+  ctx.fillStyle="#3fb950";
+  ctx.fillText("R = "+fmtSI(R_FIX,"Ω",2), Math.max((O[0]+A[0])/2, O[0]+42), A[1]+16);
+  ctx.textAlign="left";
+  ctx.fillStyle="#58a6ff";
+  ctx.fillText("X_L = "+fmtSI(M.XL,"Ω",2), A[0]+10, (A[1]+B[1])/2);
+  ctx.save();                                // Z: entlang der Hypotenuse (außen), sonst über der Spitze
+  if(phi>0.5){
+    ctx.translate((O[0]+B[0])/2,(O[1]+B[1])/2); ctx.rotate(-phi);
+    ctx.textAlign="center"; ctx.fillStyle="#e6edf3";
+    ctx.fillText("Z = "+fmtSI(M.Z,"Ω",2), 0, -14);
+  }else{
+    ctx.textAlign="center"; ctx.fillStyle="#e6edf3";
+    ctx.fillText("Z = "+fmtSI(M.Z,"Ω",2), B[0], B[1]-20);
+  }
+  ctx.restore();
+
+  /* cos φ hervorgehoben, in der Status-Farbe der Schaltung */
+  let col="#f0b429";
+  if(M.Cos<0.25) col="#ff6b6b";
+  else if(M.Cos>0.75) col="#3fb950";
+  ctx.textAlign="center";
+  ctx.font="700 15px system-ui"; ctx.fillStyle=col;
+  ctx.fillText("cos φ = R/Z = "+fmtNum(M.Cos,3), 0, 148);
+  ctx.font="11px system-ui"; ctx.fillStyle="#8b949e";
+  ctx.fillText(I18N[lang].impCosHint, 0, 166);
+
+  ctx.restore();
+}
+
+/* ---------- 7. Oszilloskop: u_L, i, p_L, u_R, p_R übereinander ---------- */
+function drawScope(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const L=46, Rp=96, Tp=24, Bp=22;
+  const plotW=W-L-Rp, laneH=(H-Tp-Bp)/5, T=1/state.f;
+  const mid=[0,1,2,3,4].map(k=>Tp+laneH*(k+0.5));
+  const amp=laneH*0.38;
+  const t2x=t=>L+t/(2*T)*plotW;
+  const ucNow=M.ULA*Math.sin(state.phi), iNow=-M.Ihat*Math.cos(state.phi),
+        pNow=ucNow*iNow, urNow=-M.UrA*Math.cos(state.phi), prNow=R_FIX*iNow*iNow;
+
+  /* Gitter + Zeitachse */
+  ctx.font="11px ui-monospace,monospace"; ctx.textAlign="center"; ctx.textBaseline="top";
+  const unit=T>=0.5?"s":T>=5e-4?"ms":"µs", mul=unit==="s"?1:unit==="ms"?1e3:1e6;
+  ctx.strokeStyle="#21262d"; ctx.lineWidth=1;
+  for(let k=0;k<=4;k++){
+    const x=L+k*plotW/4;
+    ctx.beginPath(); ctx.moveTo(x,Tp); ctx.lineTo(x,H-Bp); ctx.stroke();
+    ctx.fillStyle="#8b949e"; ctx.fillText(fmtNum(k*T/2*mul,3), x, H-Bp+6);
+  }
+  ctx.textAlign="right"; ctx.fillText(unit, W-6, H-Bp+6);
+  ctx.textBaseline="middle";
+  const lanes=[
+    {tag:"u_L", col:"#ff5c5c"},
+    {tag:"i",   col:"#58a6ff"},
+    {tag:"p_L", col:"#3fb950"},
+    {tag:"u_R", col:"#f0b429"},
+    {tag:"p_R", col:"#fb8500"}
+  ];
+  for(let k=0;k<5;k++){
+    ctx.setLineDash(k===2?[5,4]:[3,4]);                    // p_L-Nulllinie betont gestrichelt (Mittelwert 0)
+    ctx.strokeStyle=k===2?"#2ea043":"#484f58";
+    ctx.beginPath(); ctx.moveTo(L,mid[k]); ctx.lineTo(L+plotW,mid[k]); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font="700 13px system-ui"; ctx.textAlign="left";
+    ctx.fillStyle=lanes[k].col;
+    ctx.fillText(lanes[k].tag, 10, mid[k]);
+  }
+  /* Amplituden / Mittelwerte rechts */
+  ctx.font="11px ui-monospace,monospace"; ctx.textAlign="left";
+  const ampTxt=["Û_L = "+fmtSI(M.ULA,"V"), "Î = "+fmtSI(M.Ihat,"A"),
+                "P̂ = "+fmtSI(M.Phat,"W"), "Û_R = "+fmtSI(M.UrA,"V"),
+                "P̄_R = "+fmtSI(M.PR,"W")];
+  for(let k=0;k<5;k++){
+    ctx.fillStyle=lanes[k].col;
+    ctx.fillText(ampTxt[k], L+plotW+8, mid[k]-amp+8);
+  }
+  ctx.fillStyle="#3fb950";
+  ctx.fillText(I18N[lang].avgZero, L+plotW+8, mid[2]+amp+2);
+
+  /* Kurven: p_L grün, p_R orange, jeweils positive Anteile schattiert */
+  const curves=[
+    {fn:t=>M.ULA*Math.sin(M.w*t),                 A:M.ULA,  m:mid[0], col:"#ff5c5c"},
+    {fn:t=>-M.Ihat*Math.cos(M.w*t),               A:M.Ihat, m:mid[1], col:"#58a6ff"},
+    {fn:t=>-M.Phat*Math.sin(2*M.w*t),             A:M.Phat, m:mid[2], col:"#3fb950", fill:"rgba(63,185,80,0.10)"},
+    {fn:t=>-M.UrA*Math.cos(M.w*t),                A:M.UrA,  m:mid[3], col:"#f0b429"},
+    {fn:t=>{const i=-M.Ihat*Math.cos(M.w*t); return R_FIX*i*i;}, A:M.PR, m:mid[4], col:"#fb8500", fill:"rgba(251,133,0,0.14)"}
+  ];
+  ctx.lineWidth=2; ctx.lineJoin="round";
+  for(const c of curves){
+    if(c.fill){                                           // Energie-Pakete sichtbar machen
+      ctx.fillStyle=c.fill;
+      for(let x=0;x<=plotW;x+=2){
+        const v=c.fn(x/plotW*2*T);
+        if(v>0){ const y=c.m-v/c.A*amp; ctx.fillRect(L+x,y,2,c.m-y); }
+      }
+    }
+    ctx.strokeStyle=c.col; ctx.beginPath();
+    for(let x=0;x<=plotW;x+=2){
+      const y=c.m-c.fn(x/plotW*2*T)/c.A*amp;
+      x===0?ctx.moveTo(L+x,y):ctx.lineTo(L+x,y);
+    }
+    ctx.stroke();
+  }
+
+  /* Markierung: u_L = Û genau am steigenden Nulldurchgang von i (dort i = 0) */
+  [T/4, 5*T/4].forEach((tt,idx)=>{
+    const x=t2x(tt);
+    ctx.setLineDash([4,4]); ctx.strokeStyle="#58a6ff"; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(x,mid[0]-amp); ctx.lineTo(x,mid[1]); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle="#58a6ff"; ctx.beginPath(); ctx.arc(x,mid[1],4,0,7); ctx.fill();
+    ctx.strokeStyle="#ff5c5c"; ctx.beginPath(); ctx.arc(x,mid[0]-amp,4,0,7); ctx.stroke();
+    ctx.font="11px system-ui"; ctx.fillStyle="#58a6ff";
+    ctx.textAlign=idx===0?"left":"right";
+    ctx.fillText(I18N[lang].markUMax, idx===0?x+7:x-7, mid[1]+16);
+  });
+
+  /* Zeitcursor durchs ganze Fenster (Werte ≡ aktuelle Phase) */
+  const tCur=mod(state.phi/M.w,2*T), xC=t2x(tCur);
+  ctx.strokeStyle="rgba(139,148,158,0.55)"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(xC,Tp); ctx.lineTo(xC,H-Bp); ctx.stroke();
+  const vals=[ucNow, iNow, pNow, urNow, prNow];
+  curves.forEach((c,k)=>{
+    ctx.fillStyle=c.col;
+    ctx.beginPath(); ctx.arc(xC, c.m-vals[k]/c.A*amp, 4, 0, 7); ctx.fill();
+  });
+}
+
+/* ---------- 8. Messwerte-Panel ---------- */
+const el=id=>document.getElementById(id);
+function updatePanel(){
+  el("mU").innerHTML=fmtSI(M.Ueff,"V");
+  el("mI").innerHTML=fmtSI(M.Ieff,"A");
+  el("mX").innerHTML=fmtSI(M.XL,"Ω");
+  el("mQ").innerHTML=fmtSI(M.Qb,"var");
+  el("mP").innerHTML=fmtSI(M.PR,"W");
+  el("mCos").innerHTML=fmtNum(M.Cos,3);
+  el("oL").textContent=fmtSI(state.L,"H",4);
+  el("oF").textContent=fmtSI(state.f,"Hz",4);
+  el("oV").textContent=fmtNum(state.Uhat,4)+" V";
+}
+
+/* ---------- 9. Sprachumschaltung ---------- */
+function setLang(l){
+  lang=l;
+  document.documentElement.lang=l;
+  el("btnDE").classList.toggle("active",l==="de");
+  el("btnEN").classList.toggle("active",l==="en");
+  document.querySelectorAll("[data-i18n]").forEach(n=>{
+    const v=I18N[l][n.dataset.i18n]; if(v!==undefined) n.textContent=v;
+  });
+  document.querySelectorAll("[data-i18n-html]").forEach(n=>{
+    const v=I18N[l][n.dataset.i18nHtml]; if(v!==undefined) n.innerHTML=v;
+  });
+  el("icRun").textContent=state.running?"⏸":"▶";
+  el("btnRun").lastElementChild.textContent=I18N[l][state.running?"btnStop":"btnStart"];
+  updatePanel();
+}
+el("btnDE").onclick=()=>setLang("de");
+el("btnEN").onclick=()=>setLang("en");
+
+/* ---------- 10. Steuerung ---------- */
+const sL=el("sL"), sF=el("sF"), sV=el("sV");
+function readSliders(){
+  state.L =Math.pow(10,-3+4*(sL.value/1000));    // 1 mH … 10 H (log)
+  state.f =Math.pow(10, 1+3*(sF.value/1000));    // 10 Hz … 10 kHz (log)
+  state.Uhat=+sV.value;                          // 1 … 325 V (linear)
+  recompute(); updatePanel();
+}
+sL.oninput=sF.oninput=sV.oninput=readSliders;
+
+el("btnRun").onclick=()=>{
+  state.running=!state.running;
+  el("icRun").textContent=state.running?"⏸":"▶";
+  el("btnRun").lastElementChild.textContent=I18N[lang][state.running?"btnStop":"btnStart"];
+};
+window.addEventListener("keydown",e=>{           // Leertaste = Start/Stopp
+  if(e.code==="Space"&&!["INPUT","BUTTON","SELECT"].includes(document.activeElement.tagName)){
+    e.preventDefault(); el("btnRun").click();
+  }
+});
+
+/* ---------- 11. Hauptschleife (requestAnimationFrame, ~60 FPS) ---------- */
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(state.running) state.phi+=2*Math.PI*visFreq()*dt;
+  if(state.phi>1e7) state.phi=mod(state.phi,2*Math.PI);
+
+  drawCircuit(el("cvCircuit"));
+  drawPhasor(el("cvPhasor"));
+  drawImp(el("cvImp"));
+  drawScope(el("cvScope"));
+  updatePanel();
+  requestAnimationFrame(loop);
+}
+
+/* ---------- 12. Start ---------- */
+sL.value=750; sF.value=Math.round((Math.log10(50)-1)/3*1000); sV.value=325;
+setLang("de");
+readSliders();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

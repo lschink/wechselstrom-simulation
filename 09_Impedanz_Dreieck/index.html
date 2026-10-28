@@ -1,0 +1,1178 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Interaktive Simulation: Impedanz-Dreieck für RLC-Schaltungen – Wirkwiderstand R, Blindwiderstand X, Scheinwiderstand Z mit Phasenwinkel φ und Resonanz.">
+<title>Impedanz-Dreieck (RLC) – Simulation</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📐</text></svg>">
+<style>
+  /* ---------- Grundfarben (dunkles Design, Stil wie 04_Kondensator) ---------- */
+  :root{
+    --bg:#0d1117;            /* Seitenhintergrund */
+    --panel:#161b22;         /* Panel-Hintergrund */
+    --panel2:#21262d;        /* etwas hellere Fläche */
+    --border:#30363d;        /* Rahmen */
+    --text:#e6edf3;          /* Haupttext */
+    --muted:#8b949e;         /* Nebentext */
+    --u:#ff5c5c;             /* u(t) – rot */
+    --i:#f0b429;             /* i(t) – gelb */
+    --p:#fb8500;             /* p(t) – orange */
+    --r:#3fb950;             /* Wirkanteil R / P – grün */
+    --x:#58a6ff;             /* induktiver Blindanteil – blau */
+    --xc:#ff5c5c;            /* kapazitiver Blindanteil – rot */
+    --gold:#ffd166;          /* Z / S / Resonanz – gold */
+    --accent:#58a6ff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:16px 20px; border-bottom:1px solid var(--border); flex-wrap:wrap;
+  }
+  h1{font-size:20px; margin:0}
+  .sub{color:var(--muted); font-size:13px; margin:2px 0 0}
+  .lang button{
+    background:var(--panel2); color:var(--muted); border:1px solid var(--border);
+    padding:6px 12px; cursor:pointer; font-weight:600;
+  }
+  .lang button:first-child{border-radius:8px 0 0 8px}
+  .lang button:last-child{border-radius:0 8px 8px 0; border-left:none}
+  .lang button.active{color:var(--text); background:var(--accent); border-color:var(--accent)}
+
+  main{max-width:1180px; margin:0 auto; padding:16px 20px 8px; display:grid; gap:14px}
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px;
+  }
+  .panel-head{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px}
+  h2{font-size:15px; margin:0; letter-spacing:.3px}
+  .row1{display:grid; grid-template-columns:7fr 5fr; gap:14px}
+  .row1 > div{display:grid; gap:14px; align-content:start}
+  canvas{display:block; width:100%; background:#0b0f14; border-radius:8px}
+  #cvImp{aspect-ratio:660/560}
+  #cvPhasor{aspect-ratio:1/1}
+  #cvScope{aspect-ratio:1000/560}
+  .note{color:var(--muted); font-size:13px; margin:10px 2px 0}
+  .note strong{color:var(--text)}
+  .chiprow{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .chip{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted);
+        background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:3px 10px}
+  .dot{width:10px; height:10px; border-radius:50%; display:inline-block}
+
+  /* ---------- Messwerte ---------- */
+  .mgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+  .mrow{background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:8px 10px}
+  .mlab{font-size:11.5px; color:var(--muted); line-height:1.35}
+  .mval{font:600 16px ui-monospace,SFMono-Regular,Menlo,monospace; margin-top:2px}
+  .mval small{font-size:11.5px; color:var(--muted); font-weight:400}
+
+  /* ---------- Steuerung ---------- */
+  .controls{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px 16px}
+  .ctrl label{display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:6px}
+  .ctrl label b{font-weight:600}
+  .ctrl output{font:600 13px ui-monospace,Menlo,monospace; color:var(--accent)}
+  input[type=range]{width:100%; accent-color:var(--accent); cursor:pointer}
+  .ctrlrow{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px}
+  .btn{
+    background:var(--accent); color:#0d1117; border:none; border-radius:10px;
+    padding:11px 22px; font-size:15px; font-weight:700; cursor:pointer; white-space:nowrap;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn2{
+    background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    border-radius:9px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .btn2:hover{border-color:var(--accent)}
+  .seg{display:inline-flex}
+  .seg button{
+    background:var(--panel2); color:var(--muted); border:1px solid var(--border);
+    padding:8px 14px; cursor:pointer; font-weight:600; font-size:13px;
+  }
+  .seg button:first-child{border-radius:9px 0 0 9px}
+  .seg button:last-child{border-radius:0 9px 9px 0; border-left:none}
+  .seg button.active{color:#0d1117; background:var(--accent); border-color:var(--accent)}
+  .ampel{display:inline-flex; align-items:center; gap:8px; background:var(--panel2);
+         border:1px solid var(--border); border-radius:999px; padding:7px 14px; font-size:13px}
+  #ampDot{width:12px; height:12px; border-radius:50%; background:#3fb950; box-shadow:0 0 8px currentColor}
+  .callout{margin-top:12px; font-size:13px; color:var(--text); background:var(--panel2);
+           border:1px solid var(--border); border-left:3px solid var(--gold); border-radius:8px; padding:9px 12px}
+  .callout code{font-family:ui-monospace,Menlo,monospace}
+
+  /* ---------- Erklärung ---------- */
+  .explain p{margin:0 0 12px; color:#c9d1d9; text-align:justify}
+  .explain p:last-child{margin-bottom:0}
+
+  footer{color:var(--muted); font-size:12.5px; text-align:center; padding:14px 20px 26px}
+
+  @media (max-width:940px){
+    .row1{grid-template-columns:1fr}
+    .controls{grid-template-columns:1fr 1fr}
+  }
+  @media (max-width:560px){
+    .controls{grid-template-columns:1fr}
+    .mgrid{grid-template-columns:1fr 1fr}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 data-i18n="tTitle">Impedanz-Dreieck (RLC-Reihenschaltung)</h1>
+    <p class="sub" data-i18n="tSub">Wirkwiderstand R, Blindwiderstand X, Scheinwiderstand Z &amp; Phasenwinkel φ</p>
+  </div>
+  <div class="lang" role="group" aria-label="Sprache / language">
+    <button id="btnDE" class="active">DE</button><button id="btnEN">EN</button>
+  </div>
+</header>
+
+<main>
+  <!-- ========== Zeile 1: Impedanz-Dreieck | Zeigerdiagramm + Messwerte ========== -->
+  <div class="row1">
+    <section class="panel">
+      <div class="panel-head">
+        <h2 data-i18n="tImp">Impedanz-Dreieck</h2>
+        <div class="chiprow">
+          <span class="chip"><span class="dot" style="background:var(--r)"></span><span data-i18n="lgR2">R / P (Wirkanteil)</span></span>
+          <span class="chip"><span class="dot" style="background:var(--x)"></span><span data-i18n="lgX">X / Q (induktiv)</span></span>
+          <span class="chip"><span class="dot" style="background:var(--xc)"></span><span data-i18n="lgXC">X / Q (kapazitiv)</span></span>
+          <span class="chip"><span class="dot" style="background:var(--gold)"></span><span data-i18n="lgZ">Z / S</span></span>
+        </div>
+      </div>
+      <canvas id="cvImp"></canvas>
+      <p class="note" data-i18n-html="impNote"></p>
+    </section>
+
+    <div>
+      <section class="panel">
+        <div class="panel-head"><h2 data-i18n="tPhasor">Zeigerdiagramm</h2></div>
+        <canvas id="cvPhasor"></canvas>
+        <p class="note" id="phasorCap"></p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2 data-i18n="tMeas">Messwerte</h2></div>
+        <div class="mgrid">
+          <div class="mrow"><div class="mlab" id="lXL"></div><div class="mval" id="mXL">–</div></div>
+          <div class="mrow"><div class="mlab" id="lXC"></div><div class="mval" id="mXC">–</div></div>
+          <div class="mrow"><div class="mlab" id="lX"></div><div class="mval" id="mX">–</div></div>
+          <div class="mrow"><div class="mlab" id="lZ"></div><div class="mval" id="mZ">–</div></div>
+          <div class="mrow"><div class="mlab" id="lI"></div><div class="mval" id="mI">–</div></div>
+          <div class="mrow"><div class="mlab" id="lPhi"></div><div class="mval" id="mPhi">–</div></div>
+          <div class="mrow"><div class="mlab" id="lCos"></div><div class="mval" id="mCos">–</div></div>
+          <div class="mrow"><div class="mlab" id="lF0"></div><div class="mval" id="mF0">–</div></div>
+          <div class="mrow"><div class="mlab" id="lU"></div><div class="mval" id="mU">–</div></div>
+          <div class="mrow"><div class="mlab" id="lP"></div><div class="mval" id="mP">–</div></div>
+          <div class="mrow"><div class="mlab" id="lQ"></div><div class="mval" id="mQ">–</div></div>
+          <div class="mrow"><div class="mlab" id="lS"></div><div class="mval" id="mS">–</div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ========== Oszilloskop ========== -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2 data-i18n="tScope">Oszilloskop</h2>
+      <div class="chiprow">
+        <span class="chip"><span class="dot" style="background:var(--u)"></span><span data-i18n="lgU">u(t) Spannung</span></span>
+        <span class="chip"><span class="dot" style="background:var(--r)"></span><span id="chipUR">u_R(t) am R</span></span>
+        <span class="chip"><span class="dot" id="dotUX" style="background:var(--x)"></span><span id="chipUX">u_X(t) an der Reaktanz</span></span>
+        <span class="chip"><span class="dot" style="background:var(--i)"></span><span data-i18n="lgI">i(t) Strom</span></span>
+        <span class="chip"><span class="dot" style="background:var(--p)"></span><span data-i18n="lgP">p(t) Leistung</span></span>
+        <span class="chip" data-i18n="scopeHint">φ &gt; 0: Strom nacheilt (induktiv)</span>
+      </div>
+    </div>
+    <canvas id="cvScope"></canvas>
+  </section>
+
+  <!-- ========== Steuerung ========== -->
+  <section class="panel">
+    <div class="panel-head"><h2 data-i18n="tCtrl">Steuerung</h2></div>
+    <div class="controls">
+      <div class="ctrl">
+        <label><b data-i18n="cRes">Widerstand R</b><output id="oR"></output></label>
+        <input id="sR" type="range" min="0" max="1000" step="1">
+      </div>
+      <div class="ctrl">
+        <label><b data-i18n="cInd">Induktivität L</b><output id="oL"></output></label>
+        <input id="sL" type="range" min="0" max="1000" step="1">
+      </div>
+      <div class="ctrl">
+        <label><b data-i18n="cCap">Kapazität C</b><output id="oC"></output></label>
+        <input id="sC" type="range" min="0" max="1000" step="1">
+      </div>
+      <div class="ctrl">
+        <label><b data-i18n="cFreq">Frequenz f</b><output id="oF"></output></label>
+        <input id="sF" type="range" min="0" max="1000" step="1">
+      </div>
+      <div class="ctrl">
+        <label><b data-i18n="cVolt">Scheitelspannung Û</b><output id="oV"></output></label>
+        <input id="sV" type="range" min="1" max="325" step="0.5">
+      </div>
+    </div>
+    <div class="ctrlrow">
+      <div class="seg" role="group" aria-label="Schaltungsart">
+        <button id="btnSer" class="active" data-i18n="cSeries">Reihenschaltung</button><button id="btnPar" data-i18n="cParallel">Parallelschaltung</button>
+      </div>
+      <button class="btn2" id="pRes" data-i18n="pRes">Resonanz</button>
+      <button class="btn2" id="pInd" data-i18n="pInd">Stark induktiv</button>
+      <button class="btn2" id="pCap" data-i18n="pCap">Stark kapazitiv</button>
+      <button class="btn2" id="pOhm" data-i18n="pOhm">Nahezu reiner Widerstand</button>
+      <span class="ampel"><span id="ampDot"></span><span id="ampTxt">–</span></span>
+      <button id="btnRun" class="btn"><span id="icRun">⏸</span> <span data-i18n="btnStop">Stopp</span></button>
+    </div>
+    <div class="callout" data-i18n-html="callout"></div>
+  </section>
+
+  <!-- ========== Erklärung ========== -->
+  <section class="panel explain">
+    <div class="panel-head"><h2 data-i18n="tExplain">Erklärung</h2></div>
+    <div id="expl" data-i18n-html="expl"></div>
+  </section>
+</main>
+
+<footer data-i18n="footer"></footer>
+
+<script>
+"use strict";
+/* =====================================================================
+   Simulation: Impedanz-Dreieck für RLC-Schaltungen
+   ---------------------------------------------------------------------
+   Physik-Modell (Reihenschaltung, Standardmodus):
+     ω = 2πf,  X_L = ωL (wächst mit f),  X_C = 1/(ωC) (fällt mit f)
+     X = X_L − X_C,  Z = √(R²+X²),  I_eff = U_eff/Z,  Î = Û/Z
+     tan φ = X/R  →  φ > 0 induktiv (Strom nacheilt), φ < 0 kapazitiv
+     Resonanz: X_L = X_C bei f_0 = 1/(2π√(LC)) → Z = R (minimal!)
+     P = I²·R,  Q = I²·X,  S = I²·Z,  S² = P² + Q²
+   Parallelmodus (Leitwert-Dreieck, dual dazu):
+     G = 1/R,  B_C = ωC,  B_L = 1/(ωL),  B = B_C − B_L
+     Y = √(G²+B²),  Z = 1/Y,  I_eff = U_eff·Y
+     φ = arctan(−B/G) (φ > 0 weiterhin „induktiv"),
+     P = U²·G,  Q = −U²·B,  S = U²·Y
+   Alle Werte exakt nach Formeln; φ stets über atan2 (kein Näherung).
+   Die Animation läuft wie in 04 in Zeitlupe: sichtbare Frequenz folgt
+   logarithmisch der eingestellten Frequenz, die Phasenlage bleibt exakt.
+   ===================================================================== */
+
+/* ---------- 1. Sprach-Dictionary (DE/EN) ---------- */
+const I18N = {
+de:{
+  tTitle:"Impedanz-Dreieck (RLC-Reihenschaltung)",
+  tSub:"Wirkwiderstand R, Blindwiderstand X, Scheinwiderstand Z & Phasenwinkel φ",
+  tImp:"Impedanz-Dreieck", tPhasor:"Zeigerdiagramm", tScope:"Oszilloskop",
+  tMeas:"Messwerte", tCtrl:"Steuerung", tExplain:"Erklärung",
+  lgR2:"R / P (Wirkanteil)", lgX:"X / Q (induktiv)", lgXC:"X / Q (kapazitiv)", lgZ:"Z / S",
+  lgU:"u(t) Spannung", lgI:"i(t) Strom", lgP:"p(t) Leistung",
+  chipURs:"u_R(t) am R", chipUXs:"u_X(t) an der Reaktanz",
+  chipURp:"i_R(t) durch R", chipUXp:"i_X(t) in den Blindzweigen",
+  scopeHint:"φ > 0: Strom nacheilt (induktiv)",
+  compTitle:"Komponenten",
+  barTitle:"Blindwiderstände vs. f",
+  barXLs:"X_L = ωL", barXCs:"X_C = 1/(ωC)",
+  barXLp:"B_L = 1/(ωL)", barXCp:"B_C = ωC",
+  barNoteS:"X = X_L − X_C =", barNoteP:"B = B_C − B_L =",
+  powTitle:"Leistungs-Dreieck",
+  impRes:"Resonanz! Z = R (minimal)",
+  slowmo:"Zeitlupe",
+  cRes:"Widerstand R", cInd:"Induktivität L", cCap:"Kapazität C",
+  cFreq:"Frequenz f", cVolt:"Scheitelspannung Û",
+  cSeries:"Reihenschaltung", cParallel:"Parallelschaltung",
+  pRes:"Resonanz", pInd:"Stark induktiv", pCap:"Stark kapazitiv", pOhm:"Nahezu reiner Widerstand",
+  btnStart:"Start", btnStop:"Stopp",
+  aGood:"gut angepasst (|φ| < 30°)", aMid:"mäßige Blindlast (30°…60°)", aBad:"stark Blindlast (|φ| > 60°)",
+  callout:"<code>Z = √(R²+X²)</code> ist immer größer als der größte Einzelwiderstand — Wirk- und Blindwiderstand kann man "
+    +"nicht skalar addieren, weil die zugehörigen Spannungen um 90° versetzt sind. <b>tan φ = X/R</b> liefert die Phasenverschiebung, "
+    +"<b>cos φ = R/Z</b> den Wirkanteil. Bei <b>Resonanz</b> (f = f<sub>0</sub>) heben sich X<sub>L</sub> und X<sub>C</sub> auf: "
+    +"Z = R ist minimal, der Strom maximal, φ = 0.",
+  impNote:'<strong>So liest man das Dreieck:</strong> Horizontale Kathete = Wirkwiderstand R (grün), vertikale Kathete = Blindwiderstand '
+    +'X = X<sub>L</sub> − X<sub>C</sub> (blau nach oben = induktiv, rot nach unten = kapazitiv), Hypotenuse = Scheinwiderstand Z. '
+    +'Der Winkel φ zwischen R und Z ist die Phasenverschiebung zwischen Spannung und Strom. '
+    +'Links rutschen die X<sub>L</sub>- und X<sub>C</sub>-Balken bei Frequenzänderung gegenläufig — dort, wo sie gleich lang sind, liegt die Resonanz. '
+    +'Rechts unten das Leistungs-Dreieck: dieselbe Geometrie, skaliert mit I<sub>eff</sub>².',
+  phasorCaption:"Langsame Drehung im Uhrzeigersinn (ω). Die Spannungszeiger U_R, U_L und U_C addieren sich geometrisch zur Gesamtspannung U; "
+    +"ihr Winkel zu I ist φ. Zeigerlängen nicht maßstäblich zueinander.",
+  phasorCaptionP:"Langsame Drehung im Uhrzeigersinn (ω). U ist die Referenz; die Stromzeiger I_R, I_C und I_L addieren sich geometrisch zum "
+    +"Gesamtstrom I — bei kapazitivem Verhalten eilt er der Spannung voraus. Zeigerlängen nicht maßstäblich zueinander.",
+  /* Messwert-Beschriftungen (je nach Modus) */
+  lXLs:"X<sub>L</sub> = ωL", lXCs:"X<sub>C</sub> = 1/(ωC)", lXs:"X = X<sub>L</sub> − X<sub>C</sub>",
+  lZs:"Z = √(R²+X²)", lIs:"I<sub>eff</sub> = U<sub>eff</sub>/Z", lPhis:"φ = arctan(X/R)",
+  lCoss:"cos φ = R/Z · sin φ = X/Z", lPs:"P = I<sub>eff</sub>²·R",
+  lQs:"Q = I<sub>eff</sub>²·X", lSs:"S = I<sub>eff</sub>²·Z",
+  lXLp:"B<sub>C</sub> = ωC", lXCp:"B<sub>L</sub> = 1/(ωL)", lXp:"B = B<sub>C</sub> − B<sub>L</sub>",
+  lZp:"Y = √(G²+B²) · Z = 1/Y", lIp:"I<sub>eff</sub> = U<sub>eff</sub>·Y", lPhip:"φ = arctan(−B/G)",
+  lCosp:"cos φ = G/Y · sin φ = −B/Y", lPp:"P = U<sub>eff</sub>²·G",
+  lQp:"Q = −U<sub>eff</sub>²·B", lSp:"S = U<sub>eff</sub>²·Y",
+  lF0:"f<sub>0</sub> = 1/(2π√(LC))", lU:"U<sub>eff</sub> = Û/√2",
+  expl:
+    '<p><b>Das Dreieck als Rechenmodell:</b> In einer RLC-Schaltung fallen an R, L und C zeitgleich Spannungen ab, die nicht „in dieselbe '
+    +'Richtung zeigen“: u_R läuft in Phase mit dem Strom, die Blindspannungen sind gegenüber dem Strom um exakt 90° verschoben. '
+    +'Skalare Addition u_R + u_L + u_C wäre deshalb falsch. Der Ausweg ist die Zeigerdarstellung: Jede sinusförmige Größe wird als rotierender '
+    +'Zeiger dargestellt, deren Projektion den Momentanwert ergibt. Zeiger addiert man vektoriell (geometrisch) — das Impedanz-Dreieck ist nichts '
+    +'anderes als diese Vektoraddition für die Widerstände: R waagrecht, X = X_L − X_C senkrecht, und die Hypotenuse Z ist das Ergebnis. '
+    +'Pythagoras liefert Z = √(R²+X²), der Winkel φ = arctan(X/R) die Phasenlage.</p>'
+    +'<p><b>Wirkwiderstand R:</b> Er wandelt elektrische Energie dauerhaft in Wärme (oder Licht, Bewegung) um. Strom und Spannung sind in Phase, '
+    +'der Wirkanteil des Dreiecks. Die zugehörige Leistung P = I_eff²·R ist die einzige, die das Netz wirklich „liefert“ und die ein Zähler bezahlt. '
+    +'In der Leistungsbilanz ist P die waagrechte Kathete des Leistungs-Dreiecks; es gilt stets S² = P² + Q².</p>'
+    +'<p><b>Blindwiderstand X:</b> Spule und Kondensator speichern Energie — die Spule im Magnetfeld (W = ½·L·i²), der Kondensator im elektrischen '
+    +'Feld (W = ½·C·u²) — und geben sie im nächsten Viertelzyklus unverändert zurück. Strom und Spannung sind um 90° versetzt. '
+    +'Die beiden Blindwiderstände wirken <em>entgegengesetzt</em>: X = X_L − X_C. Ist X positiv, dominiert die Spule (induktiv, Strom nacheilt, '
+    +'blauer Pfeil nach oben); ist X negativ, dominiert der Kondensator (kapazitiv, Strom eilt voraus, roter Pfeil nach unten). '
+    +'Die Blindleistung Q = I_eff²·X pendelt zwischen Quelle und Energiespeichern hin und her.</p>'
+    +'<p><b>Scheinwiderstand Z:</b> Er ist die „Gesamtresistenz“ der Schaltung gegenüber dem Strom und bestimmt mit I_eff = U_eff/Z die Stromaufnahme. '
+    +'Wegen des rechten Winkels ist Z = √(R²+X²) stets <em>größer</em> als jeder Einzelwiderstand — das Dreieck macht das sofort sichtbar: '
+    +'Die Hypotenuse ist die längste Seite. Z und φ genügen, um die Schaltung für die Quelle vollständig zu beschreiben; der Zeiger Z dreht sich '
+    +'mit ω um den Ursprung.</p>'
+    +'<p><b>Resonanz:</b> X_L = ωL wächst mit der Frequenz, X_C = 1/(ωC) fällt — es gibt genau eine Frequenz, bei der beide gleich groß sind: '
+    +'die Resonanzfrequenz f_0 = 1/(2π√(LC)). Dort heben sich die Blindwiderstände auf, X = 0, das Dreieck degeneriert zur waagrechten Linie: '
+    +'Z = R (minimal!), der Strom wird maximal (I_max = U/R), φ = 0, die Schaltung ist rein ohmisch. Unterhalb f_0 dominiert der Kondensator, '
+    +'oberhalb die Spule. Dieses Verhalten ist der Kern von Filtern, Schwingkreisen und der Frequenzgangsteuerung.</p>'
+    +'<p><b>Praxis:</b> Jede reale Wechselstromquelle hat eine innere Impedanz (Netzimpedanz) — sie begrenzt Kurzschlussströme und lässt die '
+    +'Klemmspannung unter Last einbrechen. Verschlechtert ein Verbraucher den Wirkfaktor cos φ (z. B. ein Motor mit großem X), wird er mittels '
+    +'Kondensator-Kompensation wieder „nachgebessert“. Filter und Frequenzweichen dimensioniert man über das Verhältnis von X zu R bei der '
+    +'Grenzfrequenz; in der HF-Technik spielt der Wellenwiderstand √(L/C) die zentrale Rolle. Und ein Sicherheitshinweis: An reinen Blindwiderständen '
+    +'kann trotz hoher Ströme kaum Wirkleistung umgesetzt werden — Berührspannungen an Kondensatoren und Spulen sind deshalb trügerisch.</p>',
+  footer:"Eine einzige HTML-Datei · kein Framework · offline nutzbar · bereit für GitHub Pages"
+},
+en:{
+  tTitle:"Impedance Triangle (RLC Series Circuit)",
+  tSub:"Resistance R, reactance X, impedance Z & phase angle φ",
+  tImp:"Impedance triangle", tPhasor:"Phasor diagram", tScope:"Oscilloscope",
+  tMeas:"Measurements", tCtrl:"Controls", tExplain:"Explanation",
+  lgR2:"R / P (real part)", lgX:"X / Q (inductive)", lgXC:"X / Q (capacitive)", lgZ:"Z / S",
+  lgU:"u(t) voltage", lgI:"i(t) current", lgP:"p(t) power",
+  chipURs:"u_R(t) across R", chipUXs:"u_X(t) across the reactance",
+  chipURp:"i_R(t) through R", chipUXp:"i_X(t) in the reactive branches",
+  scopeHint:"φ > 0: current lags (inductive)",
+  compTitle:"Components",
+  barTitle:"Reactances vs. f",
+  barXLs:"X_L = ωL", barXCs:"X_C = 1/(ωC)",
+  barXLp:"B_L = 1/(ωL)", barXCp:"B_C = ωC",
+  barNoteS:"X = X_L − X_C =", barNoteP:"B = B_C − B_L =",
+  powTitle:"Power triangle",
+  impRes:"Resonance! Z = R (minimum)",
+  slowmo:"slow motion",
+  cRes:"Resistance R", cInd:"Inductance L", cCap:"Capacitance C",
+  cFreq:"Frequency f", cVolt:"Peak voltage Û",
+  cSeries:"Series circuit", cParallel:"Parallel circuit",
+  pRes:"Resonance", pInd:"Strongly inductive", pCap:"Strongly capacitive", pOhm:"Almost pure resistance",
+  btnStart:"Start", btnStop:"Pause",
+  aGood:"well matched (|φ| < 30°)", aMid:"moderate reactive load (30°…60°)", aBad:"strong reactive load (|φ| > 60°)",
+  callout:"<code>Z = √(R²+X²)</code> is always larger than the largest individual resistance — real and reactive parts cannot be added "
+    +"scalars because their voltages are 90° apart. <b>tan φ = X/R</b> gives the phase shift, <b>cos φ = R/Z</b> the real-power share. "
+    +"At <b>resonance</b> (f = f<sub>0</sub>) X<sub>L</sub> and X<sub>C</sub> cancel: Z = R is minimal, current maximal, φ = 0.",
+  impNote:'<strong>How to read the triangle:</strong> Horizontal leg = resistance R (green), vertical leg = reactance X = X<sub>L</sub> − X<sub>C</sub> '
+    +'(blue up = inductive, red down = capacitive), hypotenuse = impedance Z. The angle φ between R and Z is the phase shift between voltage and current. '
+    +'On the left, the X<sub>L</sub> and X<sub>C</sub> bars slide in opposite directions as the frequency changes — where they are equally long, resonance occurs. '
+    +'Bottom right, the power triangle: same geometry, scaled by I<sub>rms</sub>².',
+  phasorCaption:"Slow clockwise rotation (ω). The voltage phasors U_R, U_L and U_C add geometrically to the total voltage U; "
+    +"its angle to I is φ. Phasor lengths not to scale.",
+  phasorCaptionP:"Slow clockwise rotation (ω). U is the reference; the current phasors I_R, I_C and I_L add geometrically to the "
+    +"total current I — with capacitive behaviour it leads the voltage. Phasor lengths not to scale.",
+  lXLs:"X<sub>L</sub> = ωL", lXCs:"X<sub>C</sub> = 1/(ωC)", lXs:"X = X<sub>L</sub> − X<sub>C</sub>",
+  lZs:"Z = √(R²+X²)", lIs:"I<sub>rms</sub> = U<sub>rms</sub>/Z", lPhis:"φ = arctan(X/R)",
+  lCoss:"cos φ = R/Z · sin φ = X/Z", lPs:"P = I<sub>rms</sub>²·R",
+  lQs:"Q = I<sub>rms</sub>²·X", lSs:"S = I<sub>rms</sub>²·Z",
+  lXLp:"B<sub>C</sub> = ωC", lXCp:"B<sub>L</sub> = 1/(ωL)", lXp:"B = B<sub>C</sub> − B<sub>L</sub>",
+  lZp:"Y = √(G²+B²) · Z = 1/Y", lIp:"I<sub>rms</sub> = U<sub>rms</sub>·Y", lPhip:"φ = arctan(−B/G)",
+  lCosp:"cos φ = G/Y · sin φ = −B/Y", lPp:"P = U<sub>rms</sub>²·G",
+  lQp:"Q = −U<sub>rms</sub>²·B", lSp:"S = U<sub>rms</sub>²·Y",
+  lF0:"f<sub>0</sub> = 1/(2π√(LC))", lU:"U<sub>rms</sub> = Û/√2",
+  expl:
+    '<p><b>The triangle as a calculation model:</b> In an RLC circuit, voltages appear across R, L and C simultaneously, but they do not '
+    +'“point in the same direction”: u_R is in phase with the current, the reactive voltages are shifted by exactly 90° against it. '
+    +'A scalar addition u_R + u_L + u_C would therefore be wrong. The way out is the phasor representation: every sinusoidal quantity becomes a '
+    +'rotating phasor whose projection gives the instantaneous value. Phasors are added vectorially (geometrically) — the impedance triangle is '
+    +'exactly this vector addition for the resistances: R horizontal, X = X_L − X_C vertical, and the hypotenuse Z is the result. '
+    +'Pythagoras yields Z = √(R²+X²), the angle φ = arctan(X/R) the phase position.</p>'
+    +'<p><b>Resistance R:</b> It permanently converts electrical energy into heat (or light, motion). Current and voltage are in phase, '
+    +'the real leg of the triangle. The associated power P = I_rms²·R is the only one the grid truly “delivers” and a meter bills. '
+    +'In the power balance, P is the horizontal leg of the power triangle; S² = P² + Q² always holds.</p>'
+    +'<p><b>Reactance X:</b> Inductor and capacitor store energy — the coil in its magnetic field (W = ½·L·i²), the capacitor in its electric '
+    +'field (W = ½·C·u²) — and return it unchanged in the next quarter cycle. Current and voltage are 90° apart. '
+    +'The two reactances act in <em>opposite</em> directions: X = X_L − X_C. Positive X means the coil dominates (inductive, current lags, '
+    +'blue arrow pointing up); negative X means the capacitor dominates (capacitive, current leads, red arrow pointing down). '
+    +'The reactive power Q = I_rms²·X sloshes back and forth between source and energy storage.</p>'
+    +'<p><b>Impedance Z:</b> It is the “total resistance” of the circuit against the current and, via I_rms = U_rms/Z, sets the current draw. '
+    +'Because of the right angle, Z = √(R²+X²) is always <em>larger</em> than any individual resistance — the triangle makes that obvious: '
+    +'the hypotenuse is the longest side. Z and φ fully describe the circuit as seen by the source; the Z phasor rotates about the origin at ω.</p>'
+    +'<p><b>Resonance:</b> X_L = ωL grows with frequency, X_C = 1/(ωC) falls — so there is exactly one frequency where both are equal: '
+    +'the resonant frequency f_0 = 1/(2π√(LC)). There the reactances cancel, X = 0, and the triangle degenerates to a horizontal line: '
+    +'Z = R (minimum!), the current becomes maximum (I_max = U/R), φ = 0, and the circuit is purely resistive. Below f_0 the capacitor dominates, '
+    +'above it the coil. This behaviour is the core of filters, tank circuits and frequency-response control.</p>'
+    +'<p><b>Practice:</b> Every real AC source has an internal impedance (grid impedance) — it limits short-circuit currents and makes the terminal '
+    +'voltage sag under load. If a load degrades the power factor cos φ (e.g. a motor with large X), it is “corrected” by capacitor compensation. '
+    +'Filters and crossovers are dimensioned via the ratio of X to R at the cut-off frequency; in RF engineering the characteristic impedance '
+    +'√(L/C) plays the central role. And a safety note: across pure reactances hardly any real power is converted despite high currents — '
+    +'touch voltages across capacitors and coils are therefore treacherous.</p>',
+  footer:"A single HTML file · no framework · works offline · ready for GitHub Pages"
+}};
+
+/* ---------- 2. Zustand der Simulation ---------- */
+const TAU = 2*Math.PI;
+const state = {
+  R: 100,      // Widerstand in Ω        (1 Ω … 10 kΩ, logarithmisch)
+  L: 0.1,      // Induktivität in H      (1 mH … 10 H, logarithmisch)
+  C: 1e-6,     // Kapazität in F         (1 pF … 10 µF, logarithmisch)
+  f: 50,       // Frequenz in Hz         (10 Hz … 1 MHz, logarithmisch)
+  Uhat: 325,   // Scheitelwert in V      (1 … 325 V, linear)
+  phi: 0,      // laufende Phase der Animation (Rad)
+  running: true,
+  mode: "series" // "series" | "parallel"
+};
+/* Animierte Balken-Endpunkte (weiche Bewegung bei f-Änderung) */
+const anim = { a:0.5, b:0.5 };
+let lang = "de";
+
+/* Abgeleitete Größen (recompute()) — Namen XLv/XCv sind im Parallelmodus BC/BL! */
+const M = { w:0, f0:0, Ueff:0, horiz:0, XLv:0, XCv:0, signed:0, mag:0, Z:0,
+            Ieff:0, Ihat:0, phi:0, cosF:0, sinF:0, P:0, Q:0, S:0, reso:false };
+
+function recompute(){
+  M.w    = TAU*state.f;
+  M.Ueff = state.Uhat/Math.SQRT2;
+  M.f0   = 1/(TAU*Math.sqrt(state.L*state.C));     // Resonanzfrequenz (beide Modi)
+  if(state.mode==="series"){
+    M.horiz = state.R;                             // R
+    M.XLv   = M.w*state.L;                         // X_L = ωL
+    M.XCv   = 1/(M.w*state.C);                     // X_C = 1/(ωC)
+    M.signed= M.XLv - M.XCv;                       // X
+    M.mag   = Math.hypot(state.R, M.signed);       // Z
+    M.Z     = M.mag;
+    M.Ieff  = M.Ueff/M.Z;
+    M.Ihat  = state.Uhat/M.Z;
+    M.phi   = Math.atan2(M.signed, state.R);       // exakt, kein tan-Überlauf
+    M.cosF  = state.R/M.Z;
+    M.sinF  = M.signed/M.Z;
+    M.P     = M.Ieff*M.Ieff*state.R;
+    M.Q     = M.Ieff*M.Ieff*M.signed;
+    M.S     = M.Ieff*M.Ieff*M.Z;
+    M.reso  = Math.abs(M.signed) < 0.01*state.R;   // |X| < 1 % von R
+  }else{
+    M.horiz = 1/state.R;                           // G
+    M.XLv   = M.w*state.C;                         // B_C = ωC
+    M.XCv   = 1/(M.w*state.L);                     // B_L = 1/(ωL)
+    M.signed= M.XLv - M.XCv;                       // B
+    M.mag   = Math.hypot(M.horiz, M.signed);       // Y
+    M.Z     = 1/M.mag;
+    M.Ieff  = M.Ueff*M.mag;
+    M.Ihat  = state.Uhat*M.mag;
+    M.phi   = Math.atan2(-M.signed, M.horiz);      // φ > 0 = induktiv
+    M.cosF  = M.horiz/M.mag;
+    M.sinF  = -M.signed/M.mag;
+    M.P     = M.Ueff*M.Ueff*M.horiz;
+    M.Q     = -M.Ueff*M.Ueff*M.signed;
+    M.S     = M.Ueff*M.Ueff*M.mag;
+    M.reso  = Math.abs(M.signed) < 0.01*M.horiz;   // |B| < 1 % von G
+  }
+  if(!isFinite(M.phi)) M.phi = 0;                  // Fallback für den (hier unmöglichen) Fall 0/0
+}
+
+/* Sichtbare Animationsfrequenz (wie 04: logarithmisch, max. 12 Hz sichtbar) */
+function visFreq(){ return Math.min(12, 0.9*Math.sqrt(state.f/10)); }
+
+/* ---------- 3. Formatier-Helfer ---------- */
+function fmtNum(x, sig=3){
+  return x.toLocaleString(lang==="de"?"de-DE":"en-US",{maximumSignificantDigits:sig});
+}
+function fmtSI(v, unit, sig=3){
+  if(v===0) return "0 "+unit;
+  const a=Math.abs(v);
+  const U=[[1e9,"G"],[1e6,"M"],[1e3,"k"],[1,""],[1e-3,"m"],[1e-6,"µ"],[1e-9,"n"],[1e-12,"p"]];
+  for(const [f,p] of U) if(a>=f) return fmtNum(v/f,sig)+" "+p+unit;
+  return fmtNum(v/1e-12,sig)+" p"+unit;
+}
+function fmtPhi(){ // φ in Grad mit Vorzeichen (Float-Reste bei exakter Resonanz → 0°)
+  const d = M.phi*180/Math.PI;
+  if(Math.abs(d)<1e-9) return "0°";
+  return (d>0?"+":"")+fmtNum(d,3)+"°";
+}
+function mod(n,m){ return ((n%m)+m)%m; }
+
+/* ---------- 4. Canvas-Hilfsfunktionen ---------- */
+function fit(cv){
+  const dpr=window.devicePixelRatio||1, r=cv.getBoundingClientRect();
+  const W=Math.max(1,Math.round(r.width)), H=Math.max(1,Math.round(r.height));
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){
+    cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+  }
+  const ctx=cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx,W,H};
+}
+function arrowHead(ctx,x,y,ang,len=9){
+  ctx.beginPath();
+  ctx.moveTo(x,y);
+  ctx.lineTo(x-len*Math.cos(ang-0.45), y-len*Math.sin(ang-0.45));
+  ctx.moveTo(x,y);
+  ctx.lineTo(x-len*Math.cos(ang+0.45), y-len*Math.sin(ang+0.45));
+  ctx.stroke();
+}
+function rr(ctx,x,y,w,h,r){ // abgerundetes Rechteck
+  ctx.beginPath(); ctx.roundRect(x,y,w,h,r);
+}
+
+/* ---------- 5. Hauptszene: Impedanz-Dreieck + Komponenten + Leistungs-Dreieck ---------- */
+/* Design-Koordinaten 660×560. */
+function drawImp(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const s=Math.min(W/660,H/560);
+  ctx.save();
+  ctx.translate((W-660*s)/2,(H-560*s)/2); ctx.scale(s,s);
+  const D=I18N[lang], par = state.mode==="parallel";
+
+  /* ===== 5a. Links: Komponenten-Symbole (Reihe: Kette, Parallel: drei Zweige) ===== */
+  ctx.font="700 13px system-ui"; ctx.textAlign="left"; ctx.textBaseline="middle";
+  ctx.fillStyle="#8b949e";
+  ctx.fillText(D.compTitle, 20, 24);
+  ctx.lineCap="round";
+  if(!par){
+    /* Reihenschaltung: Quelle → R → L → C als horizontale Kette (y=64) */
+    ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=2.4;
+    ctx.beginPath();
+    ctx.moveTo(20,64); ctx.lineTo(44,64); ctx.moveTo(96,64); ctx.lineTo(120,64);
+    ctx.moveTo(168,64); ctx.lineTo(196,64); ctx.moveTo(246,64); ctx.lineTo(262,64);
+    ctx.stroke();
+    ctx.strokeRect(46,52,48,24);                        // R als Rechteck (DIN)
+    ctx.beginPath();                                    // L als Spulenbögen
+    for(let k=0;k<4;k++){ ctx.arc(128+k*12+6,64,6,-Math.PI/2,Math.PI/2); }
+    ctx.stroke();
+    ctx.beginPath();                                    // C als Plattenpaar
+    ctx.moveTo(222,50); ctx.lineTo(222,78); ctx.moveTo(236,50); ctx.lineTo(236,78);
+    ctx.stroke();
+    ctx.font="700 12px system-ui"; ctx.textAlign="center";
+    ctx.fillStyle="#3fb950"; ctx.fillText("R", 70, 40);
+    ctx.fillStyle="#58a6ff"; ctx.fillText("L", 150, 40);
+    ctx.fillStyle="#ff5c5c"; ctx.fillText("C", 229, 40);
+    ctx.font="600 11px ui-monospace,monospace"; ctx.fillStyle="#8b949e";
+    ctx.fillText(fmtSI(state.R,"Ω",3), 70, 94);
+    ctx.fillText(fmtSI(state.L,"H",3), 150, 94);
+    ctx.fillText(fmtSI(state.C,"F",3), 229, 94);
+  }else{
+    /* Parallelschaltung: Sammelschienen, drei senkrechte Zweige */
+    ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=2.4;
+    ctx.beginPath();
+    ctx.moveTo(28,42); ctx.lineTo(300,42);
+    ctx.moveTo(28,104); ctx.lineTo(300,104);
+    ctx.stroke();
+    const bx=[80,170,260];
+    ctx.strokeRect(bx[0]-14,58,28,30);                  // R-Zweig
+    ctx.beginPath();
+    for(let k=0;k<3;k++){ ctx.arc(bx[1]-12+k*12+6,73,6,-Math.PI/2,Math.PI/2); }
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(bx[2]-6,56); ctx.lineTo(bx[2]-6,90); ctx.moveTo(bx[2]+6,56); ctx.lineTo(bx[2]+6,90);
+    ctx.stroke();
+    ctx.font="700 12px system-ui"; ctx.textAlign="center";
+    ctx.fillStyle="#3fb950"; ctx.fillText("R", bx[0], 118);
+    ctx.fillStyle="#58a6ff"; ctx.fillText("L", bx[1], 118);
+    ctx.fillStyle="#ff5c5c"; ctx.fillText("C", bx[2], 118);
+    ctx.font="600 11px ui-monospace,monospace"; ctx.fillStyle="#8b949e";
+    ctx.fillText(fmtSI(state.R,"Ω",3), bx[0], 134);
+    ctx.fillText(fmtSI(state.L,"H",3), bx[1], 134);
+    ctx.fillText(fmtSI(state.C,"F",3), bx[2], 134);
+  }
+
+  /* ===== 5b. Links: gegenläufige Balken (animiert, logarithmisch) ===== */
+  /* Farblogik einheitlich: Blau = induktiv, Rot = kapazitiv (beide Modi).
+     Reihe: X = X_L − X_C (X > 0 induktiv). Parallel: B = B_C − B_L (B < 0 induktiv!) */
+  const induktiv = par ? M.signed<0 : M.signed>0;
+  const xCol = Math.abs(M.signed)<1e-12*Math.max(M.horiz,1) ? "#8b949e"
+             : (induktiv ? "#58a6ff" : "#ff5c5c");
+  /* Blaue Seite = Spule (X_L bzw. B_L), rote Seite = Kondensator (X_C bzw. B_C) */
+  const vBlue = par ? M.XCv : M.XLv;
+  const vRed  = par ? M.XLv : M.XCv;
+  /* Normierung über 13 Dekaden (−5…8), damit der ganze Reglerbereich sichtbar ist */
+  const tXL = Math.min(1, Math.max(0, (Math.log10(Math.max(vBlue,1e-5))+5)/13));
+  const tXC = Math.min(1, Math.max(0, (Math.log10(Math.max(vRed,1e-5))+5)/13));
+  anim.a += (tXL-anim.a)*0.12;
+  anim.b += (tXC-anim.b)*0.12;
+
+  ctx.font="700 13px system-ui"; ctx.textAlign="left"; ctx.fillStyle="#8b949e";
+  ctx.fillText(D.barTitle, 20, 176);
+  const axX=170, bY1=206, bY2=248;
+  ctx.strokeStyle="#484f58"; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(axX,192); ctx.lineTo(axX,264); ctx.stroke();
+  ctx.font="600 12px system-ui"; ctx.textAlign="right";
+  ctx.fillStyle="#58a6ff";
+  ctx.fillText(par?D.barXLp:D.barXLs, 150, bY1);        // Blau = Spulen-Seite
+  ctx.fillStyle="#ff5c5c";
+  ctx.fillText(par?D.barXCp:D.barXCs, 150, bY2);        // Rot = Kondensator-Seite
+  ctx.textAlign="left"; ctx.textBaseline="middle";
+  ctx.fillStyle="#58a6ff";
+  rr(ctx, axX, bY1-7, 8+84*anim.a, 14, 4); ctx.fill();  // wächst mit f
+  ctx.fillStyle="#ff5c5c";
+  const wl=8+84*anim.b;
+  rr(ctx, axX-wl, bY2-7, wl, 14, 4); ctx.fill();        // fällt mit f
+  ctx.font="600 10.5px ui-monospace,monospace"; ctx.fillStyle="#8b949e";
+  ctx.fillText(fmtSI(vBlue, par?"S":"Ω", 2), axX+92, bY1);
+  ctx.textAlign="right";
+  ctx.fillText(fmtSI(vRed, par?"S":"Ω", 2), axX-92, bY2);
+  ctx.textAlign="left"; ctx.font="600 11.5px system-ui";
+  ctx.fillStyle = xCol;
+  const noteVal = fmtSI(M.signed, par?"S":"Ω", 3);
+  ctx.fillText((par?D.barNoteP:D.barNoteS)+" "+noteVal, 20, 288);
+  ctx.textBaseline="alphabetic";
+
+  /* ===== 5c. Impedanz-/Leitwert-Dreieck (zentriert rechts) ===== */
+  const ox=250, oy=300, RMAX=225;
+  const k = RMAX/Math.max(M.horiz, Math.abs(M.signed), M.mag, 1e-12);
+  const Ax=ox+k*M.horiz, Ay=oy;                        // rechter Winkel
+  /* Spitze: Reihe X>0 (induktiv) nach oben; Parallel B>0 (kapazitiv) nach unten */
+  const Bx=Ax, By= par ? oy+k*M.signed : oy-k*M.signed;
+  const ang=Math.atan2(By-oy, Bx-ox);                  // Zeigerwinkel von Z
+  const reso=M.reso;
+
+  if(reso){                                            // Resonanz-Goldglühen
+    ctx.save();
+    ctx.shadowColor="rgba(255,209,102,0.95)"; ctx.shadowBlur=22;
+    ctx.strokeStyle="#ffd166"; ctx.lineWidth=3.4; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(Ax,Ay); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(Bx,By); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.lineCap="round"; ctx.lineWidth=3.2;
+  ctx.strokeStyle="#3fb950";                           // R bzw. G (waagrecht)
+  ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(Ax,Ay); ctx.stroke();
+  ctx.strokeStyle=xCol;                                // X bzw. B (senkrecht)
+  ctx.beginPath(); ctx.moveTo(Ax,Ay); ctx.lineTo(Bx,By); ctx.stroke();
+  ctx.strokeStyle= reso ? "#ffd166" : "#e6edf3";       // Z bzw. Y (Hypotenuse)
+  ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(Bx,By); ctx.stroke();
+  arrowHead(ctx,Bx,By,ang,11);
+  ctx.fillStyle= reso ? "#ffd166" : "#e6edf3";
+  ctx.beginPath(); ctx.arc(Bx,By,4,0,7); ctx.fill();
+
+  /* rechter Winkel an Ecke A */
+  ctx.strokeStyle="#8b949e"; ctx.lineWidth=1.3;
+  const sgnY = Math.sign(By-Ay)||1;
+  ctx.beginPath();
+  ctx.moveTo(Ax-9,Ay); ctx.lineTo(Ax-9,Ay+9*sgnY); ctx.lineTo(Ax,Ay+9*sgnY); ctx.stroke();
+
+  /* φ-Sektor am Ursprung (Richtung: gegen Uhrzeigersinn nach oben = induktiv);
+     bei negativem Endwinkel muss anticlockwise=true gesetzt werden,
+     sonst zeichnet arc() den langen Weg (fast Vollkreis). */
+  const rr0=34, acw=ang<0;
+  ctx.fillStyle="rgba(240,180,41,0.14)";
+  ctx.beginPath(); ctx.moveTo(ox,oy); ctx.arc(ox,oy,rr0,0,ang,acw); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle="#f0b429"; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.arc(ox,oy,rr0,0,ang,acw); ctx.stroke();
+  arrowHead(ctx,ox+rr0*Math.cos(ang),oy+rr0*Math.sin(ang),ang+Math.PI/2,7);
+  if(Math.abs(ang)>0.12){
+    ctx.font="italic 700 14px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillStyle="#f0b429";
+    ctx.fillText("φ", ox+rr0*0.62*Math.cos(ang/2), oy+rr0*0.62*Math.sin(ang/2));
+  }
+
+  /* Beschriftungen mit Live-Werten */
+  const unit = par?"S":"Ω";
+  ctx.font="600 13px system-ui"; ctx.textBaseline="middle";
+  /* R-/G-Label: unter der Basis; bei sehr kurzer Basis (fast senkrechtes Dreieck)
+     links daneben, damit die Hypotenuse es nicht schneidet */
+  const rTxt=(par?"G = ":"R = ")+fmtSI(M.horiz,unit,3);
+  ctx.fillStyle="#3fb950";
+  if(k*M.horiz>70){ ctx.textAlign="center"; ctx.fillText(rTxt, (ox+Ax)/2, Ay+18); }
+  else            { ctx.textAlign="right";  ctx.fillText(rTxt, ox-12, Ay+18); }
+  ctx.textAlign="left";
+  ctx.fillStyle=xCol;
+  const xLab = (par?"B = ":"X = ")+(par?"B_C − B_L":"X_L − X_C")+" = "+fmtSI(M.signed,unit,3);
+  ctx.fillText(xLab, Math.min(Ax+12, 640-ctx.measureText(xLab).width), (Ay+By)/2);
+  ctx.save();
+  ctx.textAlign="center"; ctx.fillStyle= reso ? "#ffd166" : "#e6edf3";
+  ctx.font="700 13px system-ui";
+  const zTxt=(par?"Y = ":"Z = ")+fmtSI(M.mag,unit,3)+"   ·   φ = "+fmtPhi();
+  if(Math.abs(ang)>1.2){                                 // fast senkrecht: horizontal neben der Spitze
+    ctx.textAlign="left";
+    ctx.fillText(zTxt, Bx+12, By);
+  }else if(Math.abs(ang)>0.5){                           // entlang der Hypotenuse (außen)
+    ctx.translate((ox+Bx)/2,(oy+By)/2); ctx.rotate(ang);
+    ctx.fillText(zTxt, 0, 16);
+  }else{
+    ctx.fillText(zTxt, Bx, By-20);
+  }
+  ctx.restore();
+
+  /* Resonanz-Hinweis */
+  if(reso){
+    ctx.font="800 16px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    const rt=D.impRes;
+    const tw=ctx.measureText(rt).width+26;
+    ctx.fillStyle="rgba(255,209,102,0.12)";
+    ctx.strokeStyle="#ffd166"; ctx.lineWidth=1.4;
+    rr(ctx, 430-tw/2, 40, tw, 30, 9); ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#ffd166";
+    ctx.fillText(rt, 430, 56);
+  }
+  ctx.textBaseline="alphabetic";
+
+  /* ===== 5d. Leistungs-Dreieck (klein, rechts unten) =====
+     Q trägt das Vorzeichen: Q > 0 (induktiv) zeigt nach oben, Q < 0 nach unten —
+     damit stimmt die Richtung in beiden Modi automatisch. */
+  const px=470, py=474, PMAX=80;
+  ctx.font="700 12px system-ui"; ctx.textAlign="center"; ctx.fillStyle="#8b949e";
+  ctx.fillText(D.powTitle, px+85, 380);
+  const qMax=Math.max(M.P, Math.abs(M.Q), M.S, 1e-30);
+  const k2=PMAX/qMax;
+  const pH=k2*M.P, pV=k2*M.Q;
+  const Qx=px+pH, Qy=py, Sx=Qx, Sy=py-pV;
+  const pang=Math.atan2(Sy-py, Sx-px);
+  ctx.lineCap="round"; ctx.lineWidth=2.6;
+  ctx.strokeStyle="#3fb950";
+  ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(Qx,Qy); ctx.stroke();
+  ctx.strokeStyle=M.Q>=0?"#58a6ff":"#ff5c5c";
+  ctx.beginPath(); ctx.moveTo(Qx,Qy); ctx.lineTo(Sx,Sy); ctx.stroke();
+  ctx.strokeStyle="#ffd166";
+  ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(Sx,Sy); ctx.stroke();
+  arrowHead(ctx,Sx,Sy,pang,9);
+  /* rechter Winkel */
+  const qsgn=Math.sign(Sy-Qy)||1;
+  ctx.strokeStyle="#8b949e"; ctx.lineWidth=1.1;
+  ctx.beginPath();
+  ctx.moveTo(Qx-7,Qy); ctx.lineTo(Qx-7,Qy+7*qsgn); ctx.lineTo(Qx,Qy+7*qsgn); ctx.stroke();
+  /* Beschriftungen: P unter der Basis, Q neben dem vertikalen Schenkel
+     (bei fast fehlendem Q oberhalb der Basis), S neben der Spitze */
+  ctx.font="600 10.5px system-ui"; ctx.textBaseline="middle";
+  ctx.textAlign="center"; ctx.fillStyle="#3fb950";
+  ctx.fillText("P = "+fmtSI(M.P,"W",2), (px+Qx)/2, py+14);
+  ctx.textAlign="left"; ctx.fillStyle=M.Q>=0?"#58a6ff":"#ff5c5c";
+  const qTxt="Q = "+fmtSI(M.Q,"var",2);
+  ctx.fillText(qTxt, Qx+8, Math.abs(Sy-Qy)>16 ? (Qy+Sy)/2 : Qy-14);
+  ctx.fillStyle="#ffd166"; ctx.font="700 10.5px system-ui";
+  const sTxt="S = "+fmtSI(M.S,"VA",2);
+  if(Sx<585){ ctx.textAlign="left";  ctx.fillText(sTxt, Sx+8, Sy); }
+  else      { ctx.textAlign="right"; ctx.fillText(sTxt, Sx-8, Sy); }
+  ctx.textBaseline="alphabetic";
+
+  /* Zeitlupen-Hinweis */
+  const slow=state.f/visFreq();
+  if(slow>1.02){
+    ctx.font="12px system-ui"; const txt="⏱ "+D.slowmo+" ×"+fmtNum(slow,2);
+    const tw=ctx.measureText(txt).width+18;
+    ctx.fillStyle="#21262d"; ctx.strokeStyle="#30363d"; ctx.lineWidth=1;
+    rr(ctx,14,318,tw,24,7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#8b949e"; ctx.textAlign="left"; ctx.fillText(txt,23,335);
+  }
+  ctx.restore();
+}
+
+/* ---------- 6. Zeigerdiagramm (rotierend, Reihe: Spannungen um I, Parallel: Ströme um U) ---------- */
+function drawPhasor(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const s=Math.min(W,H)/360;
+  ctx.save(); ctx.translate(W/2,H/2); ctx.scale(s,s);
+  const R=146, par = state.mode==="parallel";
+  const rot = state.phi;                               // langsame Drehung (Uhrzeigersinn)
+  ctx.rotate(rot);
+
+  /* Skala: längster Zeiger → Referenzlänge 128 */
+  let ref;
+  if(!par){
+    ref=Math.max(M.Ihat*state.R, M.Ihat*M.XLv, M.Ihat*M.XCv, M.Ihat*M.Z, 1e-30);
+  }else{
+    ref=Math.max(state.Uhat/state.R, state.Uhat*M.XLv, state.Uhat*M.XCv, M.Ihat, 1e-30);
+  }
+  const k=128/ref;
+  const D=I18N[lang];
+
+  /* Kreis + Achsen */
+  ctx.strokeStyle="#30363d"; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke();
+  ctx.setLineDash([5,5]); ctx.strokeStyle="#3d444d";
+  ctx.beginPath(); ctx.moveTo(-R,0); ctx.lineTo(R,0); ctx.moveTo(0,-R); ctx.lineTo(0,R);
+  ctx.moveTo(0,0); ctx.lineTo(R+16,0); ctx.stroke();
+  ctx.setLineDash([]);
+
+  /* ω-Drehpfeil im Uhrzeigersinn */
+  ctx.strokeStyle="#8b949e"; ctx.fillStyle="#8b949e"; ctx.lineWidth=1.6;
+  const a1=-1.25, a2=-0.42;
+  ctx.beginPath(); ctx.arc(0,0,R+16,a1,a2); ctx.stroke();
+  arrowHead(ctx,(R+16)*Math.cos(a2),(R+16)*Math.sin(a2),a2+Math.PI/2,8);
+  ctx.font="italic 13px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText("ω",(R+30)*Math.cos((a1+a2)/2),(R+30)*Math.sin((a1+a2)/2));
+
+  /* Zeigerketten: Referenz horizontal, dann ±90°-Segmente.
+     Canvas-Winkel positiv = visuell im Uhrzeigersinn = „unten";
+     induktiv-führende Zeiger zeichnen wir nach oben (negativer Winkel). */
+  const seg=(x0,y0,len,ang,col,lw)=>{
+    ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.lineCap="round";
+    const x1=x0+len*Math.cos(ang), y1=y0+len*Math.sin(ang);
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+    arrowHead(ctx,x1,y1,ang,10);
+    return [x1,y1];
+  };
+  const lab=(x,y,txt,col)=>{
+    ctx.font="italic 700 15px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillStyle=col; ctx.fillText(txt, x, y);
+  };
+
+  if(!par){
+    /* I (weiß, Referenz) + U_R (grün, in Phase) liegen beide horizontal */
+    const RI=Math.max(60, M.Ihat*k*0.9);
+    ctx.globalAlpha=0.9;
+    seg(0,0, RI, 0, "#e6edf3", 3);                     // I
+    ctx.globalAlpha=1;
+    const UR=M.Ihat*state.R*k;
+    const [tx1,ty1]=seg(0,0, UR, 0, "#3fb950", 3);     // U_R
+    const UL=M.Ihat*M.XLv*k, UC=M.Ihat*M.XCv*k;
+    const [tx2,ty2]=seg(tx1,ty1, UL, -Math.PI/2, "#58a6ff", 3);   // U_L nach oben
+    const [tx3,ty3]=seg(tx2,ty2, UC,  Math.PI/2, "#ff5c5c", 3);   // U_C nach unten
+    ctx.setLineDash([4,4]); ctx.strokeStyle="#f0b429"; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(tx3,ty3); ctx.stroke();
+    ctx.setLineDash([]);
+    arrowHead(ctx,tx3,ty3,Math.atan2(ty3,tx3),11);
+    ctx.fillStyle="#f0b429"; ctx.beginPath(); ctx.arc(tx3,ty3,4,0,7); ctx.fill();
+    /* Beschriftungen */
+    lab(RI*Math.cos(0)+6, RI*Math.sin(0)+20, "I", "#e6edf3");
+    lab(UR/2, -16, "U_R", "#3fb950");
+    lab(tx1+14, ty1-UL/2, "U_L", "#58a6ff");
+    lab(tx2+14, ty2+UC/2+6, "U_C", "#ff5c5c");
+    lab(tx3+26*Math.cos(Math.atan2(ty3,tx3)), ty3+26*Math.sin(Math.atan2(ty3,tx3)), "U", "#f0b429");
+    /* φ-Bogen zwischen I und U */
+    const phiA=Math.atan2(ty3,tx3);
+    if(Math.abs(phiA)>0.06){
+      ctx.strokeStyle="#f0b429"; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(0,0,42,0,phiA,phiA<0); ctx.stroke();
+      arrowHead(ctx,42*Math.cos(phiA),42*Math.sin(phiA),phiA+Math.PI/2,6);
+      ctx.font="700 12px system-ui"; ctx.fillStyle="#f0b429";
+      ctx.fillText(fmtPhi().replace("+",""), 52*Math.cos(phiA/2), 52*Math.sin(phiA/2));
+    }
+  }else{
+    /* U (weiß, Referenz) + I_R (grün, in Phase) horizontal */
+    const RU=Math.max(60, state.Uhat*k*0.9);
+    ctx.globalAlpha=0.9;
+    seg(0,0, RU, 0, "#e6edf3", 3);                     // U
+    ctx.globalAlpha=1;
+    const IR=state.Uhat/state.R*k;
+    const [tx1,ty1]=seg(0,0, IR, 0, "#3fb950", 3);     // I_R
+    const IC=state.Uhat*M.XLv*k, IL=state.Uhat*M.XCv*k;
+    const [tx2,ty2]=seg(tx1,ty1, IC, -Math.PI/2, "#58a6ff", 3);   // I_C nach oben
+    const [tx3,ty3]=seg(tx2,ty2, IL,  Math.PI/2, "#ff5c5c", 3);   // I_L nach unten
+    ctx.setLineDash([4,4]); ctx.strokeStyle="#f0b429"; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(tx3,ty3); ctx.stroke();
+    ctx.setLineDash([]);
+    arrowHead(ctx,tx3,ty3,Math.atan2(ty3,tx3),11);
+    ctx.fillStyle="#f0b429"; ctx.beginPath(); ctx.arc(tx3,ty3,4,0,7); ctx.fill();
+    lab(RU+6, 20, "U", "#e6edf3");
+    lab(IR/2, -16, "I_R", "#3fb950");
+    lab(tx1+14, ty1-IC/2, "I_C", "#58a6ff");
+    lab(tx2+14, ty2+IL/2+6, "I_L", "#ff5c5c");
+    lab(tx3+26*Math.cos(Math.atan2(ty3,tx3)), ty3+26*Math.sin(Math.atan2(ty3,tx3)), "I", "#f0b429");
+    const phiA=Math.atan2(ty3,tx3);                    // = −φ_page: kapazitiv zeigt I nach oben
+    if(Math.abs(phiA)>0.06){
+      ctx.strokeStyle="#f0b429"; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(0,0,42,0,phiA,phiA<0); ctx.stroke();
+      arrowHead(ctx,42*Math.cos(phiA),42*Math.sin(phiA),phiA+Math.PI/2,6);
+      ctx.font="700 12px system-ui"; ctx.fillStyle="#f0b429";
+      ctx.fillText(fmtPhi().replace("+",""), 52*Math.cos(phiA/2), 52*Math.sin(phiA/2));
+    }
+  }
+  ctx.restore();
+}
+
+/* ---------- 7. Oszilloskop: u, u_R/u_X (oder i_R/i_X), i, p mit getrennten Nulllinien ---------- */
+function drawScope(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const L=46, Rp=126, Tp=26, Bp=24;
+  const plotW=W-L-Rp, laneH=(H-Tp-Bp)/5, T=1/state.f;
+  const mid=[0,1,2,3,4].map(kk=>Tp+laneH*(kk+0.5));
+  const amp=laneH*0.36;
+  const par=state.mode==="parallel";
+  const w=M.w, ph=M.phi, Uh=state.Uhat;
+
+  /* Kurven je nach Modus (φ = Phasenwinkel der Seite, i = Î·sin(θ−φ)) */
+  const sI = par ? Uh*M.mag : Uh/M.Z;                  // Î
+  /* Blau wenn der Blindanteil induktiv ist, rot wenn kapazitiv (beide Modi) */
+  const colX = (par ? M.signed<0 : M.signed>0) ? "#58a6ff" : "#ff5c5c";
+  const curves = par ? [
+    {tag:"u",     fn:t=>Uh*Math.sin(w*t),                 A:Uh,        m:mid[0], col:"#ff5c5c"},
+    {tag:"i_R",   fn:t=>Uh/state.R*Math.sin(w*t),         A:Uh/state.R,m:mid[1], col:"#3fb950"},
+    {tag:"i_X",   fn:t=>Uh*M.signed*Math.cos(w*t),        A:Math.abs(Uh*M.signed), m:mid[2], col:colX},
+    {tag:"i",     fn:t=>sI*Math.sin(w*t-ph),              A:sI,        m:mid[3], col:"#f0b429"},
+    {tag:"p",     fn:t=>Uh*Math.sin(w*t)*sI*Math.sin(w*t-ph), A:0,     m:mid[4], col:"#fb8500", fill:"rgba(251,133,0,0.14)"}
+  ] : [
+    {tag:"u",     fn:t=>Uh*Math.sin(w*t),                 A:Uh,        m:mid[0], col:"#ff5c5c"},
+    {tag:"u_R",   fn:t=>sI*state.R*Math.sin(w*t-ph),      A:sI*state.R,m:mid[1], col:"#3fb950"},
+    {tag:"u_X",   fn:t=>sI*M.signed*Math.cos(w*t-ph),     A:Math.abs(sI*M.signed), m:mid[2], col:colX},
+    {tag:"i",     fn:t=>sI*Math.sin(w*t-ph),              A:sI,        m:mid[3], col:"#f0b429"},
+    {tag:"p",     fn:t=>Uh*Math.sin(w*t)*sI*Math.sin(w*t-ph), A:0,     m:mid[4], col:"#fb8500", fill:"rgba(251,133,0,0.14)"}
+  ];
+  /* p-Amplitude: max |u·i| = Û·Î/2·(1+|cos φ|) exakt aus sin·sin */
+  curves[4].A = Uh*sI/2*(1+Math.abs(M.cosF));
+
+  /* Gitter + Zeitachse */
+  ctx.font="11px ui-monospace,monospace"; ctx.textAlign="center"; ctx.textBaseline="top";
+  const unit=T>=0.5?"s":T>=5e-4?"ms":"µs", mul=unit==="s"?1:unit==="ms"?1e3:1e6;
+  ctx.strokeStyle="#21262d"; ctx.lineWidth=1;
+  for(let kk=0;kk<=4;kk++){
+    const x=L+kk*plotW/4;
+    ctx.beginPath(); ctx.moveTo(x,Tp); ctx.lineTo(x,H-Bp); ctx.stroke();
+    ctx.fillStyle="#8b949e"; ctx.fillText(fmtNum(kk*T/2*mul,3), x, H-Bp+6);
+  }
+  ctx.textAlign="right"; ctx.fillText(unit, W-6, H-Bp+6);
+  ctx.textBaseline="middle";
+  for(let kk=0;kk<5;kk++){
+    ctx.strokeStyle="#21262d";
+    ctx.beginPath(); ctx.moveTo(L,mid[kk]); ctx.lineTo(L+plotW,mid[kk]); ctx.stroke();
+    ctx.setLineDash([3,4]); ctx.strokeStyle="#484f58";
+    ctx.beginPath(); ctx.moveTo(L,mid[kk]); ctx.lineTo(L+plotW,mid[kk]); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font="700 13px system-ui"; ctx.textAlign="left";
+    ctx.fillStyle=curves[kk].col;
+    ctx.fillText(curves[kk].tag, 10, mid[kk]);
+  }
+  /* Amplituden / Mittelwert rechts */
+  ctx.font="11px ui-monospace,monospace"; ctx.textAlign="left";
+  const ampTxt=[ "Û = "+fmtSI(Uh,"V"),
+                 (par?"Î_R = ":"Û_R = ")+fmtSI(curves[1].A,par?"A":"V"),
+                 (par?"Î_X = ":"Û_X = ")+fmtSI(curves[2].A,par?"A":"V"),
+                 (par?"Î = ":"Î = ")+fmtSI(sI,"A"),
+                 "p̂ = "+fmtSI(curves[4].A,"W") ];
+  for(let kk=0;kk<5;kk++){
+    ctx.fillStyle=curves[kk].col;
+    ctx.fillText(ampTxt[kk], L+plotW+8, mid[kk]-amp+8);
+  }
+  /* p-Lane: gestrichelte Linie beim Mittelwert P (Wirkleistung) */
+  const pMeanY=mid[4]-M.P/curves[4].A*amp;
+  ctx.setLineDash([6,4]); ctx.strokeStyle="#ffd166"; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(L,pMeanY); ctx.lineTo(L+plotW,pMeanY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font="11px system-ui"; ctx.fillStyle="#ffd166";
+  ctx.fillText("P̄ = "+fmtSI(M.P,"W",3), L+plotW+8, pMeanY);
+
+  /* Kurven (p mit gefüllter Fläche) */
+  ctx.lineWidth=2; ctx.lineJoin="round";
+  for(const c of curves){
+    const scaleA=c.A>1e-30?c.A:1;
+    if(c.fill){
+      ctx.fillStyle=c.fill;
+      for(let x=0;x<=plotW;x+=2){
+        const v=c.fn(x/plotW*2*T);
+        if(v>0){ const y=c.m-v/scaleA*amp; ctx.fillRect(L+x,y,2,c.m-y); }
+      }
+    }
+    ctx.strokeStyle=c.col; ctx.beginPath();
+    for(let x=0;x<=plotW;x+=2){
+      const y=c.m-c.fn(x/plotW*2*T)/scaleA*amp;
+      x===0?ctx.moveTo(L+x,y):ctx.lineTo(L+x,y);
+    }
+    ctx.stroke();
+  }
+
+  /* Zeitcursor + Wert-Tooltip */
+  const tCur=mod(state.phi/M.w,2*T), xC=L+tCur/(2*T)*plotW;
+  ctx.strokeStyle="rgba(139,148,158,0.55)"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(xC,Tp); ctx.lineTo(xC,H-Bp); ctx.stroke();
+  curves.forEach(c=>{
+    const scaleA=c.A>1e-30?c.A:1;
+    ctx.fillStyle=c.col;
+    ctx.beginPath(); ctx.arc(xC, c.m-c.fn(tCur)/scaleA*amp, 4, 0, 7); ctx.fill();
+  });
+  /* Tooltip-Box mit den Werten an der Cursorposition */
+  const tV = par
+    ? [ ["t", fmtNum(tCur*mul,3)+" "+unit, "#8b949e"],
+        ["u",  fmtSI(curves[0].fn(tCur),"V",3), "#ff5c5c"],
+        ["i_R",fmtSI(curves[1].fn(tCur),"A",3), "#3fb950"],
+        ["i_X",fmtSI(curves[2].fn(tCur),"A",3), curves[2].col],
+        ["i",  fmtSI(curves[3].fn(tCur),"A",3), "#f0b429"],
+        ["p",  fmtSI(curves[4].fn(tCur),"W",3), "#fb8500"] ]
+    : [ ["t",  fmtNum(tCur*mul,3)+" "+unit, "#8b949e"],
+        ["u",  fmtSI(curves[0].fn(tCur),"V",3), "#ff5c5c"],
+        ["u_R",fmtSI(curves[1].fn(tCur),"V",3), "#3fb950"],
+        ["u_X",fmtSI(curves[2].fn(tCur),"V",3), curves[2].col],
+        ["i",  fmtSI(curves[3].fn(tCur),"A",3), "#f0b429"],
+        ["p",  fmtSI(curves[4].fn(tCur),"W",3), "#fb8500"] ];
+  ctx.font="600 11.5px ui-monospace,monospace";
+  const bw=118, bh=6+tV.length*15, bxx=xC+12;
+  const bx0 = bxx+bw>W-4 ? xC-12-bw : bxx;
+  ctx.fillStyle="rgba(22,27,34,0.92)";
+  ctx.strokeStyle="#30363d"; ctx.lineWidth=1;
+  rr(ctx, bx0, Tp+6, bw, bh, 7); ctx.fill(); ctx.stroke();
+  tV.forEach((row,i)=>{
+    const yy=Tp+16+i*15;
+    ctx.textAlign="left"; ctx.fillStyle=row[2];
+    ctx.fillText(row[0], bx0+9, yy);
+    ctx.textAlign="right"; ctx.fillStyle="#e6edf3";
+    ctx.fillText(row[1], bx0+bw-9, yy);
+  });
+}
+
+/* ---------- 8. Messwerte-Panel + Ampel ---------- */
+const el=id=>document.getElementById(id);
+function updatePanel(){
+  const par=state.mode==="parallel";
+  const un=par?"S":"Ω";
+  el("mXL").textContent=fmtSI(M.XLv,un);
+  el("mXC").textContent=fmtSI(M.XCv,un);
+  el("mX").textContent=fmtSI(M.signed,un);
+  el("mZ").innerHTML=par
+    ? fmtSI(M.mag,"S")+"<small> = "+fmtSI(M.Z,"Ω")+"</small>"
+    : fmtSI(M.Z,"Ω");
+  el("mI").textContent=fmtSI(M.Ieff,"A");
+  el("mPhi").textContent=fmtPhi();
+  el("mCos").innerHTML=fmtNum(M.cosF,3)+"<small> / "+fmtNum(M.sinF,3)+"</small>";
+  el("mF0").textContent=fmtSI(M.f0,"Hz");
+  el("mU").textContent=fmtSI(M.Ueff,"V");
+  el("mP").textContent=fmtSI(M.P,"W");
+  el("mQ").textContent=fmtSI(M.Q,"var");
+  el("mS").textContent=fmtSI(M.S,"VA");
+  el("oR").textContent=fmtSI(state.R,"Ω",4);
+  el("oL").textContent=fmtSI(state.L,"H",4);
+  el("oC").textContent=fmtSI(state.C,"F",4);
+  el("oF").textContent=fmtSI(state.f,"Hz",4);
+  el("oV").textContent=fmtNum(state.Uhat,4)+" V";
+  /* Ampel: |φ| in drei Bereiche */
+  const ad=Math.abs(M.phi)*180/Math.PI;
+  let col="#3fb950", txt=I18N[lang].aGood;
+  if(ad>60){ col="#ff6b6b"; txt=I18N[lang].aBad; }
+  else if(ad>30){ col="#f0b429"; txt=I18N[lang].aMid; }
+  el("ampDot").style.background=col;
+  el("ampDot").style.color=col;
+  el("ampTxt").textContent=txt;
+  el("ampTxt").style.color=col;
+  el("dotUX").style.background=(par ? M.signed<0 : M.signed>0)?"#58a6ff":"#ff5c5c";
+}
+
+/* Modusabhängige Beschriftungen (Messwerte, Legende) */
+function updateModeLabels(){
+  const par=state.mode==="parallel";
+  const p=par?"p":"s";
+  el("lXL").innerHTML=I18N[lang]["lXL"+p];
+  el("lXC").innerHTML=I18N[lang]["lXC"+p];
+  el("lX").innerHTML=I18N[lang]["lX"+p];
+  el("lZ").innerHTML=I18N[lang]["lZ"+p];
+  el("lI").innerHTML=I18N[lang]["lI"+p];
+  el("lPhi").innerHTML=I18N[lang]["lPhi"+p];
+  el("lCos").innerHTML=I18N[lang]["lCos"+p];
+  el("lP").innerHTML=I18N[lang]["lP"+p];
+  el("lQ").innerHTML=I18N[lang]["lQ"+p];
+  el("lS").innerHTML=I18N[lang]["lS"+p];
+  el("lF0").innerHTML=I18N[lang].lF0;
+  el("lU").innerHTML=I18N[lang].lU;
+  el("chipUR").textContent=par?I18N[lang].chipURp:I18N[lang].chipURs;
+  el("chipUX").textContent=par?I18N[lang].chipUXp:I18N[lang].chipUXs;
+  el("phasorCap").textContent=par?I18N[lang].phasorCaptionP:I18N[lang].phasorCaption;
+}
+
+/* ---------- 9. Sprachumschaltung ---------- */
+function setLang(l){
+  lang=l;
+  document.documentElement.lang=l;
+  el("btnDE").classList.toggle("active",l==="de");
+  el("btnEN").classList.toggle("active",l==="en");
+  document.querySelectorAll("[data-i18n]").forEach(n=>{
+    const v=I18N[l][n.dataset.i18n]; if(v!==undefined) n.textContent=v;
+  });
+  document.querySelectorAll("[data-i18n-html]").forEach(n=>{
+    const v=I18N[l][n.dataset.i18nHtml]; if(v!==undefined) n.innerHTML=v;
+  });
+  el("icRun").textContent=state.running?"⏸":"▶";
+  el("btnRun").lastElementChild.textContent=I18N[l][state.running?"btnStop":"btnStart"];
+  updateModeLabels();
+  updatePanel();
+}
+el("btnDE").onclick=()=>setLang("de");
+el("btnEN").onclick=()=>setLang("en");
+
+/* ---------- 10. Steuerung, Modus, Voreinstellungen ---------- */
+const sR=el("sR"), sL=el("sL"), sC=el("sC"), sF=el("sF"), sV=el("sV");
+function readSliders(){
+  state.R  =Math.pow(10,  0+4*(sR.value/1000));       // 1 Ω … 10 kΩ (log)
+  state.L  =Math.pow(10, -3+4*(sL.value/1000));       // 1 mH … 10 H (log)
+  state.C  =Math.pow(10,-12+7*(sC.value/1000));       // 1 pF … 10 µF (log)
+  state.f  =Math.pow(10,  1+5*(sF.value/1000));       // 10 Hz … 1 MHz (log)
+  state.Uhat=+sV.value;                               // 1 … 325 V (linear)
+  recompute(); updatePanel();
+}
+[sR,sL,sC,sF,sV].forEach(sl=>sl.oninput=readSliders);
+
+function setLogSlider(sl, val, eMin, eMax){
+  sl.value=Math.round((Math.log10(val)-eMin)/(eMax-eMin)*1000);
+}
+
+function setMode(m){
+  state.mode=m;
+  el("btnSer").classList.toggle("active",m==="series");
+  el("btnPar").classList.toggle("active",m==="parallel");
+  updateModeLabels();
+  recompute(); updatePanel();
+}
+el("btnSer").onclick=()=>setMode("series");
+el("btnPar").onclick=()=>setMode("parallel");
+
+/* Voreinstellungen: f_0 muss im Reglerbereich liegen → L/C ggf. nachjustieren */
+function ensureF0Range(){
+  while(1/(TAU*Math.sqrt(state.L*state.C))>1e6){ state.C*=4; }   // f_0 zu hoch → C vergrößern
+  while(1/(TAU*Math.sqrt(state.L*state.C))<10){  state.C/=4; }   // f_0 zu tief  → C verkleinern
+  setLogSlider(sC, state.C, -12, 7);
+}
+el("pRes").onclick=()=>{
+  ensureF0Range();
+  state.f=1/(TAU*Math.sqrt(state.L*state.C));
+  setLogSlider(sF, state.f, 1, 6);
+  readSliders();
+};
+el("pInd").onclick=()=>{
+  ensureF0Range();
+  state.f=Math.min(1e6, 10/(TAU*Math.sqrt(state.L*state.C)));     // f = 10·f_0
+  setLogSlider(sF, state.f, 1, 6);
+  readSliders();
+};
+el("pCap").onclick=()=>{
+  ensureF0Range();
+  state.f=Math.max(10, 0.1/(TAU*Math.sqrt(state.L*state.C)));     // f = f_0/10
+  setLogSlider(sF, state.f, 1, 6);
+  readSliders();
+};
+el("pOhm").onclick=()=>{
+  ensureF0Range();
+  const f0=1/(TAU*Math.sqrt(state.L*state.C));
+  const rho=Math.sqrt(state.L/state.C);                          // Wellenwiderstand
+  /* f so wählen, dass |X| = 0,05·R:  y − 1/y = X/ρ, y = f/f_0 (exakt) */
+  const a=0.05*state.R/rho;
+  const y=(a+Math.sqrt(a*a+4))/2;
+  state.f=Math.min(1e6, Math.max(10, f0*y));
+  setLogSlider(sF, state.f, 1, 6);
+  readSliders();
+};
+
+el("btnRun").onclick=()=>{
+  state.running=!state.running;
+  el("icRun").textContent=state.running?"⏸":"▶";
+  el("btnRun").lastElementChild.textContent=I18N[lang][state.running?"btnStop":"btnStart"];
+};
+window.addEventListener("keydown",e=>{              // Leertaste = Start/Stopp
+  if(e.code==="Space"&&!["INPUT","BUTTON","SELECT"].includes(document.activeElement.tagName)){
+    e.preventDefault(); el("btnRun").click();
+  }
+});
+
+/* ---------- 11. Hauptschleife (requestAnimationFrame, ~60 FPS) ---------- */
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(state.running) state.phi+=TAU*visFreq()*dt;
+  if(state.phi>1e7) state.phi=mod(state.phi,TAU);
+
+  drawImp(el("cvImp"));
+  drawPhasor(el("cvPhasor"));
+  drawScope(el("cvScope"));
+  requestAnimationFrame(loop);
+}
+
+/* ---------- 12. Start ---------- */
+sR.value=500;                    // 100 Ω
+sL.value=500;                    // 100 mH
+sC.value=857;                    // ≈ 1 µF
+sF.value=Math.round((Math.log10(50)-1)/5*1000);   // 50 Hz
+sV.value=325;
+setLang("de");
+readSliders();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

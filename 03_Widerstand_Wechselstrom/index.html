@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ohmscher Widerstand im Wechselstromkreis – Simulation</title>
+<style>
+  /* ---------- Grundlayout (dunkles Labor-Design, Raster wie 01_Einfuehrung) ---------- */
+  :root{
+    --bg:#0b1220; --panel:#141d33; --panel2:#1b2745; --text:#e5ecf7; --muted:#93a4c3;
+    --accent:#f59e0b; --green:#4ade80; --cyan:#22d3ee; --red:#f87171; --blue:#60a5fa;
+    --border:#26355a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--text);
+       font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+  header{display:flex;justify-content:space-between;align-items:center;gap:1rem;
+         padding:.8rem 1.2rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  h1{font-size:1.25rem}
+  .sub{color:var(--muted);font-size:.85rem}
+  button{background:var(--accent);color:#1a1206;border:0;border-radius:8px;
+         padding:.45rem .9rem;font-weight:700;font-size:.9rem;cursor:pointer}
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  button:hover{filter:brightness(1.12)}
+  main{max-width:1280px;margin:0 auto;padding:1rem}
+
+  /* ---------- Bühne: Schaltung links, Oszilloskop/Zeiger/Messwerte rechts ---------- */
+  .stage{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:1rem}
+  @media (max-width:920px){.stage{grid-template-columns:1fr}}
+  .canvas-wrap{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  canvas{display:block;width:100%;height:auto}
+  #scene{aspect-ratio:3/2}
+  #scope{aspect-ratio:8/3}
+  #phasor{aspect-ratio:4/3}
+  .side{display:flex;flex-direction:column;gap:1rem}
+  @media (max-width:920px){.side .phaswrap{order:-1}}
+
+  /* ---------- Messwert-Chips ---------- */
+  h2.sec{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem}
+  .readouts{display:grid;grid-template-columns:repeat(auto-fill,minmax(106px,1fr));gap:.5rem}
+  .chip{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.45rem .6rem}
+  .chip .l{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+  .chip .v{font-size:1.02rem;font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* ---------- Steuerung ---------- */
+  section h2.sec{margin:1.2rem 0 .5rem}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:.8rem}
+  .card h3{font-size:.85rem;color:var(--muted);margin-bottom:.5rem;font-weight:600}
+  .row{display:flex;justify-content:space-between;align-items:baseline;font-size:.9rem;margin-bottom:.25rem;gap:.5rem}
+  .row output{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
+  .buttons{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+  .check{display:flex;gap:.45rem;align-items:center;font-size:.85rem;cursor:pointer;user-select:none}
+  .check input{accent-color:var(--accent);width:1rem;height:1rem;cursor:pointer}
+  .hint{color:var(--muted);font-size:.75rem;margin-top:.4rem}
+
+  /* ---------- Formelzeile und Erklärung ---------- */
+  .formulas{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+  .formula{background:var(--panel2);border:1px solid var(--border);border-radius:10px;
+           padding:.45rem .8rem;font-family:Georgia,serif;font-style:italic;white-space:nowrap;font-size:.95rem}
+  .explain{margin-top:1.2rem;background:var(--panel);border:1px solid var(--border);
+           border-radius:12px;padding:1rem 1.2rem}
+  .explain h2{font-size:1.05rem;margin-bottom:.4rem}
+  .explain p{margin:.55rem 0;font-size:.92rem;color:#cdd8ec}
+  .explain strong{color:var(--text)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 data-i18n="title">Ohmscher Widerstand im Wechselstromkreis</h1>
+    <div class="sub" data-i18n="subtitle">Wechselspannung am ohmschen Widerstand – Spannung und Strom phasengleich, reine Wirkleistung</div>
+  </div>
+  <button id="btnLang" class="secondary">EN</button>
+</header>
+
+<main>
+  <!-- ============ Bühne ============ -->
+  <div class="stage">
+    <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+    <div class="side">
+      <div class="canvas-wrap"><canvas id="scope"></canvas></div>
+      <div class="canvas-wrap phaswrap"><canvas id="phasor"></canvas></div>
+      <div>
+        <h2 class="sec" data-i18n="readings">Messwerte</h2>
+        <div class="readouts">
+          <div class="chip"><div class="l" data-i18n="rU">u(t) Momentanwert</div><div class="v" id="vU">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rI">i(t) Momentanwert</div><div class="v" id="vI">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rUeff">U_eff (Effektivwert)</div><div class="v" id="vUeff">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rIeff">I_eff (Effektivwert)</div><div class="v" id="vIeff">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rP">P = U_eff·I_eff</div><div class="v" id="vP">–</div></div>
+          <div class="chip"><div class="l" data-i18n="rPhi">Phasenverschiebung φ</div><div class="v" id="vPhi">–</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Steuerung ============ -->
+  <section>
+    <h2 class="sec" data-i18n="settings">Einstellungen</h2>
+    <div class="controls">
+      <div class="card">
+        <div class="row"><span data-i18n="r">Widerstand R</span><output id="oR"></output></div>
+        <input type="range" id="rR" min="0" max="1000" step="1" value="667">
+        <div class="hint" data-i18n="rHint">I_eff = Û / (R·√2) – der Strom hängt nur von R ab, nicht von der Frequenz.</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="uhat">Scheitelwert Û</span><output id="oUhat"></output></div>
+        <input type="range" id="rUhat" min="1" max="325" step="1" value="325">
+        <div class="hint" data-i18n="uhatHint">U_eff = Û/√2 ≈ 0,707·Û (Netz: 230 V entsprechen Û ≈ 325 V).</div>
+      </div>
+      <div class="card">
+        <div class="row"><span data-i18n="freq">Frequenz f</span><output id="oF"></output></div>
+        <input type="range" id="rF" min="0" max="1000" step="1" value="900">
+        <div class="hint" data-i18n="freqHint">Änderung von f: Amplituden bleiben gleich, nur alles läuft schneller/langsamer.</div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="operation">Betrieb</h3>
+        <div class="buttons">
+          <button id="btnRun"></button>
+          <label class="check"><input type="checkbox" id="cP" checked><span data-i18n="showP">p(t)-Kurve</span></label>
+        </div>
+        <div class="hint" data-i18n="switchHint">Tipp: Der Schalter in der Schaltung startet/stoppt ebenfalls.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Formeln ============ -->
+  <h2 class="sec" data-i18n="formulas">Formeln</h2>
+  <div class="formulas">
+    <div class="formula">u(t) = R · i(t)</div>
+    <div class="formula">i(t) = (Û/R)·sin(ω·t)</div>
+    <div class="formula">U<sub>eff</sub> = Û/√2</div>
+    <div class="formula">p(t) = Û·Î·sin²(ω·t) ≥ 0</div>
+    <div class="formula">P = U<sub>eff</sub>·I<sub>eff</sub> = Û·Î/2</div>
+  </div>
+
+  <!-- ============ Erklärung ============ -->
+  <article class="explain">
+    <h2 data-i18n="explanation">Erklärung</h2>
+    <p data-i18n-html="exp1"></p>
+    <p data-i18n-html="exp2"></p>
+    <p data-i18n-html="exp3"></p>
+    <p data-i18n-html="exp4"></p>
+    <p data-i18n-html="exp5"></p>
+  </article>
+</main>
+
+<script>
+"use strict";
+/* ==================================================================
+   Wechselstrom-Simulation: ohmscher Widerstand an Wechselspannung
+   Reines JS + Canvas, keine externen Abhängigkeiten, offline lauffähig.
+
+   Physikmodell:
+     u(t) = Û·sin(φ),  i(t) = u(t)/R = Î·sin(φ),  Î = Û/R   (phasengleich, φ = 0°)
+     p(t) = u·i = Û·Î·sin²(φ) ≥ 0                          (doppelte Frequenz)
+     P    = p̄  = Û·Î/2 = U_eff·I_eff                      (Wirkleistung)
+     U_eff = Û/√2,  I_eff = Î/√2
+   ================================================================== */
+
+/* ---------------- 1. Sprachdatei (DE/EN) ---------------- */
+const I18N = {
+  de: {
+    title: "Ohmscher Widerstand im Wechselstromkreis",
+    subtitle: "Wechselspannung am ohmschen Widerstand – Spannung und Strom phasengleich, reine Wirkleistung",
+    readings: "Messwerte",
+    rU: "u(t) Momentanwert", rI: "i(t) Momentanwert", rUeff: "U_eff (Effektivwert)",
+    rIeff: "I_eff (Effektivwert)", rP: "P = U_eff·I_eff", rPhi: "Phasenverschiebung φ",
+    settings: "Einstellungen",
+    r: "Widerstand R", uhat: "Scheitelwert Û", freq: "Frequenz f",
+    rHint: "I_eff = Û / (R·√2) – der Strom hängt nur von R ab, nicht von der Frequenz.",
+    uhatHint: "U_eff = Û/√2 ≈ 0,707·Û (Netz: 230 V entsprechen Û ≈ 325 V).",
+    freqHint: "Änderung von f: Amplituden bleiben gleich, nur alles läuft schneller/langsamer.",
+    operation: "Betrieb", btnStart: "▶ Start", btnStop: "❚❚ Stopp", showP: "p(t)-Kurve",
+    switchHint: "Tipp: Der Schalter in der Schaltung startet/stoppt ebenfalls.",
+    formulas: "Formeln", explanation: "Erklärung",
+    legEl: "Punkte/Pfeile gelb: Elektronen (fließen entgegen I)",
+    legI: "Pfeile weiß: technische Stromrichtung I",
+    statusP0: "p = 0 — kein Strom, keine Wärme",
+    statusPMax: "p maximal — volle Heizleistung",
+    statusPause: "❚❚ Pause",
+    srcU: "u(t)", lblP: "p(t)", lblMean: "P",
+    phasorTitle: "Zeigerdiagramm",
+    phiBadge: "φ = 0° — phasengleich",
+    scaleNote: "Zeigerlängen: 100 V =",
+    pxAndA: "px · 1 A =",
+    scopeInfo: "i phasengleich zu u · i = u/R · φ = 0°",
+    exp1: `<strong>Ohmsches Gesetz gilt augenblicklich:</strong> Zu jedem Zeitpunkt ist <strong>u(t) = R·i(t)</strong>. Weil der Widerstand Spannung und Strom fest miteinander koppelt, gilt das Ohmsche Gesetz im Wechselstromkreis genau wie im Gleichstromkreis – nur eben zeitlich aufgelöst. Der Strom <strong>i(t) = u(t)/R</strong> hat dieselbe Sinusform wie die Spannung, sein Scheitelwert ist <strong>Î = Û/R</strong>: Die blaue Kurve im Oszilloskop ist die rote, nur mit dem Faktor 1/R skaliert.`,
+    exp2: `<strong>Keine Phasenverschiebung:</strong> Spannung und Strom durchlaufen Nullpunkte und Maxima gleichzeitig (<strong>φ = 0°</strong>) – im Zeigerdiagramm drehen die Zeiger deckungsgleich. Der Widerstand speichert keine Energie (im Gegensatz zu Spule und Kondensator), sondern wandelt sie sofort um. Entscheidend: <strong>Î = Û/R hängt nicht von der Frequenz ab.</strong> Stellen Sie f um – die Amplituden bleiben gleich, nur alles läuft schneller oder langsamer ab.`,
+    exp3: `<strong>Momentanleistung und Wärme:</strong> Die Leistung <strong>p(t) = u(t)·i(t) = Û·Î·sin²(ωt)</strong> ist nie negativ und schwingt mit doppelter Frequenz. Das Glühen am Widerstand folgt genau dieser Kurve – bei p = 0 ist es dunkel, zur Mitte des Halbwellenbergs maximal. Weil p(t) nie unter null fällt, gibt es kein Hin-und-Herpulen von Energie wie bei Spule oder Kondensator: Der Widerstand nimmt die Energie dauerhaft auf.`,
+    exp4: `<strong>Wirkleistung:</strong> Der Mittelwert der Momentanleistung ist die Wirkleistung <strong>P = Û·Î/2 = U_eff·I_eff</strong> (gestrichelte Linie im Oszilloskop). Sie ist die Leistung, die mittelfristig in Wärme umgesetzt wird – die einzige Leistung, die ein ohmscher Widerstand kennt.`,
+    exp5: `<strong>Warum der Effektivwert?</strong> Eine Gleichspannung mit dem Wert <strong>U_eff</strong> erzeugt am selben Widerstand genau dieselbe Wärme wie das Wechselspannungssignal. Deshalb vergleicht man Wechsel- mit Gleichgrößen über den Effektivwert <strong>U_eff = Û/√2 ≈ 0,707·Û</strong>: Das 230-V-Netz hat Û ≈ 325 V.`
+  },
+  en: {
+    title: "Resistor in an AC Circuit",
+    subtitle: "Alternating voltage across an ohmic resistor – voltage and current in phase, pure active power",
+    readings: "Readings",
+    rU: "u(t) instantaneous", rI: "i(t) instantaneous", rUeff: "U_eff (RMS value)",
+    rIeff: "I_eff (RMS value)", rP: "P = U_eff·I_eff", rPhi: "Phase shift φ",
+    settings: "Settings",
+    r: "Resistance R", uhat: "Peak value Û", freq: "Frequency f",
+    rHint: "I_eff = Û / (R·√2) – the current depends only on R, not on frequency.",
+    uhatHint: "U_eff = Û/√2 ≈ 0.707·Û (mains: 230 V corresponds to Û ≈ 325 V).",
+    freqHint: "Changing f leaves the amplitudes unchanged – only the speed changes.",
+    operation: "Operation", btnStart: "▶ Start", btnStop: "❚❚ Stop", showP: "p(t) curve",
+    switchHint: "Tip: clicking the switch in the circuit also starts/stops.",
+    formulas: "Formulas", explanation: "Explanation",
+    legEl: "yellow dots/arrows: electrons (flow against I)",
+    legI: "white arrows: conventional current direction I",
+    statusP0: "p = 0 – no current, no heat",
+    statusPMax: "p max – full heating power",
+    statusPause: "❚❚ paused",
+    srcU: "u(t)", lblP: "p(t)", lblMean: "P",
+    phasorTitle: "Phasor diagram",
+    phiBadge: "φ = 0° – in phase",
+    scaleNote: "Phasor lengths: 100 V =",
+    pxAndA: "px · 1 A =",
+    scopeInfo: "i in phase with u · i = u/R · φ = 0°",
+    exp1: `<strong>Ohm's law holds instant by instant:</strong> at every moment <strong>u(t) = R·i(t)</strong>. Because the resistor ties voltage and current firmly together, Ohm's law works in AC circuits exactly as in DC – just resolved in time. The current <strong>i(t) = u(t)/R</strong> has the same sine shape as the voltage; its peak value is <strong>Î = Û/R</strong>: the blue curve in the scope is the red one scaled by 1/R.`,
+    exp2: `<strong>No phase shift:</strong> voltage and current cross zero and peak at the same instants (<strong>φ = 0°</strong>) – in the phasor diagram the arrows rotate on top of each other. A resistor stores no energy (unlike inductors and capacitors); it converts energy immediately. Crucially, <strong>Î = Û/R does not depend on frequency.</strong> Change f – the amplitudes stay the same, everything just runs faster or slower.`,
+    exp3: `<strong>Instantaneous power and heat:</strong> the power <strong>p(t) = u(t)·i(t) = Û·Î·sin²(ωt)</strong> is never negative and oscillates at twice the frequency. The glow of the resistor follows this curve – dark at p = 0, brightest at the crest of each half-wave. Because p(t) never dips below zero, there is no energy sloshing back and forth as with inductors or capacitors: the resistor absorbs the energy permanently.`,
+    exp4: `<strong>Active power:</strong> the average of the instantaneous power is the active power <strong>P = Û·Î/2 = U_eff·I_eff</strong> (dashed line in the scope). It is the power converted to heat on average – the only kind of power an ohmic resistor knows.`,
+    exp5: `<strong>Why the RMS value?</strong> a DC voltage equal to <strong>U_eff</strong> produces exactly the same heat in the same resistor as the AC signal. That is why alternating quantities are compared with DC via the RMS value <strong>U_eff = Û/√2 ≈ 0.707·Û</strong>: the 230 V mains has Û ≈ 325 V.`
+  }
+};
+let lang = "de";
+const T = k => (I18N[lang] && I18N[lang][k]) || I18N.de[k] || k;
+
+/* ---------------- 2. Zustand und Physik ---------------- */
+const state = { running: true, phase: 0, simTime: 0, R: 100, Uhat: 325, f: 50, showP: true };
+const omega  = () => 2 * Math.PI * state.f;          // ω [rad/s]
+const uNow   = () => state.Uhat * Math.sin(state.phase);   // u [V]
+const iNow   = () => uNow() / state.R;                     // i [A]
+const pNow   = () => uNow() * iNow();                      // p [W]
+const Ueff   = () => state.Uhat / Math.SQRT2;
+const Ieff   = () => Ueff() / state.R;
+
+/* ---------------- 3. DOM und Canvas-Hilfen ---------------- */
+const $ = id => document.getElementById(id);
+const sceneCv = $("scene"), scopeCv = $("scope"), phasorCv = $("phasor");
+const sceneCtx = sceneCv.getContext("2d"), scopeCtx = scopeCv.getContext("2d"), phasorCtx = phasorCv.getContext("2d");
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+// Canvas an CSS-Größe anpassen (Retina-scharf), gibt CSS-Größe zurück
+function fitCanvas(cv){
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (w > 0 && (cv.width !== Math.round(w * DPR) || cv.height !== Math.round(h * DPR))){
+    cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  }
+  return [w, h];
+}
+// Pfeil von (x1,y1) nach (x2,y2) mit Dreieckskopf
+function arrow2d(ctx, x1, y1, x2, y2, color, width = 2, head = 7){
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - head * Math.cos(a - 0.42), y2 - head * Math.sin(a - 0.42));
+  ctx.lineTo(x2 - head * Math.cos(a + 0.42), y2 - head * Math.sin(a + 0.42));
+  ctx.closePath(); ctx.fill();
+}
+// abgerundetes Rechteck (Status-Chip)
+function rr(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+const locale = () => lang === "de" ? "de-DE" : "en-US";
+const fmt = (x, d = 1) => x.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
+// Farbinterpolation für die Heizanzeige (kalt → glühend)
+function mixRGB(c1, c2, t){
+  return `rgb(${c1.map((v, i) => Math.round(v + (c2[i] - v) * t)).join(",")})`;
+}
+
+/* ---------------- 4. Weltgeometrie der Schaltszene ----------------
+   Rechteckiger Stromkreis (Canvas-Koordinaten, y nach unten):
+   AC-Quelle links, Schalter oben, Widerstand rechts. Bei i > 0
+   fließt der technische Strom im Uhrzeigersinn (oben: +x). */
+const SRC = { x: 140, y: 333, r: 44 };          // AC-Quelle
+const BOX = { x: 860, y: 303, w: 110, h: 60 };  // Widerstand (Mitte rechts)
+const LOOP = [
+  [140, 130, 860, 130, 720],    // oben   (Richtung für i > 0: +x)
+  [860, 130, 860, 537, 407],    // rechts
+  [860, 537, 140, 537, 720],    // unten
+  [140, 537, 140, 130, 407]     // links
+];
+const LOOP_LEN = LOOP.reduce((a, s) => a + s[4], 0);   // 2254
+const S_X0 = 300, S_X1 = 352;                          // Schalter-Lücke oben
+
+// Position auf dem Leiterkreis zum Umlauf-Parameter s
+function loopPos(s){
+  s = ((s % LOOP_LEN) + LOOP_LEN) % LOOP_LEN;
+  for (const [x1, y1, x2, y2, L] of LOOP){
+    if (s <= L) return [x1 + (x2 - x1) * s / L, y1 + (y2 - y1) * s / L];
+    s -= L;
+  }
+  return [LOOP[0][0], LOOP[0][1]];
+}
+// Elektronen: verteilt auf dem Kreis, pendeln um ihre Ruhelage
+const eDots = Array.from({ length: 34 }, (_, i) => ({ home: i / 34 * LOOP_LEN }));
+
+let cam = { s: 1, ox: 0, oy: 0 };   // Kamera der Szene (für Klick-Hit-Test)
+
+/* ---------------- 5. Hauptszene zeichnen ---------------- */
+function drawScene(){
+  const [w, h] = fitCanvas(sceneCv);
+  if (w < 10) return;
+  const ctx = sceneCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  // Hintergrund
+  const grd = ctx.createRadialGradient(w / 2, h * 0.45, 10, w / 2, h * 0.45, Math.max(w, h) * 0.75);
+  grd.addColorStop(0, "#17223d"); grd.addColorStop(1, "#0a1120");
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+
+  // Kamera: Welt 1000×667 passt immer
+  const s = Math.min(w / 1000, h / 667);
+  cam = { s, ox: (w - 1000 * s) / 2, oy: (h - 667 * s) / 2 };
+  const P2 = (x, y) => [cam.ox + x * s, cam.oy + y * s];
+  const fs = Math.max(11, 18 * s);
+  const line = (x1, y1, x2, y2) => {
+    const a = P2(x1, y1), b = P2(x2, y2);
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  };
+
+  // Momentanwerte und normierte Leistung pn = p/p_max = sin²(φ) ∈ [0,1]
+  const u = uNow(), i = iNow();
+  const pn = pNow() / (state.Uhat * state.Uhat / state.R);
+  const off = -30 * Math.cos(state.phase);   // gemeinsame Pendelauslenkung der Elektronen (Drift ∝ i)
+
+  /* --- Wärmeglut hinter dem Widerstand --- */
+  const gc = P2(BOX.x, BOX.y + BOX.h / 2);
+  const glow = ctx.createRadialGradient(gc[0], gc[1], 4, gc[0], gc[1], 130 * s);
+  glow.addColorStop(0, `rgba(249,115,22,${0.55 * pn})`);
+  glow.addColorStop(1, "rgba(249,115,22,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(gc[0] - 135 * s, gc[1] - 135 * s, 270 * s, 270 * s);
+
+  /* --- Leitungen (oben mit Schalter-Lücke) --- */
+  ctx.strokeStyle = "#93a4c3"; ctx.lineWidth = Math.max(1.6, 3 * s); ctx.lineCap = "round";
+  line(SRC.x, SRC.y - SRC.r, SRC.x, 130);            // links oben
+  line(SRC.x, SRC.y + SRC.r, SRC.x, 537);            // links unten
+  line(140, 130, S_X0, 130);                         // oben bis Schalter
+  line(S_X1, 130, 860, 130);                         // oben ab Schalter
+  line(BOX.x, 130, BOX.x, BOX.y);                    // rechts oben
+  line(BOX.x, BOX.y + BOX.h, BOX.x, 537);            // rechts unten
+  line(140, 537, 860, 537);                          // unten
+  // mitfließende Strichelung auf den Leitungen (Richtung = technischer Strom bei i > 0)
+  ctx.save();
+  ctx.setLineDash([2, 10]); ctx.lineDashOffset = -off * 2;
+  ctx.strokeStyle = "rgba(229,236,247,.22)"; ctx.lineWidth = Math.max(1.4, 2.4 * s);
+  for (const [x1, y1, x2, y2] of LOOP) line(x1, y1, x2, y2);
+  ctx.restore();
+
+  /* --- Elektronen (gelbe Punkte, pendeln um Ruhelage) --- */
+  ctx.fillStyle = "#fde047"; ctx.strokeStyle = "#a16207"; ctx.lineWidth = 0.8;
+  for (const p of eDots){
+    const [x, y] = loopPos(p.home + off);
+    const q = P2(x, y);
+    ctx.beginPath(); ctx.arc(q[0], q[1], Math.max(2.4, 3.6 * s), 0, 7); ctx.fill(); ctx.stroke();
+  }
+
+  /* --- AC-Quelle: Kreis mit „~“ --- */
+  const c0 = P2(SRC.x, SRC.y);
+  ctx.beginPath(); ctx.arc(c0[0], c0[1], SRC.r * s, 0, 7);
+  ctx.fillStyle = "#1b2745"; ctx.fill();
+  ctx.strokeStyle = "#cdd8ec"; ctx.lineWidth = Math.max(1.6, 2.6 * s); ctx.stroke();
+  ctx.fillStyle = "#cdd8ec"; ctx.font = `bold ${Math.max(20, 42 * s)}px Georgia`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("~", c0[0], c0[1] + 2 * s);
+  ctx.font = `italic ${fs * 0.9}px Georgia`;
+  ctx.fillText(T("srcU"), c0[0], c0[1] + (SRC.r + 22) * s);
+
+  /* --- Schalter (geschlossen; anklickbar = Start/Stopp) --- */
+  ctx.fillStyle = "#cdd8ec";
+  for (const sx of [S_X0, S_X1]){
+    const q = P2(sx, 130);
+    ctx.beginPath(); ctx.arc(q[0], q[1], Math.max(2, 3.5 * s), 0, 7); ctx.fill();
+  }
+  ctx.strokeStyle = "#cdd8ec"; ctx.lineWidth = Math.max(1.6, 2.6 * s);
+  line(S_X0, 130, S_X1 - 4, 130);   // Betätigungshebel, geschlossen
+
+  /* --- Widerstand: Kasten, Färbung und Schrift nach p(t) --- */
+  const hot = Math.pow(pn, 0.8);
+  const bg = P2(BOX.x - BOX.w / 2, BOX.y);
+  ctx.save();
+  ctx.shadowColor = "rgba(249,115,22," + (0.9 * pn) + ")";
+  ctx.shadowBlur = 34 * pn;
+  rr(ctx, bg[0], bg[1], BOX.w * s, BOX.h * s, 6 * s);
+  ctx.fillStyle = mixRGB([27, 39, 69], [249, 115, 22], hot);
+  ctx.fill();
+  ctx.restore();
+  rr(ctx, bg[0], bg[1], BOX.w * s, BOX.h * s, 6 * s);
+  ctx.strokeStyle = "#cdd8ec"; ctx.lineWidth = Math.max(1.4, 2.2 * s); ctx.stroke();
+  ctx.fillStyle = hot > 0.55 ? "#1a1206" : "#e5ecf7";
+  ctx.font = `bold ${fs}px system-ui`;
+  ctx.fillText("R", bg[0] + BOX.w * s / 2, bg[1] + BOX.h * s * 0.34);
+  ctx.font = `bold ${fs * 0.85}px system-ui`;
+  const rTxt = state.R < 9.95 ? fmt(state.R, 1) : fmt(state.R, 0);
+  ctx.fillText(rTxt + " Ω", bg[0] + BOX.w * s / 2, bg[1] + BOX.h * s * 0.74);
+
+  /* --- Pfeile: technischer Strom (oben) vs. Elektronen (unten) --- */
+  const chevron = (cx, cy, dir, col) => {
+    const p = [P2(cx + 9 * dir, cy), P2(cx - 6 * dir, cy - 6), P2(cx - 6 * dir, cy + 6)];
+    ctx.beginPath(); ctx.moveTo(p[0][0], p[0][1]); ctx.lineTo(p[1][0], p[1][1]); ctx.lineTo(p[2][0], p[2][1]);
+    ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+  };
+  const dirI = i >= 0 ? 1 : -1;      // technische Stromrichtung
+  ctx.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(state.phase));
+  for (const hx of [180, 320, 460, 600, 740]) chevron(hx + off, 130, dirI, "#e5ecf7");
+  for (const hx of [200, 340, 480, 620, 760]) chevron(hx + off, 537, -dirI, "#fde047");
+  ctx.globalAlpha = 1;
+
+  /* --- p(t)-Leiste neben dem Widerstand (Füllhöhe = Momentanleistung) --- */
+  const bx = 936, bw = 16, by = BOX.y, bh = BOX.h;
+  const b0 = P2(bx, by);
+  rr(ctx, b0[0], b0[1], bw * s, bh * s, 4 * s);
+  ctx.fillStyle = "#0f1830"; ctx.fill();
+  ctx.strokeStyle = "#26355a"; ctx.lineWidth = 1; ctx.stroke();
+  if (pn > 0.004){
+    const fh = bh * pn * s;
+    ctx.save();
+    ctx.shadowColor = "#4ade80"; ctx.shadowBlur = 8 * pn;
+    rr(ctx, b0[0], b0[1] + bh * s - fh, bw * s, fh, 4 * s);
+    ctx.fillStyle = "#4ade80"; ctx.fill();
+    ctx.restore();
+  }
+  // Mittelwert-Kennzeichnung P (bei 50 % der Leiste)
+  const my = P2(bx - 4, by + bh / 2);
+  ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = Math.max(1.2, 2 * s);
+  ctx.beginPath(); ctx.moveTo(my[0] - 3 * s, my[1]); ctx.lineTo(my[0] + (bw + 4) * s, my[1]); ctx.stroke();
+  ctx.fillStyle = "#4ade80"; ctx.font = `bold ${fs * 0.72}px system-ui`;
+  ctx.fillText(T("lblP"), b0[0] + bw * s / 2, b0[1] - 6 * s);
+  ctx.fillStyle = "#f59e0b";
+  ctx.fillText(T("lblMean"), my[0] - 8 * s, my[1] + 3 * s);
+
+  /* --- Wärmeschlieren über dem Widerstand --- */
+  if (pn > 0.03){
+    ctx.save();
+    ctx.strokeStyle = `rgba(253,186,116,${0.6 * pn})`;
+    ctx.lineWidth = Math.max(1, 1.8 * s);
+    ctx.setLineDash([5, 7]); ctx.lineDashOffset = -state.simTime * 26;
+    for (const dx of [-26, 0, 26]){
+      ctx.beginPath();
+      for (let k = 0; k <= 12; k++){
+        const yy = 300 - 56 * k / 12;
+        const xx = BOX.x + dx + 5 * Math.sin(k / 12 * Math.PI * 2 + state.simTime * 4 + dx);
+        const q = P2(xx, yy);
+        k ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* --- Legende (oben links) --- */
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  const lg = P2(24, 22);
+  ctx.beginPath(); ctx.arc(lg[0], lg[1], Math.max(3, 3.6 * s), 0, 7);
+  ctx.fillStyle = "#fde047"; ctx.fill(); ctx.strokeStyle = "#a16207"; ctx.stroke();
+  ctx.fillStyle = "#cdd8ec"; ctx.font = `${fs * 0.8}px system-ui`;
+  ctx.fillText(T("legEl"), lg[0] + 12, lg[1]);
+  chevronAt(ctx, P2(24, 42), 1, "#e5ecf7");
+  ctx.fillText(T("legI"), P2(24, 42)[0] + 12, P2(24, 42)[1]);
+  ctx.textBaseline = "alphabetic";
+
+  /* --- Status-Chip: Pause / p = 0 / p maximal --- */
+  if (!state.running)      chip(ctx, w, h, fs, T("statusPause"), "#fbbf24");
+  else if (pn <= 0.03)     chip(ctx, w, h, fs, T("statusP0"), "#fbbf24");
+  else if (pn >= 0.97)     chip(ctx, w, h, fs, T("statusPMax"), "#4ade80");
+}
+// kleines Richtungs-Dreieck für die Legende
+function chevronAt(ctx, p, dir, col){
+  ctx.beginPath();
+  ctx.moveTo(p[0] + 8 * dir, p[1]);
+  ctx.lineTo(p[0] - 5 * dir, p[1] - 5);
+  ctx.lineTo(p[0] - 5 * dir, p[1] + 5);
+  ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+}
+function chip(ctx, w, h, fs, txt, col){
+  ctx.font = `bold ${fs * 0.92}px system-ui`;
+  const tw = ctx.measureText(txt).width, pw = tw + 24, ph = fs * 1.9;
+  const x = 14, y = h - 14 - ph;
+  rr(ctx, x, y, pw, ph, 8);
+  ctx.globalAlpha = 0.16; ctx.fillStyle = col; ctx.fill();
+  ctx.globalAlpha = 1; ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = col; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  ctx.fillText(txt, x + 12, y + ph / 2 + 1);
+  ctx.textBaseline = "alphabetic";
+}
+
+/* ---------------- 6. Oszilloskop: u (rot), i (blau), p (grün) ----------------
+   Kanäle u und i sind auf je ihren Scheitelwert normiert und haben
+   dieselbe Pixel-Amplitude ⇒ deckungsgleich sichtbar (φ = 0°).        */
+function niceStep(x){
+  if (x <= 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(x))), n = x / p;
+  return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p;
+}
+// Zeitfenster: immer 2 Perioden von u (analytisch, keine Abtastung nötig)
+const scopeWin = () => Math.min(20, Math.max(0.02, 2 / state.f));
+
+function drawScope(){
+  const [w, h] = fitCanvas(scopeCv);
+  if (w < 10) return;
+  const ctx = scopeCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#04101c"; ctx.fillRect(0, 0, w, h);
+
+  const L = 46, Rr = 44, Tt = 32, Bb = 26;
+  const pw = w - L - Rr, ph = h - Tt - Bb, mid = Tt + ph / 2, Au = ph / 2 * 0.74;
+  const Uh = state.Uhat, Ih = Uh / state.R, Pmax = Uh * Ih, P = Pmax / 2;
+  const win = scopeWin(), t1 = state.simTime, t0 = t1 - win, om = omega();
+  const X = t => L + (t - t0) / win * pw;
+  const fsS = Math.max(10, h * 0.072);
+
+  // Phase zu jedem Zeitpunkt im Fenster (beim Pausieren: eingefroren)
+  const phiOf = t => state.phase + (state.running ? om * (t - state.simTime) : 0);
+  const yU = u => mid - (u / Uh) * Au;
+  const yI = i => mid - (i / Ih) * Au;
+  const yP = p => mid - (p / Pmax) * Au;
+
+  // Vertikalgitter + Bezugslinien
+  ctx.strokeStyle = "rgba(148,163,184,.14)"; ctx.lineWidth = 1;
+  for (const yy of [mid - Au, mid - Au / 2, mid, mid + Au / 2, mid + Au]){
+    ctx.beginPath(); ctx.moveTo(L, yy); ctx.lineTo(L + pw, yy); ctx.stroke();
+  }
+  ctx.strokeStyle = "rgba(229,236,247,.55)"; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(L, mid); ctx.lineTo(L + pw, mid); ctx.stroke();
+
+  // Gestrichelt: U_eff (amber, u-Skala) und P (grün, p-Skala)
+  const dashed = (yy, col, lab, xLab, align) => {
+    ctx.save(); ctx.setLineDash([6, 5]); ctx.strokeStyle = col; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(L, yy); ctx.lineTo(L + pw, yy); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle = col; ctx.font = `${fsS * 0.85}px system-ui`;
+    ctx.textAlign = align; ctx.fillText(lab, xLab, yy - 3); ctx.restore();
+  };
+  dashed(yU(Ueff()), "#fbbf24", "U_eff", L - 5, "right");
+  dashed(yP(P), "#4ade80", "P", L + pw + 5, "left");
+
+  // Achsenbeschriftung
+  ctx.fillStyle = "#7c8db0"; ctx.font = `${fsS * 0.85}px system-ui`;
+  ctx.textAlign = "right";
+  ctx.fillText("Û", L - 5, yU(Uh) + 3);
+  ctx.fillText("0", L - 5, mid + 3);
+  ctx.textAlign = "left";
+  ctx.fillText("Î", L + pw + 5, yI(Ih) + 3);
+  ctx.textAlign = "right"; ctx.fillText(win < 0.5 ? "t/ms" : "t/s", L + pw, h - 6);
+
+  // Kurven (analytisch, 240 Stützstellen – auch bei 100 Hz aliasfrei)
+  const N = 240;
+  const trace = (yOf, fn) => {
+    ctx.beginPath();
+    for (let k = 0; k <= N; k++){
+      const t = t0 + win * k / N, x = X(t), y = yOf(fn(t));
+      k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+  };
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#f87171"; ctx.shadowColor = "#f87171"; ctx.shadowBlur = 5;
+  trace(yU, t => Uh * Math.sin(phiOf(t)));
+  ctx.strokeStyle = "#60a5fa"; ctx.shadowColor = "#60a5fa"; ctx.globalAlpha = 0.85;
+  trace(yI, t => Ih * Math.sin(phiOf(t)));
+  if (state.showP){
+    ctx.globalAlpha = 1; ctx.strokeStyle = "#4ade80"; ctx.shadowColor = "#4ade80";
+    trace(yP, t => { const sn = Math.sin(phiOf(t)); return Uh * Ih * sn * sn; });
+  }
+  ctx.restore();
+
+  // Aktuelle Messpunkte am rechten Rand (u und i deckungsgleich)
+  const xe = X(t1);
+  ctx.strokeStyle = "rgba(148,163,184,.3)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xe, Tt); ctx.lineTo(xe, Tt + ph); ctx.stroke();
+  const dot = (yy, col, r) => {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(xe, yy, r, 0, 7); ctx.fill();
+  };
+  dot(yU(uNow()), "#f87171", 3.6);
+  dot(yI(iNow()), "#60a5fa", 2.3);          // liegt exakt auf u ⇒ „deckungsgleich“
+  if (state.showP) dot(yP(pNow()), "#4ade80", 3);
+
+  // Legende oben: farbige Kästchen u/i/p + Kernbotschaft rechts
+  let lx = L;
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  ctx.font = `${fsS * 0.9}px system-ui`;
+  for (const [col, lab] of [["#f87171", "u"], ["#60a5fa", "i"], ["#4ade80", "p"]]){
+    if (lab === "p" && !state.showP) continue;
+    ctx.fillStyle = col; ctx.fillRect(lx, Tt - 18, 9, 9);
+    ctx.fillStyle = "#cdd8ec"; ctx.fillText(lab, lx + 13, Tt - 13);
+    lx += 13 + ctx.measureText(lab).width + 12;
+  }
+  ctx.textAlign = "right"; ctx.fillStyle = "#9fb0d0";
+  ctx.fillText(T("scopeInfo"), L + pw, Tt - 13);
+  ctx.textBaseline = "alphabetic";
+}
+
+/* ---------------- 7. Zeigerdiagramm (Effektivwert-Zeiger) ----------------
+   U- und I-Zeiger rotieren synchron und deckungsgleich (φ = 0°).
+   Längen linear zu U_eff bzw. I_eff, mit eigenen Skalen (unten vermerkt). */
+function drawPhasor(){
+  const [w, h] = fitCanvas(phasorCv);
+  if (w < 10) return;
+  const ctx = phasorCtx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const grd = ctx.createRadialGradient(w / 2, h * 0.45, 8, w / 2, h * 0.45, Math.max(w, h) * 0.7);
+  grd.addColorStop(0, "#101a30"); grd.addColorStop(1, "#0a1120");
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+
+  const cx = w / 2, cy = h * 0.48, R = Math.min(w * 0.40, h * 0.34);
+  const Ue = Ueff(), Ie = Ieff();
+  const Lu = Math.min(R * 0.95, R * 0.95 / 230 * Ue);   // 230 V ≙ 0,95·R
+  const Li = Math.min(R * 0.95, R * 0.95 / 2.3 * Ie);   // 2,3 A ≙ 0,95·R
+  const a = state.phase;
+
+  // Titel + φ-Badge
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#e5ecf7"; ctx.font = `bold ${Math.max(12, h * 0.068)}px system-ui`;
+  ctx.fillText(T("phasorTitle"), 12, h * 0.11);
+  ctx.textAlign = "right"; ctx.fillStyle = "#4ade80";
+  ctx.font = `bold ${Math.max(11, h * 0.056)}px system-ui`;
+  ctx.fillText(T("phiBadge"), w - 12, h * 0.11);
+
+  // Bezugsachse und Drehsinn ω (gegen den Uhrzeigersinn)
+  arrow2d(ctx, cx - R * 1.1, cy, cx + R * 1.1, cy, "rgba(229,236,247,.4)", 1.3, 6);
+  ctx.strokeStyle = "rgba(74,222,128,.7)"; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(cx, cy, R * 0.30, Math.PI * 1.15, Math.PI * 1.85, true); ctx.stroke();
+  const ea = Math.PI * 1.85, er = R * 0.30;
+  const ex = cx + er * Math.cos(ea), ey = cy + er * Math.sin(ea);
+  arrow2d(ctx, ex - 12 * Math.sin(ea), ey + 12 * Math.cos(ea), ex, ey, "rgba(74,222,128,.7)", 1.6, 6);
+  ctx.fillStyle = "#4ade80"; ctx.font = `italic bold ${Math.max(11, h * 0.06)}px Georgia`;
+  ctx.textAlign = "center"; ctx.fillText("ω", cx + er + 14, cy - er * 0.55);
+
+  // Kreisbahn (Referenz)
+  ctx.setLineDash([5, 5]); ctx.strokeStyle = "rgba(148,163,184,.35)"; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+
+  // Zeiger: U (rot, breit) darunter I (blau, schmal) – Spitzen deckungsgleich
+  const ux = cx + Lu * Math.cos(a), uy = cy - Lu * Math.sin(a);
+  const ix = cx + Li * Math.cos(a), iy = cy - Li * Math.sin(a);
+  arrow2d(ctx, cx, cy, ux, uy, "#f87171", 5, 11);
+  arrow2d(ctx, cx, cy, ix, iy, "#60a5fa", 2.4, 9);
+
+  // Beschriftungen an den Spitzen (bei Gleichstand deutlich versetzt)
+  const sameTip = Math.hypot(ux - ix, uy - iy) < 8;
+  const labOff = sameTip ? 10 : 0;
+  ctx.font = `italic bold ${Math.max(12, h * 0.07)}px Georgia`;
+  ctx.fillStyle = "#f87171";
+  ctx.fillText("U", ux + 19 * Math.cos(a) - labOff * Math.sin(a), uy - 19 * Math.sin(a) - labOff * Math.cos(a));
+  ctx.fillStyle = "#60a5fa";
+  ctx.fillText("I", ix + 19 * Math.cos(a) + labOff * Math.sin(a) + 3, iy - 19 * Math.sin(a) + labOff * Math.cos(a));
+
+  // Skalenvermerk (px pro 100 V bzw. pro 1 A)
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${Math.max(10, h * 0.048)}px system-ui`;
+  ctx.textAlign = "center";
+  ctx.fillText(`${T("scaleNote")} ${fmt(100 * Lu / Ue, 0)} ${T("pxAndA")} ${fmt(Li / Ie, 1)} px`, cx, h - 10);
+}
+
+/* ---------------- 8. Messwerte aktualisieren ---------------- */
+const fmtI = x => {
+  const ax = Math.abs(x);
+  if (ax >= 100) return fmt(x, 1) + " A";
+  if (ax >= 1)   return fmt(x, 2) + " A";
+  if (ax >= 0.01) return fmt(x, 3) + " A";
+  return fmt(x * 1000, 2) + " mA";
+};
+const fmtP = x => {
+  if (x >= 1000) return fmt(x / 1000, x >= 10000 ? 0 : 1) + " kW";
+  if (x >= 1)    return fmt(x, 1) + " W";
+  return fmt(x * 1000, 0) + " mW";
+};
+function updateReadouts(){
+  const u = uNow(), i = iNow();
+  $("vU").textContent = (u >= 0 ? "+" : "") + fmt(u, Math.abs(u) >= 100 ? 1 : 2) + " V";
+  $("vI").textContent = (i >= 0 ? "+" : "") + fmtI(i);
+  $("vUeff").textContent = fmt(Ueff(), 2) + " V";
+  $("vIeff").textContent = fmtI(Ieff());
+  $("vP").textContent = fmtP(Ueff() * Ieff());
+  $("vPhi").textContent = "0 °";
+}
+
+/* ---------------- 9. Hauptschleife (≈60 FPS) ---------------- */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min((now - last) / 1000, 0.05);   // bei Tab-Wechsel clampen
+  last = now;
+  if (state.running) state.phase += omega() * dt;
+  state.simTime += dt;
+  drawScene(); drawScope(); drawPhasor(); updateReadouts();
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- 10. Steuerung ---------------- */
+// R: 1 Ω..1 kΩ, logarithmisch (Stellwert 0..1000 → 10^(3·w/1000))
+{
+  const el = $("rR"), out = $("oR");
+  const upd = () => {
+    state.R = Math.pow(10, 3 * el.value / 1000);
+    out.textContent = (state.R < 9.95 ? fmt(state.R, 1) : fmt(state.R, 0)) + " Ω";
+  };
+  el.addEventListener("input", upd); upd();
+}
+// Û: 1..325 V, linear
+{
+  const el = $("rUhat"), out = $("oUhat");
+  const upd = () => { state.Uhat = parseFloat(el.value); out.textContent = fmt(state.Uhat, 0) + " V"; };
+  el.addEventListener("input", upd); upd();
+}
+// f: 0,1..100 Hz, logarithmisch
+{
+  const el = $("rF"), out = $("oF");
+  const upd = () => {
+    state.f = Math.pow(10, -1 + 3 * el.value / 1000);
+    out.textContent = fmt(state.f, state.f < 1 ? 2 : state.f < 10 ? 1 : 0) + " Hz";
+  };
+  el.addEventListener("input", upd); upd();
+}
+$("cP").addEventListener("change", e => { state.showP = e.target.checked; });
+
+const btnRun = $("btnRun");
+function refreshRunBtn(){ btnRun.textContent = T(state.running ? "btnStop" : "btnStart"); }
+btnRun.addEventListener("click", () => { state.running = !state.running; refreshRunBtn(); });
+
+// Klick auf den Schalter in der Schaltung toggelt ebenfalls Start/Stopp
+sceneCv.addEventListener("click", e => {
+  const r = sceneCv.getBoundingClientRect();
+  const x = (e.clientX - r.left - cam.ox) / cam.s, y = (e.clientY - r.top - cam.oy) / cam.s;
+  if (x > 275 && x < 380 && y > 90 && y < 150){
+    state.running = !state.running; refreshRunBtn();
+  }
+});
+sceneCv.addEventListener("mousemove", e => {
+  const r = sceneCv.getBoundingClientRect();
+  const x = (e.clientX - r.left - cam.ox) / cam.s, y = (e.clientY - r.top - cam.oy) / cam.s;
+  sceneCv.style.cursor = (x > 275 && x < 380 && y > 90 && y < 150) ? "pointer" : "default";
+});
+
+/* ---------------- 11. Sprachumschalter ---------------- */
+function applyLang(){
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = T(el.dataset.i18nHtml); });
+  document.documentElement.lang = lang;
+  document.title = T("title") + " – Simulation";
+  $("btnLang").textContent = lang === "de" ? "EN" : "DE";
+  refreshRunBtn();
+}
+$("btnLang").addEventListener("click", () => { lang = lang === "de" ? "en" : "de"; applyLang(); });
+
+/* ---------------- 12. Start ---------------- */
+applyLang();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

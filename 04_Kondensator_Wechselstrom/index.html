@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Interaktive Simulation: Kondensator im Wechselstromkreis – kapazitiver Widerstand, 90°-Phasenverschiebung, Blindleistung und Hochpass-Wirkung.">
+<title>Kondensator im Wechselstromkreis – Simulation</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+<style>
+  /* ---------- Grundfarben (dunkles Design) ---------- */
+  :root{
+    --bg:#0d1117;            /* Seitenhintergrund */
+    --panel:#161b22;         /* Panel-Hintergrund */
+    --panel2:#21262d;        /* etwas hellere Fläche */
+    --border:#30363d;        /* Rahmen */
+    --text:#e6edf3;          /* Haupttext */
+    --muted:#8b949e;         /* Nebentext */
+    --u:#ff5c5c;             /* Spannung u_C(t) – rot */
+    --i:#58a6ff;             /* Strom i(t) – blau */
+    --p:#3fb950;             /* Leistung p(t) – grün */
+    --r:#f0b429;             /* Widerstand u_R(t) / E-Feld – amber */
+    --accent:#58a6ff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:16px 20px; border-bottom:1px solid var(--border); flex-wrap:wrap;
+  }
+  h1{font-size:20px; margin:0}
+  .sub{color:var(--muted); font-size:13px; margin:2px 0 0}
+  .lang button{
+    background:var(--panel2); color:var(--muted); border:1px solid var(--border);
+    padding:6px 12px; cursor:pointer; font-weight:600;
+  }
+  .lang button:first-child{border-radius:8px 0 0 8px}
+  .lang button:last-child{border-radius:0 8px 8px 0; border-left:none}
+  .lang button.active{color:var(--text); background:var(--accent); border-color:var(--accent)}
+
+  main{max-width:1180px; margin:0 auto; padding:16px 20px 8px; display:grid; gap:14px}
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px;
+  }
+  .panel-head{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px}
+  h2{font-size:15px; margin:0; letter-spacing:.3px}
+  .row1{display:grid; grid-template-columns:7fr 5fr; gap:14px}
+  .row1 > div{display:grid; gap:14px; align-content:start}
+  canvas{display:block; width:100%; background:#0b0f14; border-radius:8px}
+  #cvCircuit{aspect-ratio:640/440}
+  #cvPhasor{aspect-ratio:1/1}
+  #cvImp{aspect-ratio:1/1}
+  #cvScope{aspect-ratio:1000/560}
+  .note{color:var(--muted); font-size:13px; margin:10px 2px 0}
+  .note strong{color:var(--text)}
+  .chiprow{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .chip{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted);
+        background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:3px 10px}
+  .dot{width:10px; height:10px; border-radius:50%; display:inline-block}
+
+  /* ---------- Messwerte ---------- */
+  .mgrid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .mrow{background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:10px 12px}
+  .mlab{font-size:12px; color:var(--muted)}
+  .mval{font:600 19px ui-monospace,SFMono-Regular,Menlo,monospace; margin-top:2px}
+  .mval small{font-size:12px; color:var(--muted); font-weight:400}
+
+  /* ---------- Steuerung ---------- */
+  .controls{display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:16px; align-items:end}
+  .ctrl label{display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:6px}
+  .ctrl label b{font-weight:600}
+  .ctrl output{font:600 13px ui-monospace,Menlo,monospace; color:var(--accent)}
+  input[type=range]{width:100%; accent-color:var(--accent); cursor:pointer}
+  .btn{
+    background:var(--accent); color:#0d1117; border:none; border-radius:10px;
+    padding:11px 22px; font-size:15px; font-weight:700; cursor:pointer; white-space:nowrap;
+  }
+  .btn:active{transform:translateY(1px)}
+  .callout{margin-top:12px; font-size:13px; color:var(--text); background:var(--panel2);
+           border:1px solid var(--border); border-left:3px solid var(--r); border-radius:8px; padding:9px 12px}
+  .callout code{font-family:ui-monospace,Menlo,monospace}
+
+  /* ---------- Erklärung ---------- */
+  .explain p{margin:0 0 12px; color:#c9d1d9; text-align:justify}
+  .explain p:last-child{margin-bottom:0}
+
+  footer{color:var(--muted); font-size:12.5px; text-align:center; padding:14px 20px 26px}
+
+  @media (max-width:940px){
+    .row1{grid-template-columns:1fr}
+    .controls{grid-template-columns:1fr 1fr}
+    .btn{grid-column:1 / -1}
+  }
+  @media (max-width:560px){
+    .controls{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 data-i18n="tTitle">Kondensator im Wechselstromkreis</h1>
+    <p class="sub" data-i18n="tSub">Kapazitiver Widerstand, 90°-Phasenverschiebung &amp; Hochpass-Wirkung</p>
+  </div>
+  <div class="lang" role="group" aria-label="Sprache / language">
+    <button id="btnDE" class="active">DE</button><button id="btnEN">EN</button>
+  </div>
+</header>
+
+<main>
+  <!-- ========== Zeile 1: Stromkreis-Szene | Zeigerdiagramm + Messwerte ========== -->
+  <div class="row1">
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n="tCircuit">Stromkreis</h2></div>
+      <canvas id="cvCircuit"></canvas>
+      <p class="note" data-i18n-html="sceneNote"></p>
+    </section>
+
+    <div>
+      <section class="panel">
+        <div class="panel-head"><h2 data-i18n="tPhasor">Zeigerdiagramm</h2></div>
+        <canvas id="cvPhasor"></canvas>
+        <p class="note" data-i18n="phasorCaption"></p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2 data-i18n="tMeas">Messwerte</h2></div>
+        <div class="mgrid">
+          <div class="mrow"><div class="mlab" data-i18n-html="mU"></div><div class="mval" id="mU">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mI"></div><div class="mval" id="mI">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mX"></div><div class="mval" id="mX">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mQ"></div><div class="mval" id="mQ">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mP"></div><div class="mval" id="mP">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mCos"></div><div class="mval" id="mCos">–</div></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2 data-i18n="tImp">Impedanzdreieck</h2></div>
+        <canvas id="cvImp"></canvas>
+        <p class="note" data-i18n-html="impCaption"></p>
+      </section>
+    </div>
+  </div>
+
+  <!-- ========== Oszilloskop ========== -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2 data-i18n="tScope">Oszilloskop</h2>
+      <div class="chiprow">
+        <span class="chip"><span class="dot" style="background:var(--u)"></span><span data-i18n="lgU">u(t) Spannung</span></span>
+        <span class="chip"><span class="dot" style="background:var(--i)"></span><span data-i18n="lgI">i(t) Strom</span></span>
+        <span class="chip"><span class="dot" style="background:var(--p)"></span><span data-i18n="lgP">p(t) Leistung</span></span>
+        <span class="chip"><span class="dot" style="background:var(--r)"></span><span data-i18n="lgR">u_R(t) Widerstand</span></span>
+        <span class="chip"><span class="dot" style="background:#fb8500"></span><span data-i18n="lgPR">p_R(t) Wirkleistung</span></span>
+        <span class="chip" data-i18n="scopeHint">Strom eilt um 90° voraus</span>
+      </div>
+    </div>
+    <canvas id="cvScope"></canvas>
+  </section>
+
+  <!-- ========== Steuerung ========== -->
+  <section class="panel">
+    <div class="panel-head"><h2 data-i18n="tCtrl">Steuerung</h2></div>
+    <div class="controls">
+      <div class="ctrl">
+        <label><b data-i18n="cCap">Kapazität C</b><output id="oC"></output></label>
+        <input id="sC" type="range" min="0" max="1000" step="1">
+      </div>
+      <div class="ctrl">
+        <label><b data-i18n="cFreq">Frequenz f</b><output id="oF"></output></label>
+        <input id="sF" type="range" min="0" max="1000" step="1">
+      </div>
+      <div class="ctrl">
+        <label><b data-i18n="cVolt">Scheitelwert Û</b><output id="oV"></output></label>
+        <input id="sV" type="range" min="1" max="325" step="0.5">
+      </div>
+      <button id="btnRun" class="btn"><span id="icRun">⏸</span> <span data-i18n="btnStop">Stopp</span></button>
+    </div>
+    <div class="callout" data-i18n-html="callout"></div>
+  </section>
+
+  <!-- ========== Erklärung ========== -->
+  <section class="panel explain">
+    <div class="panel-head"><h2 data-i18n="tExplain">Erklärung</h2></div>
+    <div id="expl" data-i18n-html="expl"></div>
+  </section>
+</main>
+
+<footer data-i18n="footer"></footer>
+
+<script>
+"use strict";
+/* =====================================================================
+   Simulation: Kondensator im Wechselstromkreis (Serienschaltung C + R)
+   ---------------------------------------------------------------------
+   Physik-Modell:
+     u_C(t) = Û_C·sin(φ)                  Spannung am Kondensator
+     i(t)   = C·du_C/dt = Î·cos(φ)        Strom eilt u_C um 90° voraus
+     p(t)   = u_C·i = (Û_C·Î/2)·sin(2φ)   Pendelleistung, Mittelwert 0
+   Mit Serienwiderstand R (Hochpass):
+     X_C = 1/(ωC),  Z = √(R²+X_C²),  Î = Û/Z
+     Û_C = Î·X_C,   Û_R = Î·R           (u_R in Phase mit i)
+   → hohe f: X_C → 0, u_R ≈ Û (Signal kommt am R an)
+   → tiefe f: X_C groß, u_R ≈ 0 (Kondensator „schluckt" das Signal)
+   Die Animation läuft aus Anschaulichkeitsgründen in Zeitlupe; ihre
+   Geschwindigkeit folgt logarithmisch der Frequenz (10 Hz ≈ 0,9 Hz
+   sichtbar … 10 kHz ≈ 12 Hz), die Phasenlage bleibt dabei exakt.
+   ===================================================================== */
+
+/* ---------- 1. Sprach-Dictionary (DE/EN) ---------- */
+const I18N = {
+de:{
+  tTitle:"Kondensator im Wechselstromkreis",
+  tSub:"Kapazitiver Widerstand, 90°-Phasenverschiebung & Hochpass-Wirkung",
+  tCircuit:"Stromkreis", tPhasor:"Zeigerdiagramm", tScope:"Oszilloskop",
+  tMeas:"Messwerte", tCtrl:"Steuerung", tExplain:"Erklärung",
+  lgU:"u_C(t) Kondensator", lgI:"i(t) Strom", lgP:"p_C(t) Blindleistung", lgR:"u_R(t) Widerstand", lgPR:"p_R(t) Wirkleistung",
+  scopeHint:"Strom eilt um 90° voraus",
+  mU:"U<sub>eff</sub> = Û/√2 (Quelle)", mI:"I<sub>eff</sub> = U<sub>eff</sub>/√(R²+X<sub>C</sub>²)",
+  mX:"X<sub>C</sub> = 1/(ωC)", mQ:"Q = I<sub>eff</sub>²·X<sub>C</sub> (Blindleistung)",
+  mP:"P = I<sub>eff</sub>²·R (Wirkleistung am R)", mCos:"cos φ = R/Z (Wirkanteil an R)",
+  cCap:"Kapazität C", cFreq:"Frequenz f", cVolt:"Scheitelwert Û",
+  btnStart:"Start", btnStop:"Stopp",
+  slowmo:"Zeitlupe",
+  markIMax:"i = Î bei u_C = 0", avgZero:"Mittelwert = 0",
+  rVal:"R = 1 kΩ",
+  stThrough:"Signal kommt durch", stPartial:"teilweise gekoppelt", stBlocked:"Signal wird geschluckt",
+  callout:"<code>cos φ = R/√(R²+X<sub>C</sub>²)</code> — der Anteil der Scheinleistung, der am Widerstand als <b>Wirkleistung P = I<sub>eff</sub>²·R</b> ankommt. "
+    +"X<sub>C</sub> ≪ R: cos φ ≈ 1, alles kommt durch. X<sub>C</sub> ≫ R: cos φ ≈ 0 — die Energie pendelt nur zwischen Quelle und "
+    +"Kondensatorfeld hin und her (Blindleistung, „Reflektion“) und der Widerstand bleibt kalt.",
+  sceneNote:'<span class="chiprow" style="margin-right:6px">'
+    +'<span class="chip"><span class="dot" style="background:#79c0ff"></span>e⁻ Elektronen</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--i)"></span>i Strompfeil</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--r)"></span>E-Feld</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--u)"></span>Q Ladung</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--r)"></span>R = 1 kΩ</span></span><br>'
+    +'<strong>Es fließt kein Strom durch den Kondensator:</strong> Die Elektronen pendeln nur in den Zuleitungen, '
+    +'Ladung wird auf den Platten hin- und hergeschoben (Verschiebungsstrom). '
+    +'Hinter dem Kondensator liegt der Widerstand R: Bei <b>hohen Frequenzen</b> (kleines X_C) fließt viel Strom — er leuchtet auf und '
+    +'liefert Wirkleistung P = I_eff²·R. '
+    +'Bei <b>tiefen Frequenzen</b> (großes X_C) schluckt der Kondensator das Signal — R bleibt dunkel, die Energie pendelt als Blindleistung zurück.',
+  phasorCaption:"Der Stromzeiger I eilt der Kondensatorspannung U_C um 90° voraus (Drehung im Uhrzeigersinn; Zeigerlängen nicht maßstäblich zueinander).",
+  tImp:"Impedanzdreieck",
+  impCaption:"Z = √(R²+X_C²) aus Wirkwiderstand R (grün) und Blindwiderstand X_C (blau, kapazitiv nach unten). "
+    +"tan φ = X_C/R; <b>cos φ = R/Z</b> ist der Wirkleistungsanteil — derselbe Wert wie im Status am Schaltbild und bei P am Messwert-Panel. "
+    +"Winkel und Seitenverhältnisse maßstäblich, die Gesamtlänge ist fest.",
+  impCosHint:"= Wirkanteil am Widerstand",
+  expl:
+    '<p>Ein Kondensator sperrt Gleichstrom, lässt aber Wechselstrom „durch“ — warum? Er besteht aus zwei leitfähigen Platten, '
+    +'die durch ein Dielektrikum getrennt sind; eine galvanische Verbindung gibt es nicht. Legt man Gleichspannung an, fließt nur '
+    +'ein kurzer Stromstoß, bis die Platten geladen sind — dann ist Schluss. Bei Wechselspannung ändert sich die Spannung ständig, '
+    +'die Platten müssen fortlaufend umgeladen werden: Es fließt dauernd Strom in den Zuleitungen, obwohl nichts den Zwischenraum überquert. '
+    +'Der Kondensator „lässt Wechselstrom durch“, verschiebt die Ladung in Wahrheit nur (Verschiebungsstrom).</p>'
+    +'<p>Die Ursache der Phasenverschiebung steckt in der Kondensatorgleichung <b>i = C·du_C/dt</b>: Der Strom hängt von der '
+    +'<em>Änderungsgeschwindigkeit</em> der Spannung ab, nicht von der Spannung selbst. Eine Sinusspannung ändert sich an ihren '
+    +'Nulldurchgängen am schnellsten — dort ist der Strom am größten. An den Spitzen ändert sich u_C kaum, der Strom ist null. '
+    +'Deshalb eilt der Strom der Kondensatorspannung um exakt eine Viertelperiode (<b>90°</b>) voraus — bei jeder Frequenz und Kapazität.</p>'
+    +'<p>Weil Strom und Spannung sich ständig gegenseitig „verfolgen“, wirkt der Kondensator wie ein frequenzabhängiger Widerstand: '
+    +'der <b>kapazitive Blindwiderstand X<sub>C</sub> = 1/(ωC) = 1/(2πfC)</b>. Er wird mit steigender Frequenz und wachsender Kapazität '
+    +'<em>kleiner</em>: Bei hohen Frequenzen hat die Spannung kaum Zeit, sich aufzubauen, die Umladung läuft leicht, der Strom steigt. '
+    +'Beim ohmschen Widerstand spielt die Frequenz dagegen keine Rolle.</p>'
+    +'<p>Wirkleistung verbraucht der ideale Kondensator keine. Die Leistung p(t) = u_C(t)·i(t) pendelt gleichmäßig zwischen positiv und '
+    +'negativ, ihr Mittelwert ist <b>null</b>: In einer Viertelperiode wird Energie aus dem Netz aufgenommen und im elektrischen Feld '
+    +'zwischen den Platten gespeichert (W = ½·C·u_C²), in der nächsten wird sie vollständig zurückgegeben. Es wird Energie nur '
+    +'hin- und hergeschoben, nicht verbraucht — das ist <b>Blindleistung Q = I<sub>eff</sub>²·X<sub>C</sub></b>.</p>'
+    +'<p><b>Energiebilanz — was passiert wirklich?</b> Der ideale Kondensator verbraucht nie Energie: Er nimmt sie im Feld auf '
+    +'(W = ½·C·u_C²) und gibt sie unverändert zurück — p_C(t) pendelt, der Mittelwert ist null. Ob Energie <em>netto</em> den Kondensator '
+    +'passiert, entscheidet der Phasenwinkel: Fließt der Strom fast in Phase mit der Quellspannung (X<sub>C</sub> ≪ R), wandert laufend '
+    +'Energie zum Widerstand und wird dort in Wärme verwandelt — <b>Wirkleistung P = I<sub>eff</sub>²·R</b>. Eilt der Strom dagegen um fast '
+    +'90° voraus (X<sub>C</sub> ≫ R), pendelt die Energie nur zwischen Quelle und Kondensatorfeld hin und her — im Mittel passiert nichts, '
+    +'der Widerstand bleibt kalt. Die Quelle liefert dann fast nur <b>Blindleistung Q = I<sub>eff</sub>²·X<sub>C</sub></b>; man kann das '
+    +'als „Reflektion" lesen. Der Anteil, der wirklich ankommt, ist <b>P/S = cos φ = R/√(R²+X<sub>C</sub>²)</b> — der Schaltung mit dem '
+    +'Widerstand als Anzeige direkt ablesbar.</p>'
+    +'<p><b>Hochpass hinter dem Kondensator — und eine häufige Falle:</b> X<sub>C</sub> = 1/(ωC) wird mit <em>großer</em> Kapazität und '
+    +'hoher Frequenz <em>kleiner</em>! Beispiel C = 100 µF, f = 10 Hz: X<sub>C</sub> = 159 Ω ≪ R = 1 kΩ → es fließen 227 mA und der '
+    +'Widerstand verwandelt <b>P ≈ 53 W</b> in Wärme — das Signal kommt selbst bei dieser tiefen Frequenz durch. Geschluckt wird es erst, '
+    +'wenn X<sub>C</sub> ≫ R, also bei <em>kleiner</em> Kapazität und/oder tiefer Frequenz: C = 10 nF bei 10 Hz → X<sub>C</sub> = 1,6 MΩ, '
+    +'nur 144 µA, P ≈ 21 µW ≈ 0 — alles pendelt als Blindleistung zurück. Die Grenze liegt bei der <b>Grenzfrequenz '
+    +'f<sub>g</sub> = 1/(2πRC)</b> (hier ≈ 159 Hz), wo X<sub>C</sub> = R und gerade die halbe Maximalleistung ankommt. '
+    +'So <b>koppeln</b> Kondensatoren in der Praxis: große C für Niederfrequenz/Schall, kleine C für Höhen; sie glätten außerdem '
+    +'Restwelligkeit und <b>kompensieren</b> induktive Blindleistung von Motoren.</p>',
+  footer:"Eine einzige HTML-Datei · kein Framework · offline nutzbar · bereit für GitHub Pages"
+},
+en:{
+  tTitle:"Capacitor in an AC Circuit",
+  tSub:"Capacitive reactance, 90° phase shift & high-pass action",
+  tCircuit:"Circuit", tPhasor:"Phasor diagram", tScope:"Oscilloscope",
+  tMeas:"Measurements", tCtrl:"Controls", tExplain:"Explanation",
+  lgU:"u_C(t) capacitor", lgI:"i(t) current", lgP:"p_C(t) reactive", lgR:"u_R(t) resistor", lgPR:"p_R(t) real power",
+  scopeHint:"Current leads by 90°",
+  mU:"U<sub>rms</sub> = Û/√2 (source)", mI:"I<sub>rms</sub> = U<sub>rms</sub>/√(R²+X<sub>C</sub>²)",
+  mX:"X<sub>C</sub> = 1/(ωC)", mQ:"Q = I<sub>rms</sub>²·X<sub>C</sub> (reactive)",
+  mP:"P = I<sub>rms</sub>²·R (real power at R)", mCos:"cos φ = R/Z (real-power share)",
+  cCap:"Capacitance C", cFreq:"Frequency f", cVolt:"Peak voltage Û",
+  btnStart:"Start", btnStop:"Pause",
+  slowmo:"slow motion",
+  markIMax:"i = Î at u_C = 0", avgZero:"average = 0",
+  rVal:"R = 1 kΩ",
+  stThrough:"Signal passes through", stPartial:"partially coupled", stBlocked:"Signal is swallowed",
+  callout:"<code>cos φ = R/√(R²+X<sub>C</sub>²)</code> — the share of the apparent power that reaches the resistor as "
+    +"<b>real power P = I<sub>rms</sub>²·R</b>. X<sub>C</sub> ≪ R: cos φ ≈ 1, everything passes. X<sub>C</sub> ≫ R: cos φ ≈ 0 — the "
+    +"energy only sloshes between source and capacitor field (reactive power, “reflected”) and the resistor stays cold.",
+  sceneNote:'<span class="chiprow" style="margin-right:6px">'
+    +'<span class="chip"><span class="dot" style="background:#79c0ff"></span>e⁻ electrons</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--i)"></span>i current arrow</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--r)"></span>E field</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--u)"></span>Q charge</span>'
+    +'<span class="chip"><span class="dot" style="background:var(--r)"></span>R = 1 kΩ</span></span><br>'
+    +'<strong>No current flows through the capacitor:</strong> electrons only shuttle back and forth in the leads; '
+    +'charge is shifted between the plates (displacement current). '
+    +'Behind the capacitor sits the resistor R: at <b>high frequencies</b> (small X_C) plenty of current flows — it lights up and '
+    +'delivers real power P = I_rms²·R. '
+    +'At <b>low frequencies</b> (large X_C) the capacitor swallows the signal — R stays dark and the energy sloshes back as reactive power.',
+  phasorCaption:"The current phasor I leads the capacitor voltage U_C by 90° (clockwise rotation; phasor lengths not to scale).",
+  tImp:"Impedance triangle",
+  impCaption:"Z = √(R²+X_C²) from resistance R (green) and reactance X_C (blue, capacitive pointing down). "
+    +"tan φ = X_C/R; <b>cos φ = R/Z</b> is the real-power share — the same value as the circuit status and the P tile. "
+    +"Angle and side ratios true to scale, overall length fixed.",
+  impCosHint:"= real-power share at R",
+  expl:
+    '<p>A capacitor blocks direct current but lets alternating current “pass” — why? It consists of two conducting plates '
+    +'separated by a dielectric; there is no galvanic connection. Apply a DC voltage and only a brief current flows until the '
+    +'plates are charged — then everything stops. With an AC voltage the voltage keeps changing, so the plates must be recharged '
+    +'continuously: current keeps flowing in the leads even though nothing crosses the gap. The capacitor “passes AC”; in truth it '
+    +'merely displaces charge (displacement current).</p>'
+    +'<p>The origin of the phase shift lies in the capacitor equation <b>i = C·du_C/dt</b>: the current depends on the '
+    +'<em>rate of change</em> of the voltage, not on the voltage itself. A sine voltage changes fastest at its zero crossings — '
+    +'that is where the current is largest. At the peaks u_C barely changes and the current is zero. '
+    +'Therefore the current leads the capacitor voltage by exactly one quarter period (<b>90°</b>) — at any frequency and any capacitance.</p>'
+    +'<p>Because current and voltage perpetually “chase” each other, the capacitor acts like a frequency-dependent resistor: '
+    +'the <b>capacitive reactance X<sub>C</sub> = 1/(ωC) = 1/(2πfC)</b>. It becomes <em>smaller</em> as frequency and capacitance '
+    +'increase: at high frequencies the voltage has hardly any time to build up, recharging is easy and the current rises. '
+    +'With an ohmic resistor frequency plays no role.</p>'
+    +'<p>An ideal capacitor consumes no real power. The power p(t) = u_C(t)·i(t) swings evenly between positive and negative; '
+    +'its average is <b>zero</b>: during one quarter period energy is drawn from the grid and stored in the electric field between '
+    +'the plates (W = ½·C·u_C²), and during the next it is returned in full. Energy is only pushed back and forth, never consumed — '
+    +'that is <b>reactive power Q = I<sub>rms</sub>²·X<sub>C</sub></b>.</p>'
+    +'<p><b>Energy balance — what really happens?</b> An ideal capacitor never consumes energy: it takes energy into its field '
+    +'(W = ½·C·u_C²) and returns it unchanged — p_C(t) swings, its average is zero. Whether energy <em>on average</em> passes the '
+    +'capacitor is decided by the phase angle: if the current flows almost in phase with the source voltage (X<sub>C</sub> ≪ R), energy '
+    +'streams continuously to the resistor and is converted to heat — <b>real power P = I<sub>rms</sub>²·R</b>. If instead the current '
+    +'leads by almost 90° (X<sub>C</sub> ≫ R), the energy merely sloshes back and forth between source and capacitor field — on average '
+    +'nothing gets through and the resistor stays cold. The source then supplies almost only <b>reactive power Q = I<sub>rms</sub>²·X<sub>C</sub></b>; '
+    +'one may read this as “reflection”. The share that actually arrives is <b>P/S = cos φ = R/√(R²+X<sub>C</sub>²)</b> — directly '
+    +'readable from the circuit with the resistor as the indicator.</p>'
+    +'<p><b>High-pass behind the capacitor — and a common pitfall:</b> X<sub>C</sub> = 1/(ωC) becomes <em>smaller</em> with '
+    +'<em>large</em> capacitance and high frequency! Example C = 100 µF, f = 10 Hz: X<sub>C</sub> = 159 Ω ≪ R = 1 kΩ → 227 mA flow and '
+    +'the resistor converts <b>P ≈ 53 W</b> into heat — the signal passes even at this low frequency. It is swallowed only when '
+    +'X<sub>C</sub> ≫ R, i.e. with a <em>small</em> capacitance and/or low frequency: C = 10 nF at 10 Hz → X<sub>C</sub> = 1.6 MΩ, '
+    +'only 144 µA, P ≈ 21 µW ≈ 0 — everything sloshes back as reactive power. The boundary is the <b>cutoff frequency '
+    +'f<sub>g</sub> = 1/(2πRC)</b> (here ≈ 159 Hz), where X<sub>C</sub> = R and exactly half the maximum power arrives. '
+    +'This is how capacitors in practice act as <b>coupling</b> capacitors: large C for low frequencies/audio, small C for highs; '
+    +'they also <b>smooth</b> residual ripple and <b>compensate</b> the inductive reactive power of motors.</p>',
+  footer:"A single HTML file · no framework · works offline · ready for GitHub Pages"
+}};
+
+/* ---------- 2. Zustand der Simulation ---------- */
+const R_FIX = 1000;   // Serienwiderstand in Ω (zeigt „kommt durch / geschluckt" an)
+const state = {
+  C: 1e-6,     // Kapazität in F   (10 nF … 100 µF, logarithmisch)
+  f: 50,       // Frequenz in Hz   (10 Hz … 10 kHz, logarithmisch)
+  Uhat: 325,   // Scheitelwert der Quelle in V (1 … 325 V, linear)
+  phi: 0,      // laufende Phase der Animation (Rad)
+  running: true
+};
+let lang = "de";
+
+/* Abgeleitete Größen (recompute()) */
+const M = { w:0, XC:0, Z:0, Ihat:0, Ueff:0, Ieff:0, UcA:0, UrA:0, Qb:0, Phat:0, PR:0, Cos:0 };
+
+function recompute(){
+  M.w   = 2*Math.PI*state.f;            // ω
+  M.XC  = 1/(M.w*state.C);              // X_C = 1/(ωC)
+  M.Z   = Math.hypot(R_FIX, M.XC);      // Z = √(R²+X_C²)
+  M.Ueff= state.Uhat/Math.SQRT2;        // U_eff der Quelle
+  M.Ihat= state.Uhat/M.Z;               // Î = Û/Z
+  M.Ieff= M.Ueff/M.Z;                   // I_eff
+  M.UcA = M.Ihat*M.XC;                  // Û_C = Î·X_C  (Anteil am Kondensator)
+  M.UrA = M.Ihat*R_FIX;                 // Û_R = Î·R    (Anteil am Widerstand → Hochpass-Ausgang)
+  M.Qb  = M.Ieff*M.Ieff*M.XC;           // Blindleistung des Kondensators
+  M.Phat= M.UcA*M.Ihat/2;               // Scheitel der Pendelleistung p_C
+  M.PR  = M.Ieff*M.Ieff*R_FIX;          // Wirkleistung am Widerstand: P = I_eff²·R
+  M.Cos = R_FIX/M.Z;                    // cos φ = R/Z = Anteil, der als Wirkleistung ankommt
+}
+
+/* Sichtbare Animationsfrequenz: folgt f logarithmisch, damit der Regler
+   über den ganzen Bereich spürbar die Drehgeschwindigkeit ändert. */
+function visFreq(){ return Math.min(12, 0.9*Math.sqrt(state.f/10)); }
+
+/* ---------- 3. Formatier-Helfer ---------- */
+function fmtNum(x, sig=3){
+  return x.toLocaleString(lang==="de"?"de-DE":"en-US",{maximumSignificantDigits:sig});
+}
+function fmtSI(v, unit, sig=3){
+  if(v===0) return "0 "+unit;
+  const a=Math.abs(v);
+  const U=[[1e9,"G"],[1e6,"M"],[1e3,"k"],[1,""],[1e-3,"m"],[1e-6,"µ"],[1e-9,"n"],[1e-12,"p"]];
+  for(const [f,p] of U) if(a>=f) return fmtNum(v/f,sig)+" "+p+unit;
+  return fmtNum(v/1e-12,sig)+" p"+unit;
+}
+function mod(n,m){ return ((n%m)+m)%m; }
+
+/* ---------- 4. Canvas-Hilfsfunktionen ---------- */
+function fit(cv){
+  const dpr=window.devicePixelRatio||1, r=cv.getBoundingClientRect();
+  const W=Math.max(1,Math.round(r.width)), H=Math.max(1,Math.round(r.height));
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){
+    cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+  }
+  const ctx=cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx,W,H};
+}
+function arrowHead(ctx,x,y,ang,len=9){
+  ctx.beginPath();
+  ctx.moveTo(x,y);
+  ctx.lineTo(x-len*Math.cos(ang-0.45), y-len*Math.sin(ang-0.45));
+  ctx.moveTo(x,y);
+  ctx.lineTo(x-len*Math.cos(ang+0.45), y-len*Math.sin(ang+0.45));
+  ctx.stroke();
+}
+
+/* ---------- 5. Hauptszene: Quelle → Kondensator → Widerstand ---------- */
+/* Design-Koordinaten 640×440, werden skaliert gezeichnet. */
+const EL = { topA:[], topB:[], bot:[], src:[], res:[] };
+for(let x=112;x<=272;x+=16) EL.topA.push(x);      // Zuleitung vor dem Kondensator
+for(let x=332;x<=508;x+=16) EL.topB.push(x);      // Zuleitung hinter dem Kondensator
+for(let x=112;x<=508;x+=16) EL.bot.push(x);       // Rückleitung
+for(let y=182;y<=244;y+=14) EL.src.push(y);       // hinter der Quelle
+for(let y=184;y<=240;y+=14) EL.res.push(y);       // durch den Widerstand
+
+function drawCircuit(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const s=Math.min(W/640,H/440);
+  ctx.save();
+  ctx.translate((W-640*s)/2,(H-440*s)/2); ctx.scale(s,s);
+
+  const sn=Math.sin(state.phi);            // Phasenlage von u_C
+  const cs=Math.cos(state.phi);            // Phasenlage von i bzw. u_R
+  const ucRatio=M.UcA/state.Uhat;          // Anteil der Spannung am Kondensator (0…1)
+  const urRatio=M.UrA/state.Uhat;          // Anteil am Widerstand = „Durchkommen" (0…1)
+
+  const PLx=280, PRx=320;                  // Kondensator: vertikale Platten
+  const pTop=132, pBot=208;                // Platten y-Bereich
+  const mid=220;                           // Mitte der Schleife (y der unteren Leitung: 250)
+  const yTop=180;                          // obere Leitung (Quelle: r=40, Mitte 220)
+
+  /* --- Leitungen (Rechteckschleife) --- */
+  ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=3; ctx.lineCap="round";
+  ctx.beginPath();
+  ctx.moveTo(100,yTop); ctx.lineTo(276,yTop);        // oben: Quelle → Kondensator
+  ctx.moveTo(324,yTop); ctx.lineTo(520,yTop);        // oben: Kondensator → Widerstand
+  ctx.moveTo(520,yTop); ctx.lineTo(520,260);         // rechts: durch den Widerstand
+  ctx.moveTo(520,260); ctx.lineTo(100,260);          // unten: Rückweg zur Quelle
+  ctx.stroke();
+
+  /* --- Elektronen: pendeln in den Leitungen, KEIN Übergang über den Spalt --- */
+  const D=22;
+  ctx.fillStyle="#79c0ff";
+  for(const x of EL.topA){ ctx.beginPath(); ctx.arc(x-sn*D, yTop, 3.4, 0, 7); ctx.fill(); }
+  for(const x of EL.topB){ ctx.beginPath(); ctx.arc(x-sn*D, yTop, 3.4, 0, 7); ctx.fill(); }
+  for(const x of EL.bot ){ ctx.beginPath(); ctx.arc(x+sn*D, 260, 3.4, 0, 7); ctx.fill(); }
+  for(const y of EL.src ){ ctx.beginPath(); ctx.arc(100, y+sn*13, 3.4, 0, 7); ctx.fill(); }
+  for(const y of EL.res ){ ctx.beginPath(); ctx.arc(520, y-sn*11, 3.4, 0, 7); ctx.fill(); }
+
+  /* --- Widerstand: Glühen ∝ u_R („Signal kommt durch") --- */
+  const glow=0.05+0.55*Math.abs(urRatio*cs);        // urRatio·cs = u_R/Û im Zeitverlauf
+  const grad=ctx.createRadialGradient(520,220,4,520,220,44);
+  grad.addColorStop(0,`rgba(240,180,41,${glow})`);
+  grad.addColorStop(1,"rgba(240,180,41,0)");
+  ctx.fillStyle=grad;
+  ctx.beginPath(); ctx.arc(520,220,44,0,7); ctx.fill();
+  ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=3;       // Zickzack des Widerstands
+  ctx.beginPath();
+  ctx.moveTo(520,188); ctx.lineTo(509,198); ctx.lineTo(531,210);
+  ctx.lineTo(509,222); ctx.lineTo(531,234); ctx.lineTo(520,244);
+  ctx.stroke();
+  ctx.font="600 13px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillStyle="#8b949e";
+  ctx.fillText(I18N[lang].rVal, 520, 284);
+  /* Status: geschluckt / teilweise / kommt durch — mit cos φ als Beleg */
+  let st=I18N[lang].stPartial, stCol="#f0b429";
+  if(urRatio<0.25){ st=I18N[lang].stBlocked; stCol="#ff6b6b"; }
+  else if(urRatio>0.75){ st=I18N[lang].stThrough; stCol="#3fb950"; }
+  ctx.font="700 13px system-ui";
+  ctx.fillStyle=stCol;
+  ctx.fillText(st+"  (cos φ = "+fmtNum(urRatio,2)+")", 520, 306);
+
+  /* --- Kondensatorplatten (vertikal, Schnitt) --- */
+  ctx.fillStyle="#c9d1d9";
+  ctx.fillRect(PLx-4, pTop, 8, pBot-pTop);
+  ctx.fillRect(PRx-4, pTop, 8, pBot-pTop);
+  ctx.fillStyle="rgba(88,166,255,0.05)";            // Dielektrikum
+  ctx.fillRect(PLx, pTop, PRx-PLx, pBot-pTop);
+
+  /* --- Ladung auf den Platten (Höhe ∝ Q = C·u_C, also auch ∝ Û und f-Verhältnis) --- */
+  const nE=Math.round(7*Math.abs(sn)*Math.min(1,ucRatio*1.15));
+  for(let k=0;k<nE;k++){
+    const y=180+(k-(nE-1)/2)*11;                    // Säule auf den Innenflächen
+    if(sn<0){ dotMinus(ctx,292,y); } else if(sn>0){ dotPlus(ctx,292,y,1-sn*0.35); }
+    if(sn>0){ dotMinus(ctx,308,y); } else if(sn<0){ dotPlus(ctx,308,y,1+sn*0.35); }
+  }
+  /* Polaritäts-Badges über den Platten */
+  ctx.font="700 20px system-ui"; ctx.textAlign="center";
+  ctx.globalAlpha=0.15+0.85*Math.abs(sn)*Math.min(1,ucRatio*1.3);
+  ctx.fillStyle="#ff6b6b";
+  ctx.fillText(sn>=0?"+":"−", PLx, 118);
+  ctx.fillStyle="#79c0ff";
+  ctx.fillText(sn>=0?"−":"+", PRx, 118);
+  ctx.globalAlpha=1;
+
+  /* --- E-Feld im Spalt: wechselt Richtung mit u_C, Stärke ∝ u_C --- */
+  const eLen=(4+22*Math.abs(sn))*(0.25+0.75*Math.min(1,ucRatio*1.3));
+  ctx.strokeStyle="#f0b429"; ctx.fillStyle="#f0b429";
+  ctx.globalAlpha=0.25+0.65*Math.abs(sn); ctx.lineWidth=2;
+  for(const y of [156,180,204]){
+    const right=sn>=0;                              // E zeigt von + nach −
+    const x1=right?288:312, x2=right?288+eLen:312-eLen;
+    ctx.beginPath(); ctx.moveTo(x1,y); ctx.lineTo(x2,y); ctx.stroke();
+    arrowHead(ctx,x2,y,right?0:Math.PI,7);
+  }
+  /* Randfeld-Bögen oben und unten */
+  ctx.setLineDash([4,4]); ctx.globalAlpha*=0.6;
+  for(const y of [pTop,pBot]){
+    const b=5+9*Math.abs(sn), dir=y<180?-1:1;
+    ctx.beginPath(); ctx.moveTo(PLx,y);
+    ctx.quadraticCurveTo(300,y+dir*b, PRx,y); ctx.stroke();
+  }
+  ctx.setLineDash([]); ctx.globalAlpha=1;
+  ctx.font="italic 600 15px system-ui"; ctx.textAlign="center";
+  ctx.fillStyle="#f0b429"; ctx.fillText("E", 300, 104);
+
+  /* --- Strompfeile i(t): Verschiebung ∝ umgeladene Ladung, Richtung = Stromrichtung --- */
+  const shift=sn*48, alpha=0.2+0.8*Math.abs(cs);
+  ctx.strokeStyle="#58a6ff"; ctx.lineWidth=2.4; ctx.globalAlpha=alpha;
+  const chev=(x,y,a)=>{
+    ctx.beginPath();
+    ctx.moveTo(x-7*Math.cos(a-0.5), y-7*Math.sin(a-0.5));
+    ctx.lineTo(x,y);
+    ctx.lineTo(x-7*Math.cos(a+0.5), y-7*Math.sin(a+0.5));
+    ctx.stroke();
+  };
+  const aPos=cs>=0;                                  // Stromrichtung bei i>0
+  for(const b of [150,236]) chev(100+mod(b+shift,176), yTop, aPos?0:Math.PI);
+  for(const b of [390,470]) chev(324+mod(b+shift,196), yTop, aPos?0:Math.PI);
+  for(const b of [200,336]) chev(520-mod(b+shift,420), 260, aPos?Math.PI:0);
+  for(const b of [200,232]) chev(520, 186+mod(b+shift,64), aPos?Math.PI/2:-Math.PI/2);
+  ctx.globalAlpha=1;
+  ctx.font="italic 600 15px system-ui"; ctx.textAlign="left";
+  ctx.fillStyle="#58a6ff"; ctx.fillText("i", 196, yTop-14);
+
+  /* --- Q-Balken unter dem Kondensator: Füllstand = Ladung auf den Platten --- */
+  const bx=372, bTop=296, bBot=396, bMid=346;
+  ctx.fillStyle="#21262d"; ctx.strokeStyle="#30363d"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect(bx-8,bTop,16,bBot-bTop,4); ctx.fill(); ctx.stroke();
+  const L=48*sn;
+  ctx.fillStyle=sn>=0?"#ff5c5c":"#58a6ff";
+  if(sn>=0) ctx.fillRect(bx-8, bMid-L, 16, L||0.5);
+  else      ctx.fillRect(bx-8, bMid,   16, -L||0.5);
+  ctx.strokeStyle="#8b949e"; ctx.beginPath(); ctx.moveTo(bx-11,bMid); ctx.lineTo(bx+11,bMid); ctx.stroke();
+  ctx.font="italic 600 15px system-ui"; ctx.textAlign="center"; ctx.fillStyle="#8b949e";
+  ctx.fillText("Q", bx, 284);
+  ctx.font="600 12px ui-monospace,monospace";
+  ctx.fillText(fmtSI(state.C*M.UcA*sn,"C",3), bx, 412);
+
+  /* --- AC-Quelle (gefüllt, Elektronen verschwinden dahinter) --- */
+  ctx.fillStyle="#0b0f14";
+  ctx.beginPath(); ctx.arc(100,220,40,0,7); ctx.fill();
+  ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=3; ctx.stroke();
+  ctx.lineWidth=2; ctx.beginPath();                       // ~-Symbol
+  for(let x=76;x<=124;x+=2){
+    const y=220-9*Math.sin((x-76)/48*2*Math.PI*1.15);
+    x===76?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.font="600 13px system-ui"; ctx.textAlign="center"; ctx.fillStyle="#8b949e";
+  ctx.fillText("AC", 100, 296);
+
+  /* --- Zeitlupen-Hinweis --- */
+  const slow=state.f/visFreq();
+  if(slow>1.02){
+    ctx.font="12px system-ui"; const txt="⏱ "+I18N[lang].slowmo+" ×"+fmtNum(slow,2);
+    const tw=ctx.measureText(txt).width+18;
+    ctx.fillStyle="#21262d"; ctx.strokeStyle="#30363d"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.roundRect(14,14,tw,24,7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#8b949e"; ctx.textAlign="left"; ctx.fillText(txt,23,31);
+  }
+  ctx.restore();
+
+  function dotMinus(c,x,y){
+    c.fillStyle="#79c0ff"; c.beginPath(); c.arc(x,y,4,0,7); c.fill();
+    c.strokeStyle="#0d1117"; c.lineWidth=1.4;
+    c.beginPath(); c.moveTo(x-2.2,y); c.lineTo(x+2.2,y); c.stroke();
+  }
+  function dotPlus(c,x,y,a){
+    c.strokeStyle="#ff6b6b"; c.lineWidth=1.6; c.globalAlpha=a;
+    c.beginPath(); c.arc(x,y,4,0,7); c.stroke();
+    c.beginPath(); c.moveTo(x-2.4,y); c.lineTo(x+2.4,y);
+    c.moveTo(x,y-2.4); c.lineTo(x,y+2.4); c.stroke();
+    c.globalAlpha=1;
+  }
+}
+
+/* ---------- 6. Zeigerdiagramm: U_C und I (I um 90° voraus, Uhrzeigersinn) ---------- */
+function drawPhasor(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const s=Math.min(W,H)/360;
+  ctx.save(); ctx.translate(W/2,H/2); ctx.scale(s,s);
+  const R=140, RU=118, RI=84;
+
+  ctx.strokeStyle="#30363d"; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke();
+  ctx.setLineDash([5,5]); ctx.strokeStyle="#3d444d";
+  ctx.beginPath(); ctx.moveTo(-R,0); ctx.lineTo(R,0); ctx.moveTo(0,-R); ctx.lineTo(0,R);
+  ctx.moveTo(0,0); ctx.lineTo(R+14,0); ctx.stroke();
+  ctx.setLineDash([]);
+
+  /* ω-Drehpfeil im Uhrzeigersinn */
+  ctx.strokeStyle="#8b949e"; ctx.fillStyle="#8b949e"; ctx.lineWidth=1.6;
+  const a1=-1.25, a2=-0.42;
+  ctx.beginPath(); ctx.arc(0,0,R+16,a1,a2); ctx.stroke();
+  arrowHead(ctx,(R+16)*Math.cos(a2),(R+16)*Math.sin(a2),a2+Math.PI/2,8);
+  ctx.font="italic 13px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText("ω",(R+30)*Math.cos((a1+a2)/2),(R+30)*Math.sin((a1+a2)/2));
+
+  const aU=state.phi, aI=state.phi+Math.PI/2;
+  for(const [len,ang,col,name] of [[RU,aU,"#ff5c5c","U_C"],[RI,aI,"#58a6ff","I"]]){
+    ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=3;
+    const tx=len*Math.cos(ang), ty=len*Math.sin(ang);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(tx,ty); ctx.stroke();
+    arrowHead(ctx,tx,ty,ang,11);
+    ctx.beginPath(); ctx.arc(tx,ty,4,0,7); ctx.fill();
+    ctx.font="italic 700 16px system-ui";
+    ctx.fillText(name, tx+22*Math.cos(ang), ty+22*Math.sin(ang));
+  }
+
+  /* 90°-Bogen von U_C nach I (im Drehsinn = Uhrzeigersinn) */
+  const rA=52;
+  ctx.strokeStyle="#8b949e"; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.arc(0,0,rA,aU,aU+Math.PI/2); ctx.stroke();
+  arrowHead(ctx,rA*Math.cos(aU+Math.PI/2),rA*Math.sin(aU+Math.PI/2),aU+Math.PI,7);
+  ctx.font="13px system-ui"; ctx.fillStyle="#8b949e";
+  ctx.fillText("90°", rA*0.62*Math.cos(aU+Math.PI/4), rA*0.62*Math.sin(aU+Math.PI/4));
+
+  ctx.restore();
+}
+
+/* ---------- 6b. Impedanzdreieck: Z aus R und X_C, mit φ und cos φ ---------- */
+function drawImp(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const s=Math.min(W,H)/360;
+  ctx.save(); ctx.translate(W/2,H/2); ctx.scale(s,s);
+
+  const phi=Math.atan2(M.XC,R_FIX);          // Verschiebungswinkel zwischen Quelle und Strom
+  const cos=Math.cos(phi), sin=Math.sin(phi);
+  const L=152;                               // Hypotenuse (Länge fest, Verhältnisse maßstäblich)
+  const O=[-L*cos/2, -L*sin/2-8],            // Ursprung (zentriert)
+        A=[O[0]+L*cos, O[1]],                // Ecke mit rechtem Winkel
+        B=[A[0], A[1]+L*sin];                // Spitze (kapazitiv: X_C zeigt nach unten)
+
+  /* Schenkel: R grün (Wirkanteil), X_C blau, Z weiß als Hypotenuse */
+  ctx.lineWidth=3; ctx.lineCap="round";
+  ctx.strokeStyle="#3fb950";
+  ctx.beginPath(); ctx.moveTo(O[0],O[1]); ctx.lineTo(A[0],A[1]); ctx.stroke();
+  ctx.strokeStyle="#58a6ff";
+  ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
+  ctx.strokeStyle="#e6edf3";
+  ctx.beginPath(); ctx.moveTo(O[0],O[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
+
+  /* rechter Winkel an Ecke A */
+  ctx.strokeStyle="#8b949e"; ctx.lineWidth=1.4;
+  ctx.strokeRect(A[0]-8, A[1], 8, 8);
+
+  /* Winkel φ mit Sektor am Ursprung */
+  ctx.fillStyle="rgba(240,180,41,0.12)";
+  ctx.beginPath(); ctx.moveTo(O[0],O[1]); ctx.arc(O[0],O[1],30,0,phi); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle="#f0b429"; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.arc(O[0],O[1],30,0,phi); ctx.stroke();
+  arrowHead(ctx,O[0]+30*cos,O[1]+30*sin,phi+Math.PI/2,7);
+  ctx.font="italic 700 14px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillStyle="#f0b429";
+  ctx.fillText("φ", O[0]+20*Math.cos(phi/2), O[1]+20*Math.sin(phi/2));
+
+  /* Beschriftung der Schenkel mit Live-Werten */
+  ctx.font="600 13px system-ui";
+  ctx.fillStyle="#3fb950";
+  ctx.fillText("R = "+fmtSI(R_FIX,"Ω",2), Math.max((O[0]+A[0])/2, O[0]+42), A[1]+16);
+  ctx.textAlign="left";
+  ctx.fillStyle="#58a6ff";
+  ctx.fillText("X_C = "+fmtSI(M.XC,"Ω",2), A[0]+10, (A[1]+B[1])/2);
+  ctx.save();                                // Z: entlang der Hypotenuse (außen links), sonst unter der Spitze
+  if(phi>0.5){
+    ctx.translate((O[0]+B[0])/2,(O[1]+B[1])/2); ctx.rotate(phi);
+    ctx.textAlign="center"; ctx.fillStyle="#e6edf3";
+    ctx.fillText("Z = "+fmtSI(M.Z,"Ω",2), 0, 14);
+  }else{
+    ctx.textAlign="center"; ctx.fillStyle="#e6edf3";
+    ctx.fillText("Z = "+fmtSI(M.Z,"Ω",2), B[0], B[1]+20);
+  }
+  ctx.restore();
+
+  /* cos φ hervorgehoben, in der Status-Farbe der Schaltung */
+  let col="#f0b429";
+  if(M.Cos<0.25) col="#ff6b6b";
+  else if(M.Cos>0.75) col="#3fb950";
+  ctx.textAlign="center";
+  ctx.font="700 15px system-ui"; ctx.fillStyle=col;
+  ctx.fillText("cos φ = R/Z = "+fmtNum(M.Cos,3), 0, 148);
+  ctx.font="11px system-ui"; ctx.fillStyle="#8b949e";
+  ctx.fillText(I18N[lang].impCosHint, 0, 166);
+
+  ctx.restore();
+}
+
+/* ---------- 7. Oszilloskop: u_C, i, p_C, u_R, p_R übereinander ---------- */
+function drawScope(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const L=46, Rp=96, Tp=24, Bp=22;
+  const plotW=W-L-Rp, laneH=(H-Tp-Bp)/5, T=1/state.f;
+  const mid=[0,1,2,3,4].map(k=>Tp+laneH*(k+0.5));
+  const amp=laneH*0.38;
+  const t2x=t=>L+t/(2*T)*plotW;
+  const ucNow=M.UcA*Math.sin(state.phi), iNow=M.Ihat*Math.cos(state.phi),
+        pNow=ucNow*iNow, urNow=M.UrA*Math.cos(state.phi), prNow=urNow*iNow;
+
+  /* Gitter + Zeitachse */
+  ctx.font="11px ui-monospace,monospace"; ctx.textAlign="center"; ctx.textBaseline="top";
+  const unit=T>=0.5?"s":T>=5e-4?"ms":"µs", mul=unit==="s"?1:unit==="ms"?1e3:1e6;
+  ctx.strokeStyle="#21262d"; ctx.lineWidth=1;
+  for(let k=0;k<=4;k++){
+    const x=L+k*plotW/4;
+    ctx.beginPath(); ctx.moveTo(x,Tp); ctx.lineTo(x,H-Bp); ctx.stroke();
+    ctx.fillStyle="#8b949e"; ctx.fillText(fmtNum(k*T/2*mul,3), x, H-Bp+6);
+  }
+  ctx.textAlign="right"; ctx.fillText(unit, W-6, H-Bp+6);
+  ctx.textBaseline="middle";
+  const lanes=[
+    {tag:"u_C", col:"#ff5c5c"},
+    {tag:"i",   col:"#58a6ff"},
+    {tag:"p_C", col:"#3fb950"},
+    {tag:"u_R", col:"#f0b429"},
+    {tag:"p_R", col:"#fb8500"}
+  ];
+  for(let k=0;k<5;k++){
+    ctx.strokeStyle="#21262d";
+    ctx.beginPath(); ctx.moveTo(L,mid[k]); ctx.lineTo(L+plotW,mid[k]); ctx.stroke();
+    ctx.setLineDash(k===2?[5,4]:[3,4]);                    // p_C-Nulllinie betont gestrichelt (Mittelwert 0)
+    ctx.strokeStyle=k===2?"#2ea043":"#484f58";
+    ctx.beginPath(); ctx.moveTo(L,mid[k]); ctx.lineTo(L+plotW,mid[k]); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font="700 13px system-ui"; ctx.textAlign="left";
+    ctx.fillStyle=lanes[k].col;
+    ctx.fillText(lanes[k].tag, 10, mid[k]);
+  }
+  /* Amplituden / Mittelwerte rechts */
+  ctx.font="11px ui-monospace,monospace"; ctx.textAlign="left";
+  const ampTxt=["Û_C = "+fmtSI(M.UcA,"V"), "Î = "+fmtSI(M.Ihat,"A"),
+                "P̂ = "+fmtSI(M.Phat,"W"), "Û_R = "+fmtSI(M.UrA,"V"),
+                "P̄_R = "+fmtSI(M.PR,"W")];
+  for(let k=0;k<5;k++){
+    ctx.fillStyle=lanes[k].col;
+    ctx.fillText(ampTxt[k], L+plotW+8, mid[k]-amp+8);
+  }
+  ctx.fillStyle="#3fb950";
+  ctx.fillText(I18N[lang].avgZero, L+plotW+8, mid[2]+amp+2);
+
+  /* Kurven: p_C grün, p_R orange, jeweils positive Anteile schattiert */
+  const curves=[
+    {fn:t=>M.UcA*Math.sin(M.w*t),                 A:M.UcA,  m:mid[0], col:"#ff5c5c"},
+    {fn:t=>M.Ihat*Math.cos(M.w*t),                A:M.Ihat, m:mid[1], col:"#58a6ff"},
+    {fn:t=>(M.UcA*M.Ihat/2)*Math.sin(2*M.w*t),    A:M.Phat, m:mid[2], col:"#3fb950", fill:"rgba(63,185,80,0.10)"},
+    {fn:t=>M.UrA*Math.cos(M.w*t),                 A:M.UrA,  m:mid[3], col:"#f0b429"},
+    {fn:t=>{const i=M.Ihat*Math.cos(M.w*t); return R_FIX*i*i;}, A:M.PR, m:mid[4], col:"#fb8500", fill:"rgba(251,133,0,0.14)"}
+  ];
+  ctx.lineWidth=2; ctx.lineJoin="round";
+  for(const c of curves){
+    if(c.fill){                                           // Energie-Pakete sichtbar machen
+      ctx.fillStyle=c.fill;
+      for(let x=0;x<=plotW;x+=2){
+        const v=c.fn(x/plotW*2*T);
+        if(v>0){ const y=c.m-v/c.A*amp; ctx.fillRect(L+x,y,2,c.m-y); }
+      }
+    }
+    ctx.strokeStyle=c.col; ctx.beginPath();
+    for(let x=0;x<=plotW;x+=2){
+      const y=c.m-c.fn(x/plotW*2*T)/c.A*amp;
+      x===0?ctx.moveTo(L+x,y):ctx.lineTo(L+x,y);
+    }
+    ctx.stroke();
+  }
+
+  /* Markierung: i = Î genau bei steigendem Nulldurchgang von u_C */
+  [0,2*T].forEach((tt,idx)=>{
+    const x=t2x(tt);
+    ctx.setLineDash([4,4]); ctx.strokeStyle="#58a6ff"; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(x,mid[0]); ctx.lineTo(x,mid[1]-amp); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle="#58a6ff"; ctx.beginPath(); ctx.arc(x,mid[1]-amp,4,0,7); ctx.fill();
+    ctx.strokeStyle="#ff5c5c"; ctx.beginPath(); ctx.arc(x,mid[0],4,0,7); ctx.stroke();
+    ctx.font="11px system-ui"; ctx.fillStyle="#58a6ff";
+    ctx.textAlign=idx===0?"left":"right";
+    ctx.fillText(I18N[lang].markIMax, idx===0?x+7:x-7, mid[1]-amp-8);
+  });
+
+  /* Zeitcursor durchs ganze Fenster (Werte ≡ aktuelle Phase) */
+  const tCur=mod(state.phi/M.w,2*T), xC=t2x(tCur);
+  ctx.strokeStyle="rgba(139,148,158,0.55)"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(xC,Tp); ctx.lineTo(xC,H-Bp); ctx.stroke();
+  const vals=[ucNow, iNow, pNow, urNow, prNow];
+  curves.forEach((c,k)=>{
+    ctx.fillStyle=c.col;
+    ctx.beginPath(); ctx.arc(xC, c.m-vals[k]/c.A*amp, 4, 0, 7); ctx.fill();
+  });
+}
+
+/* ---------- 8. Messwerte-Panel ---------- */
+const el=id=>document.getElementById(id);
+function updatePanel(){
+  el("mU").innerHTML=fmtSI(M.Ueff,"V");
+  el("mI").innerHTML=fmtSI(M.Ieff,"A");
+  el("mX").innerHTML=fmtSI(M.XC,"Ω");
+  el("mQ").innerHTML=fmtSI(M.Qb,"var");
+  el("mP").innerHTML=fmtSI(M.PR,"W");
+  el("mCos").innerHTML=fmtNum(M.Cos,3);
+  el("oC").textContent=fmtSI(state.C,"F",4);
+  el("oF").textContent=fmtSI(state.f,"Hz",4);
+  el("oV").textContent=fmtNum(state.Uhat,4)+" V";
+}
+
+/* ---------- 9. Sprachumschaltung ---------- */
+function setLang(l){
+  lang=l;
+  document.documentElement.lang=l;
+  el("btnDE").classList.toggle("active",l==="de");
+  el("btnEN").classList.toggle("active",l==="en");
+  document.querySelectorAll("[data-i18n]").forEach(n=>{
+    const v=I18N[l][n.dataset.i18n]; if(v!==undefined) n.textContent=v;
+  });
+  document.querySelectorAll("[data-i18n-html]").forEach(n=>{
+    const v=I18N[l][n.dataset.i18nHtml]; if(v!==undefined) n.innerHTML=v;
+  });
+  el("icRun").textContent=state.running?"⏸":"▶";
+  el("btnRun").lastElementChild.textContent=I18N[l][state.running?"btnStop":"btnStart"];
+  updatePanel();
+}
+el("btnDE").onclick=()=>setLang("de");
+el("btnEN").onclick=()=>setLang("en");
+
+/* ---------- 10. Steuerung ---------- */
+const sC=el("sC"), sF=el("sF"), sV=el("sV");
+function readSliders(){
+  state.C =Math.pow(10,-8+4*(sC.value/1000));   // 10 nF … 100 µF (log)
+  state.f =Math.pow(10, 1+3*(sF.value/1000));   // 10 Hz … 10 kHz (log)
+  state.Uhat=+sV.value;                          // 1 … 325 V (linear)
+  recompute(); updatePanel();
+}
+sC.oninput=sF.oninput=sV.oninput=readSliders;
+
+el("btnRun").onclick=()=>{
+  state.running=!state.running;
+  el("icRun").textContent=state.running?"⏸":"▶";
+  el("btnRun").lastElementChild.textContent=I18N[lang][state.running?"btnStop":"btnStart"];
+};
+window.addEventListener("keydown",e=>{           // Leertaste = Start/Stopp
+  if(e.code==="Space"&&!["INPUT","BUTTON","SELECT"].includes(document.activeElement.tagName)){
+    e.preventDefault(); el("btnRun").click();
+  }
+});
+
+/* ---------- 11. Hauptschleife (requestAnimationFrame, ~60 FPS) ---------- */
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(state.running) state.phi+=2*Math.PI*visFreq()*dt;
+  if(state.phi>1e7) state.phi=mod(state.phi,2*Math.PI);
+
+  drawCircuit(el("cvCircuit"));
+  drawPhasor(el("cvPhasor"));
+  drawImp(el("cvImp"));
+  drawScope(el("cvScope"));
+  updatePanel();
+  requestAnimationFrame(loop);
+}
+
+/* ---------- 12. Start ---------- */
+sC.value=500; sF.value=Math.round((Math.log10(50)-1)/3*1000); sV.value=325;
+setLang("de");
+readSliders();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

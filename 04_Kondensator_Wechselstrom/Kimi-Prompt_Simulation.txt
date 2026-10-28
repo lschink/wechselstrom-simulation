@@ -1,0 +1,45 @@
+ To resume this session: kimi -r session_2ab202a5-c0c9-4aeb-8def-b099c3f822b8
+
+
+KIMI-CODE-PROMPT – Simulation: Kondensator im Wechselstromkreis
+=============================================================
+Ziel: Eine vollständig clientseitige, eigenständige Website (eine einzelne HTML-Datei,
+Canvas-Rendering), die zeigt, wie ein Kondensator im Wechselstromkreis „widersteht"
+und die Phasenverschiebung von 90° erzeugt. GitHub-Pages-tauglich.
+
+Hauptszene
+- AC-Quelle → Kondensator (zwei parallele Platten im Schnitt): Elektronen häufen sich
+  abwechselnd auf der einen bzw. anderen Platte (Ladungspakete pendeln hin und her) –
+  verdeutliche: Es fließt kein Strom *durch* den Kondensator, Ladung wird nur
+  verschoben (Verschiebungsstrom).
+- Ladung Q auf den Platten als Balken/Füllstand, Pfeil für i(t) in der Zuleitung.
+- Umgebung des Kondensators: rotierendes E-Feld zwischen den Platten andeuten.
+
+Oszilloskop-Diagramm
+- u(t) rot, i(t) blau: Der Strom eilt der Spannung um genau 90° voraus (Maximum des
+  Stroms beim Nulldurchgang der Spannung – markieren!).
+- p(t) = u(t)·i(t) grün: pendelt gleichmäßig zwischen positiv und negativ,
+  Mittelwert = 0 → keine Wirkleistung, nur Blindleistung (gestrichelte Nulllinie).
+- Messwerte: U_eff, I_eff, X_C = 1/(ωC), Q = U_eff²·ωC.
+
+Zeigerdiagramm
+- U-Zeiger und I-Zeiger: I eilt um 90° vor (im Uhrzeigersinn voraus).
+
+Steuerung (Schieberegler, sofortige Wirkung)
+- Kapazität C (10 nF – 100 µF), Frequenz f (10 Hz – 10 kHz, logarithmisch),
+  Scheitelwert Û (1–325 V). Kernaussage sichtbar: I_eff = U_eff·ωC steigt mit f und C
+  (Gegenstück zum ohmschen Widerstand: f↑ → Strom↑).
+- Start/Stopp.
+
+Erklärbereich
+- 3–5 Absätze auf Deutsch: Warum ein Kondensator den Gleichstrom sperrt, aber
+  Wechselstrom „durchlässt" (Ladung muss sich nur ändern); Herleitung i = C·du/dt →
+  Strommaximum bei steilster Spannungsflanke → 90°-Voreilung; kapazitiver Widerstand
+  X_C = 1/(ωC) fällt mit der Frequenz; Blindleistung als hin- und herpendelnde Energie
+  (Feldenergie ½Cu²), Mittelwert der Leistung null; Praxis: Kondensatoren glätten,
+  koppeln, Kompensation.
+
+Technische Anforderungen
+- Eine einzige index.html, kein Framework, offline, ca. 60 FPS, responsiv.
+- Übersichtlich kommentierter Code; deutsches UI mit EN-Umschalter; dunkles Design
+  im gleichen Stil wie die bisherigen Simulationen.

@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Interaktive Simulation: Kennwerte der Sinusschwingung – einfaches und komplexes (Euler-) Zeigerdiagramm, Oszilloskop, T, f, ω, Û, U, u(t), φ">
+<title>Kennwerte der Sinusschwingung – Simulation</title>
+<style>
+  /* ============================================================
+     Labor-Design (dunkel) – alles in einer Datei, keine Frameworks
+     ============================================================ */
+  :root{
+    --bg:#0b1220; --panel:#101a2e; --frame:#263450;
+    --text:#dbe4f0; --muted:#8fa3c0;
+    --cyan:#22d3ee; --amber:#f5a623; --violet:#a78bfa; --green:#34d399; --rose:#fb7185;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 620px at 70% -10%, #16233f 0%, var(--bg) 55%);
+    color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh;
+  }
+  main{max-width:1240px;margin:0 auto;padding:18px clamp(12px,3vw,28px) 48px}
+
+  /* ---------- Kopfzeile ---------- */
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  h1{font-size:clamp(1.25rem,2.6vw,1.8rem);margin:0 0 4px;letter-spacing:.01em}
+  .subtitle{color:var(--muted);margin:0;font-size:.93rem;max-width:70ch}
+  .lang{display:flex;gap:6px}
+  .lang button{padding:6px 12px;font-weight:600}
+  .lang button.on{background:var(--cyan);border-color:var(--cyan);color:#04222b}
+
+  button{
+    background:transparent;border:1px solid var(--frame);color:var(--text);
+    padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.92rem;
+    transition:border-color .15s,color .15s;
+  }
+  button:hover{border-color:var(--cyan);color:var(--cyan)}
+  button.primary{border-color:var(--cyan);color:var(--cyan)}
+  button.primary:hover{background:rgba(34,211,238,.12)}
+
+  /* ---------- Hauptszene (Canvas) ---------- */
+  .scene-wrap{margin:6px 0 10px}
+  #scene{width:100%;display:block;background:var(--panel);border:1px solid var(--frame);border-radius:12px}
+
+  /* ---------- Legende ---------- */
+  .legend{display:flex;flex-wrap:wrap;gap:8px 20px;color:var(--muted);font-size:.82rem;margin:4px 2px 14px}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .sw{width:18px;height:4px;border-radius:2px;display:inline-block}
+  .sw.dash{background:repeating-linear-gradient(90deg,#8fa3c0 0 4px,transparent 4px 8px)}
+
+  /* ---------- Kenngrößen-Kacheln ---------- */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin:4px 0 12px}
+  .tile{background:var(--panel);border:1px solid var(--frame);border-radius:10px;padding:10px 12px}
+  .t-label{font-size:.76rem;color:var(--muted);letter-spacing:.03em;margin-bottom:3px;white-space:nowrap}
+  .t-value{font-size:1.22rem;font-weight:650;font-variant-numeric:tabular-nums;color:var(--cyan)}
+
+  /* ---------- Formelleiste ---------- */
+  .formula{
+    background:var(--panel);border:1px solid var(--frame);border-radius:10px;
+    padding:12px 14px;text-align:center;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:clamp(.8rem,2.2vw,1rem);color:var(--text);
+    white-space:pre-wrap;margin:0 0 16px;line-height:1.8;
+  }
+
+  /* ---------- Steuerung ---------- */
+  .controls{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:16px;background:var(--panel);border:1px solid var(--frame);
+    border-radius:12px;padding:16px;margin-bottom:16px;
+  }
+  .ctl{display:flex;flex-direction:column;gap:8px}
+  .ctl-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .ctl-head label{font-size:.88rem;color:var(--muted)}
+  .ctl-head output{font-variant-numeric:tabular-nums;font-weight:650;color:var(--amber);font-size:.95rem;white-space:nowrap}
+  input[type=range]{width:100%;accent-color:var(--cyan);cursor:pointer}
+  .btn-row{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .hint{color:var(--muted);font-size:.82rem;margin-left:auto}
+
+  /* ---------- Erklärbereich ---------- */
+  .explain{background:var(--panel);border:1px solid var(--frame);border-radius:12px;padding:16px 20px}
+  .explain h2{margin:0 0 10px;font-size:1.1rem}
+  .explain p{max-width:78ch;line-height:1.65;margin:0 0 12px;color:#c7d3e4;font-size:.95rem}
+  .explain p:last-child{margin-bottom:0}
+
+  footer{color:var(--muted);font-size:.78rem;text-align:center;margin-top:22px}
+
+  @media (max-width:600px){
+    .hint{margin-left:0;width:100%}
+    .t-value{font-size:1.05rem}
+  }
+</style>
+</head>
+<body>
+<main>
+  <!-- ================= Kopfzeile ================= -->
+  <div class="topbar">
+    <div>
+      <h1 data-i18n="app.title">Kennwerte der Sinusschwingung</h1>
+      <p class="subtitle" data-i18n="app.subtitle">Interaktive Simulation: einfaches und komplexes (Euler-) Zeigerdiagramm mit Oszillogramm einer sinusförmigen Wechselspannung</p>
+    </div>
+    <div class="lang">
+      <button id="btnDE" class="on">DE</button>
+      <button id="btnEN">EN</button>
+    </div>
+  </div>
+
+  <!-- ================= Hauptszene ================= -->
+  <div class="scene-wrap"><canvas id="scene"></canvas></div>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--amber)"></i><span data-i18n="leg.phi">Einfacher Zeiger &amp; Projektion</span></span>
+    <span><i class="sw" style="background:var(--green)"></i><span data-i18n="leg.cplx">Komplexer Zeiger (Euler)</span></span>
+    <span><i class="sw" style="background:var(--cyan)"></i><span data-i18n="leg.uim">Spannung u(t) = Re{û}</span></span>
+    <span><i class="sw" style="background:var(--rose)"></i><span data-i18n="leg.ure">Imaginärteil Im{û}</span></span>
+    <span><i class="sw" style="background:var(--violet)"></i><span data-i18n="leg.u">Effektivwert</span></span>
+    <span><i class="sw dash"></i><span data-i18n="leg.uhat">Scheitelwerte</span></span>
+    <span><i class="sw" style="background:#64748b"></i><span data-i18n="leg.t">Periodendauer T</span></span>
+  </div>
+
+  <!-- ================= Physik-Anzeige ================= -->
+  <div class="tiles">
+    <div class="tile"><div class="t-label" data-i18n="tile.t">Periodendauer T</div><div class="t-value" id="vT">–</div></div>
+    <div class="tile"><div class="t-label" data-i18n="tile.f">Frequenz f</div><div class="t-value" id="vF">–</div></div>
+    <div class="tile"><div class="t-label" data-i18n="tile.om">Kreisfrequenz ω</div><div class="t-value" id="vOm">–</div></div>
+    <div class="tile"><div class="t-label" data-i18n="tile.uhat">Scheitelwert Û</div><div class="t-value" id="vUh">–</div></div>
+    <div class="tile"><div class="t-label" data-i18n="tile.ueff">Effektivwert U</div><div class="t-value" id="vUe">–</div></div>
+    <div class="tile"><div class="t-label" data-i18n="tile.ut">Momentanwert u(t)</div><div class="t-value" id="vUt">–</div></div>
+    <div class="tile"><div class="t-label" data-i18n="tile.phi">Nullphasenwinkel φ</div><div class="t-value" id="vPh">–</div></div>
+  </div>
+
+  <!-- ================= Formelleiste ================= -->
+  <div class="formula" data-i18n="formula.bar">Einfaches Zeigerdiagramm:  u(t) = Û · sin(ωt + φ)
+
+Komplexes Zeigerdiagramm (Euler):  û(t) = Û · e^( j(ωt + φ − 90°) )   →   u(t) = Re{û} = Û · sin(ωt + φ) ,   Im{û} = −Û · cos(ωt + φ)
+
+U = Û/√2 ≈ 0,707 · Û      ω = 2πf      f = 1/T</div>
+
+  <!-- ================= Steuerung ================= -->
+  <div class="controls">
+    <div class="ctl">
+      <div class="ctl-head"><label for="inU" data-i18n="ctl.uhat">Scheitelwert Û</label><output id="outU">230 V</output></div>
+      <input type="range" id="inU" min="1" max="400" step="1" value="230">
+    </div>
+    <div class="ctl">
+      <div class="ctl-head"><label for="inF" data-i18n="ctl.freq">Frequenz f (log.)</label><output id="outF">50,0 Hz</output></div>
+      <input type="range" id="inF" min="0" max="1" step="0.0005" value="0.8997">
+    </div>
+    <div class="ctl">
+      <div class="ctl-head"><label for="inP" data-i18n="ctl.phi">Nullphasenwinkel φ</label><output id="outP">0°</output></div>
+      <input type="range" id="inP" min="-180" max="180" step="1" value="0">
+    </div>
+    <div class="btn-row">
+      <button id="btnRun" class="primary" data-i18n="ctl.stop">Stopp</button>
+      <button id="btnReset" data-i18n="ctl.reset">Reset (φ = 0, t = 0)</button>
+      <span class="hint" data-i18n="ctl.hint">Tipp: „Stopp“ friert die Zeit ein – alle Werte bleiben ablesbar.</span>
+    </div>
+  </div>
+
+  <!-- ================= Erklärbereich ================= -->
+  <section class="explain">
+    <h2 data-i18n="exp.title">Erklärung</h2>
+    <p data-i18n="exp.p1"></p>
+    <p data-i18n="exp.p2"></p>
+    <p data-i18n="exp.p3"></p>
+    <p data-i18n="exp.p4"></p>
+    <p data-i18n="exp.p5"></p>
+  </section>
+
+  <footer data-i18n="foot.note">Offline-fähig · Eine einzige HTML-Datei · Keine externen Bibliotheken</footer>
+</main>
+
+<script>
+"use strict";
+
+/* ================================================================
+   1) Internationalisierung (Dictionary, data-i18n im Markup)
+   ================================================================ */
+const I18N = {
+  de: {
+    "app.title": "Kennwerte der Sinusschwingung",
+    "app.subtitle": "Interaktive Simulation: einfaches und komplexes (Euler-) Zeigerdiagramm mit Oszillogramm einer sinusförmigen Wechselspannung",
+    "leg.phi": "Einfacher Zeiger & Projektion", "leg.cplx": "Komplexer Zeiger (Euler)",
+    "leg.uim": "Spannung u(t) = Re{û}", "leg.ure": "Imaginärteil Im{û}", "leg.u": "Effektivwert",
+    "leg.uhat": "Scheitelwerte", "leg.t": "Periodendauer T",
+    "tile.t": "Periodendauer T", "tile.f": "Frequenz f", "tile.om": "Kreisfrequenz ω",
+    "tile.uhat": "Scheitelwert Û", "tile.ueff": "Effektivwert U",
+    "tile.ut": "Momentanwert u(t)", "tile.phi": "Nullphasenwinkel φ",
+    "formula.bar": "Einfaches Zeigerdiagramm:  u(t) = Û · sin(ωt + φ)\n\nKomplexes Zeigerdiagramm (Euler):  û(t) = Û · e^( j(ωt + φ − 90°) )   →   u(t) = Re{û} = Û · sin(ωt + φ) ,   Im{û} = −Û · cos(ωt + φ)\n\nU = Û/√2 ≈ 0,707 · Û      ω = 2πf      f = 1/T",
+    "ctl.uhat": "Scheitelwert Û", "ctl.freq": "Frequenz f (log.)", "ctl.phi": "Nullphasenwinkel φ",
+    "ctl.start": "Start", "ctl.stop": "Stopp", "ctl.reset": "Reset (φ = 0, t = 0)",
+    "ctl.hint": "Tipp: „Stopp“ friert die Zeit ein – alle Werte bleiben ablesbar.",
+    "exp.title": "Erklärung",
+    "exp.p1": "Der Momentanwert u(t) ist der Spannungswert, den die Wechselspannung zu einem bestimmten Zeitpunkt annimmt – der Wert, den ein ideales Messgerät gerade jetzt anzeigen würde. Im einfachen Zeigerdiagramm (links) entsteht er als senkrechte Projektion des rotierenden Zeigers der Länge Û: Der Zeiger dreht sich mit konstanter Winkelgeschwindigkeit ω, und sein Höhenwert auf der y-Achse ist genau u(t) = Û·sin(ωt + φ).",
+    "exp.p2": "Das komplexe Zeigerdiagramm (Mitte) beschreibt denselben Vorgang mit der Eulerschen Formel in der Gaußschen Zahlenebene: Die x-Achse ist der Realteil, die y-Achse der Imaginärteil. Der erzeugte Wert wird auf der REELLEN Achse abgelesen; dazu wird der Sinus als um 90° verschobener Kosinus geschrieben (sin x = cos(x − 90°)): û(t) = Û·e^(j(ωt+φ−90°)). Der Zeiger dreht sich mathematisch positiv (gegen den Uhrzeigersinn) mit der Winkelgeschwindigkeit ω. Sein Realteil (cyan) ist die Spannung u(t) = Re{û} = Û·sin(ωt+φ) – er ist null, sobald der Zeiger die imaginäre Achse überquert („0 V erzeugt“). Der Imaginärteil (rose) beträgt −Û·cos(ωt+φ). Über der Zahlenebene hängt ein um 90° gedrehtes Oszilloskop: Die Zeit läuft darin nach unten, der Wert wird waagrecht als Abstand von der Mitte (der Im-Achse) aufgetragen – die gestrichelte cyan-Linie verbindet den aktuellen Punkt mit der Zeigerspitze û und kreuzt dabei den Re{û}-Punkt auf der reellen Achse.",
+    "exp.p3": "Die Periodendauer T ist die Zeit für eine volle Umdrehung (360° bzw. 2π); danach wiederholt sich die Kurve exakt. Die Frequenz f gibt die Perioden pro Sekunde an: f = 1/T. Die Kreisfrequenz ω = 2πf = 2π/T beschreibt denselben Vorgang im Bogenmaß – wie viele Radiant der Zeiger pro Sekunde zurücklegt.",
+    "exp.p4": "Über den Effektivwert vergleicht man Wechselgrößen mit Gleichgrößen: An einem ohmschen Widerstand erwärmt die Wechselspannung genau dann wie eine Gleichspannung der Größe U, wenn U der Effektivwert ist. Mathematisch ist U der quadratische Mittelwert über eine Periode: Weil sin² (und cos²) im Mittel 1/2 beträgt, gilt U = Û/√2 ≈ 0,707·Û. Bei der Netzspannung 230 V beträgt Û also etwa 325 V.",
+    "exp.p5": "Der Nullphasenwinkel φ legt die Zeigerstellung bei t = 0 fest – er verschiebt das gesamte Signal in der Zeit, ohne Form oder Größe zu ändern. φ > 0 bedeutet, das Signal beginnt früher (Kurve nach links verschoben); im komplexen Diagramm startet der Zeiger um φ gegenüber der reellen Achse verdreht. Vergleicht man zwei Signale – etwa Strom und Spannung an einer Spule –, treten unterschiedliche Nullphasenwinkel als Phasenverschiebung in Erscheinung; das ist die Grundlage der Leistungsbetrachtung im Wechselstromkreis.",
+    "foot.note": "Offline-fähig · Eine einzige HTML-Datei · Keine externen Bibliotheken"
+  },
+  en: {
+    "app.title": "Parameters of the Sine Wave",
+    "app.subtitle": "Interactive simulation: simple and complex (Euler) phasor diagram with the oscilloscope trace of a sinusoidal AC voltage",
+    "leg.phi": "Simple pointer & projection", "leg.cplx": "Complex pointer (Euler)",
+    "leg.uim": "Voltage u(t) = Re{û}", "leg.ure": "Imaginary part Im{û}", "leg.u": "RMS value",
+    "leg.uhat": "Peak values", "leg.t": "Period T",
+    "tile.t": "Period T", "tile.f": "Frequency f", "tile.om": "Angular frequency ω",
+    "tile.uhat": "Peak value Û", "tile.ueff": "RMS value U",
+    "tile.ut": "Instantaneous value u(t)", "tile.phi": "Initial phase angle φ",
+    "formula.bar": "Simple phasor diagram:  u(t) = Û · sin(ωt + φ)\n\nComplex phasor diagram (Euler):  û(t) = Û · e^( j(ωt + φ − 90°) )   →   u(t) = Re{û} = Û · sin(ωt + φ) ,   Im{û} = −Û · cos(ωt + φ)\n\nU = Û/√2 ≈ 0.707 · Û      ω = 2πf      f = 1/T",
+    "ctl.uhat": "Peak value Û", "ctl.freq": "Frequency f (log.)", "ctl.phi": "Initial phase angle φ",
+    "ctl.start": "Start", "ctl.stop": "Stop", "ctl.reset": "Reset (φ = 0, t = 0)",
+    "ctl.hint": "Tip: “Stop” freezes time – all values remain readable.",
+    "exp.title": "Explanation",
+    "exp.p1": "The instantaneous value u(t) is the voltage the AC waveform has at a given moment – the value an ideal meter would show right now. In the simple phasor diagram (left) it appears as the vertical projection of the rotating pointer of length Û: the pointer rotates at constant angular velocity ω, and its height on the y-axis is exactly u(t) = Û·sin(ωt + φ).",
+    "exp.p2": "The complex phasor diagram (centre) describes the same process using Euler's formula in the Gaussian plane: the x-axis is the real part, the y-axis the imaginary part. The generated value is read on the REAL axis; to achieve this, the sine is written as a cosine shifted by 90° (sin x = cos(x − 90°)): û(t) = Û·e^(j(ωt+φ−90°)). The pointer rotates counter-clockwise at angular velocity ω. Its real part (cyan) is the voltage u(t) = Re{û} = Û·sin(ωt+φ) – it is zero whenever the pointer crosses the imaginary axis (“0 V generated”). The imaginary part (rose) is −Û·cos(ωt+φ). Above the plane hangs a 90°-rotated oscilloscope: time runs downward, the value is plotted horizontally as the distance from the centre (the imaginary axis) – the dashed cyan line connects the current point to the pointer tip û, crossing the Re{û} point on the real axis.",
+    "exp.p3": "The period T is the time for one full revolution (360° or 2π); afterwards the curve repeats exactly. The frequency f states how many periods pass per second: f = 1/T. The angular frequency ω = 2πf = 2π/T describes the same process in radians per second.",
+    "exp.p4": "The RMS (effective) value compares AC quantities with DC quantities: an AC voltage heats an ohmic resistor exactly like a DC voltage of value U if U is the RMS value. Mathematically, U is the root mean square over one period: since sin² (and cos²) averages to 1/2, U = Û/√2 ≈ 0.707·Û. For the 230 V mains, Û is therefore about 325 V.",
+    "exp.p5": "The initial phase angle φ sets the pointer position at t = 0 – it shifts the whole signal in time without changing its shape or size. φ > 0 means the signal starts earlier (curve shifted to the left); in the complex diagram the pointer starts rotated by φ from the real axis. Whenever two signals are compared – e.g. current and voltage across an inductor – their different initial phases appear as a phase shift; this is the basis of power analysis in AC circuits.",
+    "foot.note": "Offline-capable · A single HTML file · No external libraries"
+  }
+};
+
+/* Texte, die direkt auf dem Canvas gezeichnet werden */
+const CV = {
+  de: { phase: "ωt + φ", phase2: "ωt + φ − 90°", frozen: "● GESTOPPT", im: "Im", re: "Re", t: "t",
+        labS: "Diagramm 1: sin", labC: "Diagramm 2: Euler", labO: "Oszilloskop",
+        labV: "Oszilloskop 2 (90° gedreht)" },
+  en: { phase: "ωt + φ", phase2: "ωt + φ − 90°", frozen: "● PAUSED", im: "Im", re: "Re", t: "t",
+        labS: "Diagram 1: sin", labC: "Diagram 2: Euler", labO: "Oscilloscope",
+        labV: "Oscilloscope 2 (rotated 90°)" }
+};
+
+/* ================================================================
+   2) Zustand der Simulation
+   ================================================================ */
+const S = {
+  lang: "de",
+  running: true,
+  Uhat: 230,          // Scheitelwert in V
+  f: 50,              // Frequenz in Hz
+  phi: 0,             // Nullphasenwinkel in rad
+  t: 0                // Simulationszeit in s
+};
+
+const locale = () => (S.lang === "de" ? "de-DE" : "en-GB");
+
+/* Zahlenformatierung passend zur Sprache (Dezimalkomma / -punkt) */
+function fmt(v, digits = 1) {
+  return v.toLocaleString(locale(), { minimumFractionDigits: 0, maximumFractionDigits: digits });
+}
+function fmtT(T) {                       // Periodendauer mit sinnvoller Einheit
+  if (T >= 1)    return fmt(T, 2) + " s";
+  if (T >= 1e-3) return fmt(T * 1e3, 1) + " ms";
+  return fmt(T * 1e6, 0) + " µs";
+}
+function fmtF(f) { return fmt(f, f < 10 ? 2 : 1) + " Hz"; }
+
+/* ================================================================
+   3) Canvas, Layout (responsiv: 3 Spalten / gestapelt)
+   ================================================================ */
+const canvas = document.getElementById("scene");
+const ctx = canvas.getContext("2d");
+let dpr = 1, W = 0, H = 0;
+const L = {};                            // geometrisches Layout
+
+const COL = {
+  frame: "#2b3a55", grid: "rgba(148,163,184,0.13)", gridStrong: "rgba(148,163,184,0.32)",
+  axis: "#8fa3c0", text: "#dbe4f0", muted: "#8fa3c0",
+  amber: "#f5a623", green: "#34d399", cyan: "#22d3ee", violet: "#a78bfa", rose: "#fb7185"
+};
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth;
+  const side = w >= 940;                 // Desktop: drei Spalten, Mobil: gestapelt
+  const h = side
+    ? Math.max(480, Math.min(680, w * 0.55))
+    : 7.3 * Math.min(w * 0.30, 150) + 244;   // 3 gestapelte Zeilen + vertikales Oszilloskop
+  canvas.style.height = h + "px";
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  W = w; H = h;
+
+  const R = side ? Math.min(H * 0.30, W * 0.115)      // Zeigerradius in px
+                 : Math.min(W * 0.30, 150);
+  L.R = R;
+
+  if (side) {
+    // Desktop: einfacher Zeiger | [vertikales Osz.] komplexer Zeiger | Oszilloskop
+    L.mode = "side";
+    L.yMid = H * 0.52;
+    L.s1 = { cx: W * 0.155, cy: L.yMid };
+    L.s2 = { cx: W * 0.415, cy: L.yMid };
+    L.sx0 = W * 0.615; L.sx1 = W * 0.985;
+  } else {
+    // Mobil: untereinander gestapelt
+    L.mode = "stack";
+    L.s1 = { cx: W * 0.50, cy: R + 56 };
+    L.s2 = { cx: W * 0.50, cy: 4.3 * R + 134 };
+    L.yMid = L.s2.cy + 2 * R + 58;
+    L.sx0 = W * 0.05; L.sx1 = W * 0.97;
+  }
+  // Oszilloskop-Gehäuse: ±Û-Linien, Beschriftung und T-Bügel brauchen Rand
+  L.syT = L.yMid - R - 32;
+  L.syB = L.yMid + R + 42;
+  // Vertikales Oszilloskop (90° gedreht) über Diagramm 2:
+  // gleiche Mittellinie wie Diagramm 2, Wertachse waagrecht bündig zur Re-Achse
+  const vc = L.s2.cx, vHalf = R + 26;
+  L.v = {
+    cx: vc, x0: vc - vHalf, x1: vc + vHalf,
+    yT: side ? 24 : 2 * R + 90,
+    yB: side ? L.s2.cy - R - 44 : 3.3 * R + 90
+  };
+}
+window.addEventListener("resize", resize);
+
+/* Pfeil zeichnen (Linie + ausgefüllte Spitze) */
+function arrow(x1, y1, x2, y2, color, width = 1.5) {
+  ctx.strokeStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  const a = Math.atan2(y2 - y1, x2 - x1), hs = 7;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - hs * Math.cos(a - 0.42), y2 - hs * Math.sin(a - 0.42));
+  ctx.lineTo(x2 - hs * Math.cos(a + 0.42), y2 - hs * Math.sin(a + 0.42));
+  ctx.closePath();
+  ctx.fillStyle = color; ctx.fill();
+}
+
+/* ================================================================
+   4) Zeichnen der Hauptszene
+      - Diagramm 1: einfaches sin-Zeigerdiagramm
+      - Diagramm 2: komplexes Diagramm nach Euler (Re/Im-Ebene)
+      - Oszilloskop: Im- und Realteil als laufende Kurven
+   ================================================================ */
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const T = 1 / S.f, om = 2 * Math.PI * S.f, Ue = S.Uhat / Math.SQRT2;
+  const R = L.R, yMid = L.yMid;
+  const sc = R / S.Uhat;                        // px pro Volt (alle Diagramme)
+  const yOf = v => yMid - v * sc;               // Spannung → y-Koordinate
+  const th = om * S.t + S.phi;                  // Gesamtphase ωt + φ
+  const uIm = S.Uhat * Math.sin(th);            // Imaginärteil = u(t)
+  const uRe = S.Uhat * Math.cos(th);            // Realteil
+  const cv = CV[S.lang];
+  const fs = Math.max(11, Math.min(15, W * 0.0115));
+  ctx.font = fs + 'px system-ui, sans-serif';
+
+  /* ---------- Zeitfenster des Oszilloskops (≈ 3,2 Perioden) ---------- */
+  const NPER = 3.2, FX = 0.75;
+  const Wt = NPER * T;
+  const tS = S.t - FX * Wt, tE = S.t + (1 - FX) * Wt;
+  const xOf = tau => L.sx0 + (tau - tS) / Wt * (L.sx1 - L.sx0);
+  const px = xOf(S.t), pyIm = yOf(uIm), pyRe = yOf(uRe);
+
+  /* ==================== Diagramm 1: einfacher Zeiger ==================== */
+  {
+    const { cx, cy } = L.s1;
+    ctx.fillStyle = COL.muted; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText(cv.labS, cx, Math.max(14, cy - R - 34));
+
+    arrow(cx - R - 24, cy, cx + R + 24, cy, COL.axis);        // x-Achse
+    arrow(cx, cy + R + 24, cx, cy - R - 24, COL.axis);        // y-Achse (nach oben)
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+    ctx.strokeStyle = COL.gridStrong; ctx.lineWidth = 1.5;
+    ctx.setLineDash([]); ctx.stroke();
+
+    const tipX = cx + R * Math.cos(th), tipY = cy - R * Math.sin(th);
+
+    // Winkelbogen 0 → ωt+φ mit Beschriftung
+    const thN = ((th % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    if (thN > 0.05) {
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.42, 0, -thN, true);
+      ctx.strokeStyle = COL.amber; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    const midA = thN / 2, lr = R * 0.42 + 16;
+    ctx.fillStyle = COL.amber; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (thN > 0.3)   // Beschriftung weglassen, wenn sie den Zeiger überlagern würde
+      ctx.fillText(cv.phase, cx + lr * Math.cos(midA), cy - lr * Math.sin(midA));
+
+    // Zeiger mit Pfeilspitze + Beschriftung Û
+    arrow(cx, cy, tipX, tipY, COL.amber, 2.5);
+    ctx.fillStyle = COL.text;
+    ctx.fillText("Û", tipX + 16 * Math.cos(th), tipY - 16 * Math.sin(th));
+
+    // Projektion: gestrichelt vom Zeigerende zur y-Achse, Punkt auf der Achse
+    ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.lineTo(cx, tipY);
+    ctx.setLineDash([5, 5]); ctx.strokeStyle = COL.amber; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(cx, tipY, 4, 0, 2 * Math.PI);
+    ctx.fillStyle = COL.amber; ctx.fill();
+
+    // Verbindung vom Projektionspunkt zum Messpunkt der Kurve
+    ctx.beginPath();
+    ctx.moveTo(cx, tipY); ctx.lineTo(px, tipY); ctx.lineTo(px, pyIm);
+    ctx.setLineDash([6, 5]); ctx.strokeStyle = COL.cyan; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  /* ============ Vertikales Oszilloskop über Diagramm 2 (90° gedreht) ============
+     Wertachse waagrecht (= Re{û}, bündig mit der Re-Achse darunter),
+     Zeitachse senkrecht, laufend nach unten – der aktuelle Punkt sitzt
+     an der unteren Kante und wird gestrichelt mit û verbunden. */
+  {
+    const v = L.v;
+    ctx.fillStyle = "rgba(255,255,255,0.02)";
+    ctx.fillRect(v.x0, v.yT, v.x1 - v.x0, v.yB - v.yT);
+    ctx.strokeStyle = COL.frame; ctx.lineWidth = 1.5;
+    ctx.strokeRect(v.x0, v.yT, v.x1 - v.x0, v.yB - v.yT);
+
+    // Überschriften im Gehäuse
+    ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.fillText(cv.labV, v.x0 + 7, v.yT + 16);
+    ctx.fillText(cv.labC, v.x0 + 7, v.yB - 8);
+
+    // Zeitpfeil (läuft nach unten) rechts innen
+    arrow(v.x1 - 12, v.yT + 14, v.x1 - 12, v.yT + 36, COL.muted, 1.2);
+    ctx.textAlign = "right"; ctx.fillText(cv.t, v.x1 - 18, v.yT + 30);
+
+    // Vertikale Wertlinien: 0 (= Im-Achse), ±Û/2 (Gitter), ±U, ±Û (gestrichelt)
+    const xOfV = val => v.cx + val * sc;
+    ctx.strokeStyle = COL.gridStrong; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xOfV(0), v.yT); ctx.lineTo(xOfV(0), v.yB); ctx.stroke();
+    ctx.strokeStyle = COL.grid;
+    for (const val of [-S.Uhat / 2, S.Uhat / 2]) {
+      ctx.beginPath(); ctx.moveTo(xOfV(val), v.yT); ctx.lineTo(xOfV(val), v.yB); ctx.stroke();
+    }
+    ctx.setLineDash([6, 5]); ctx.strokeStyle = COL.axis; ctx.lineWidth = 1.2;
+    for (const val of [S.Uhat, -S.Uhat]) {
+      ctx.beginPath(); ctx.moveTo(xOfV(val), v.yT); ctx.lineTo(xOfV(val), v.yB); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.strokeStyle = COL.violet; ctx.lineWidth = 1.4;
+    for (const val of [Ue, -Ue]) {
+      ctx.beginPath(); ctx.moveTo(xOfV(val), v.yT); ctx.lineTo(xOfV(val), v.yB); ctx.stroke();
+    }
+
+    // Kurve u(τ): Zeit läuft nach unten, aktueller Punkt an der unteren Kante
+    const Tv = 2 * T;
+    ctx.beginPath();
+    ctx.strokeStyle = COL.cyan; ctx.lineWidth = 2; ctx.setLineDash([]);
+    const vsteps = Math.max(40, Math.floor((v.yB - v.yT) / 2));
+    for (let i = 0; i <= vsteps; i++) {
+      const yy = v.yT + (i / vsteps) * (v.yB - v.yT);
+      const tau = S.t - Tv * (1 - i / vsteps);
+      const xx = xOfV(S.Uhat * Math.sin(om * tau + S.phi));
+      i === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+
+    // Beschriftung der Scheitelwert-Linien unterhalb des Gehäuses
+    // (bündig mit den ±Û-Stellen der Re-Achse in Diagramm 2)
+    ctx.fillStyle = COL.axis; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText("Û",  xOfV(S.Uhat),  v.yB + 14);
+    ctx.fillText("−Û", xOfV(-S.Uhat), v.yB + 14);
+  }
+
+  /* ==================== Diagramm 2: komplexer Zeiger (Euler) ==================== */
+  {
+    const { cx, cy } = L.s2;
+
+    // Achsen: x = Realteil, y = Imaginärteil (Pfeile jeweils in beide Richtungen)
+    arrow(cx - R - 24, cy, cx + R + 24, cy, COL.axis);        // Re-Achse
+    arrow(cx + R + 24, cy, cx - R - 24, cy, COL.axis);
+    arrow(cx, cy + R + 24, cx, cy - R - 24, COL.axis);        // Im-Achse
+    arrow(cx, cy - R - 24, cx, cy + R + 24, COL.axis);
+
+    // Einheitskreis (Bahn der Zeigerspitze) als gestrichelter Kreis
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+    ctx.strokeStyle = "rgba(52,211,153,0.45)"; ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 5]); ctx.stroke(); ctx.setLineDash([]);
+
+    // Komplexer Zeiger: û(t) = Û·e^(j(ωt+φ−90°))
+    // → Re{û} = Û·cos(ωt+φ−90°) = Û·sin(ωt+φ) = u(t)
+    // Der erzeugte Wert (Spannung) wird auf der REELLEN Achse (X) abgelesen;
+    // er ist genau dann 0, wenn der Zeiger die IMAGINÄRE Achse überquert.
+    const al = th - Math.PI / 2;                 // Zeigerwinkel α = ωt+φ−90°
+    const tipX = cx + R * Math.cos(al), tipY = cy - R * Math.sin(al);
+
+    // Winkelbogen von der reellen Achse bis zum Zeiger (mathematisch positiv = CCW)
+    const alN = ((al % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    if (alN > 0.05) {
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.34, 0, -alN, true);
+      ctx.strokeStyle = COL.green; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    ctx.fillStyle = COL.green; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (alN > 0.35) {
+      const midA = alN / 2, lr = R * 0.34 + 15;
+      ctx.fillText(cv.phase2, cx + lr * Math.cos(midA), cy - lr * Math.sin(midA));
+    }
+
+    // Komplexer Zeiger û(t)
+    arrow(cx, cy, tipX, tipY, COL.green, 2.5);
+    ctx.fillStyle = COL.text;
+    ctx.fillText("û", tipX + 15 * Math.cos(al), tipY - 15 * Math.sin(al));
+
+    // Projektionen: Realteil auf der X-Achse (cyan = erzeugte Spannung),
+    // Imaginärteil auf der Y-Achse (rose)
+    ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.lineTo(tipX, cy);
+    ctx.strokeStyle = COL.cyan; ctx.stroke();                       // senkrecht zur Re-Achse
+    ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.lineTo(cx, tipY);
+    ctx.strokeStyle = COL.rose; ctx.stroke();                       // waagrecht zur Im-Achse
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(tipX, cy, 4, 0, 2 * Math.PI);
+    ctx.fillStyle = COL.cyan; ctx.fill();                           // u(t)-Punkt auf der Re-Achse
+    ctx.beginPath(); ctx.arc(cx, tipY, 4, 0, 2 * Math.PI);
+    ctx.fillStyle = COL.rose; ctx.fill();                           // Im-Punkt
+
+    // Achsenbeschriftungen Re / Im
+    ctx.fillStyle = COL.muted; ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";  ctx.fillText(cv.re, cx + R + 28, cy - 6);
+    ctx.textAlign = "right"; ctx.fillText(cv.im, cx - 8, cy - R - 10);
+
+    // Gestrichelte Verbindung vom vertikalen Oszilloskop zur Zeigerspitze û;
+    // sie verläuft exakt durch den Re{û}-Punkt (cyan) auf der reellen Achse
+    ctx.beginPath();
+    ctx.moveTo(tipX, L.v.yB); ctx.lineTo(tipX, tipY);
+    ctx.setLineDash([6, 5]); ctx.strokeStyle = COL.cyan; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.setLineDash([]);
+    // Messpunkt an der unteren Kante des vertikalen Oszilloskops
+    ctx.beginPath(); ctx.arc(tipX, L.v.yB, 4.5, 0, 2 * Math.PI);
+    ctx.fillStyle = COL.cyan; ctx.fill();
+    ctx.lineWidth = 1.8; ctx.strokeStyle = "#ffffff"; ctx.stroke();
+  }
+
+  /* ==================== Oszilloskop ==================== */
+  // Gehäuse
+  ctx.fillStyle = "rgba(255,255,255,0.02)";
+  ctx.fillRect(L.sx0, L.syT, L.sx1 - L.sx0, L.syB - L.syT);
+  ctx.strokeStyle = COL.frame; ctx.lineWidth = 1.5;
+  ctx.strokeRect(L.sx0, L.syT, L.sx1 - L.sx0, L.syB - L.syT);
+  ctx.fillStyle = COL.muted; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText(cv.labO, L.sx0 + 7, L.syT + 16);
+
+  // Vertikale Gitterlinien bei den Nullstellen mit gleicher (positiver) Steigung:
+  // ωt + φ = 2πk  →  die horizontale Distanz zweier Linien ist genau T.
+  const k0 = Math.ceil((om * tS + S.phi) / (2 * Math.PI));
+  const k1 = Math.floor((om * tE + S.phi) / (2 * Math.PI));
+  ctx.strokeStyle = COL.grid; ctx.lineWidth = 1;
+  for (let k = k0; k <= k1; k++) {
+    const x = xOf((2 * Math.PI * k - S.phi) / om);
+    ctx.beginPath(); ctx.moveTo(x, L.syT); ctx.lineTo(x, L.syB); ctx.stroke();
+  }
+  // Horizontale Gitterlinien bei ±Û/2 und bei 0
+  for (const v of [-S.Uhat / 2, S.Uhat / 2]) {
+    const y = yOf(v);
+    ctx.beginPath(); ctx.moveTo(L.sx0, y); ctx.lineTo(L.sx1, y); ctx.stroke();
+  }
+  ctx.strokeStyle = COL.gridStrong;
+  ctx.beginPath(); ctx.moveTo(L.sx0, yMid); ctx.lineTo(L.sx1, yMid); ctx.stroke();
+
+  // Scheitelwert-Linien ±Û (gestrichelt)
+  ctx.setLineDash([6, 5]); ctx.strokeStyle = COL.axis; ctx.lineWidth = 1.2;
+  for (const v of [S.Uhat, -S.Uhat]) {
+    ctx.beginPath(); ctx.moveTo(L.sx0, yOf(v)); ctx.lineTo(L.sx1, yOf(v)); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Effektivwert-Linien ±U (durchgezogen, violett)
+  ctx.strokeStyle = COL.violet; ctx.lineWidth = 1.4;
+  for (const v of [Ue, -Ue]) {
+    ctx.beginPath(); ctx.moveTo(L.sx0, yOf(v)); ctx.lineTo(L.sx1, yOf(v)); ctx.stroke();
+  }
+
+  // Beschriftungen der Linien (rechts im Gehäuse)
+  ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+  ctx.fillStyle = COL.axis;   ctx.fillText("Û",  L.sx1 - 5, yOf(S.Uhat) - 2);
+  ctx.textBaseline = "top";   ctx.fillText("−Û", L.sx1 - 5, yOf(-S.Uhat) + 3);
+  ctx.fillStyle = COL.violet; ctx.fillText("U",  L.sx1 - 5, yOf(Ue) + 3);
+  ctx.textBaseline = "bottom";ctx.fillText("−U", L.sx1 - 5, yOf(-Ue) - 2);
+
+  // Achsenbeschriftung t (rechts unten)
+  ctx.fillStyle = COL.muted; ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "right";  ctx.fillText(cv.t, L.sx1 - 7, L.syB - 7);
+
+  // Kurve 1: Imaginärteil u(t) = Û·sin(ωt + φ)  (cyan, voll)
+  ctx.beginPath();
+  ctx.strokeStyle = COL.cyan; ctx.lineWidth = 2; ctx.setLineDash([]);
+  const steps = Math.max(60, Math.floor((L.sx1 - L.sx0) / 2));
+  for (let i = 0; i <= steps; i++) {
+    const tau = tS + (i / steps) * Wt;
+    const y = yOf(S.Uhat * Math.sin(om * tau + S.phi));
+    const x = L.sx0 + (i / steps) * (L.sx1 - L.sx0);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Kurve 2: Imaginärteil Im{û} = −Û·cos(ωt + φ)  (rose, gestrichelt)
+  ctx.beginPath();
+  ctx.strokeStyle = COL.rose; ctx.lineWidth = 1.4; ctx.setLineDash([7, 5]);
+  for (let i = 0; i <= steps; i++) {
+    const tau = tS + (i / steps) * Wt;
+    const y = yOf(-S.Uhat * Math.cos(om * tau + S.phi));
+    const x = L.sx0 + (i / steps) * (L.sx1 - L.sx0);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Messpunkt am Imaginärteil (u(t)) mit Wertangabe
+  ctx.beginPath(); ctx.arc(px, pyIm, 5, 0, 2 * Math.PI);
+  ctx.fillStyle = COL.cyan; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = "#ffffff"; ctx.stroke();
+  const lbl = "u(t) = " + fmt(uIm, 1) + " V";
+  ctx.font = (fs - 1) + 'px system-ui, sans-serif';
+  ctx.textAlign = px > (L.sx0 + L.sx1) / 2 ? "right" : "left";
+  ctx.fillStyle = COL.cyan;
+  if (pyIm - 16 > L.syT + 6) ctx.fillText(lbl, px + (ctx.textAlign === "left" ? 9 : -9), pyIm - 12);
+  else                       ctx.fillText(lbl, px + (ctx.textAlign === "left" ? 9 : -9), pyIm + 20);
+  ctx.font = fs + 'px system-ui, sans-serif';
+
+  // Periodendauer: Doppelstrich mit Pfeilen zwischen zwei aufeinanderfolgenden
+  // Nulldurchgängen mit gleicher Steigung
+  for (let k = k0; k < k1; k++) {
+    const xa = xOf((2 * Math.PI * k - S.phi) / om);
+    const xb = xOf((2 * Math.PI * (k + 1) - S.phi) / om);
+    if (xa < L.sx0 + 12 || xb > L.sx1 - 12) continue;      // erstes voll sichtbares Paar
+    const yB = L.syB - 12;
+    ctx.strokeStyle = COL.text; ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(xa, yB); ctx.lineTo(xb, yB);
+    ctx.moveTo(xa, yB); ctx.lineTo(xa + 5, yB - 5);
+    ctx.moveTo(xa, yB); ctx.lineTo(xa + 5, yB + 5);
+    ctx.moveTo(xb, yB); ctx.lineTo(xb - 5, yB - 5);
+    ctx.moveTo(xb, yB); ctx.lineTo(xb - 5, yB + 5);
+    ctx.stroke();
+    ctx.fillStyle = COL.text; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText("T", (xa + xb) / 2, yB - 3);
+    ctx.textBaseline = "alphabetic";
+    break;
+  }
+
+  // Hinweis, wenn die Zeit eingefroren ist
+  if (!S.running) {
+    ctx.fillStyle = COL.amber; ctx.textAlign = "right"; ctx.textBaseline = "top";
+    ctx.fillText(cv.frozen, L.sx1 - 8, L.syT + 6);
+    ctx.textBaseline = "alphabetic";
+  }
+}
+
+/* ================================================================
+   5) Live-Kacheln (nur bei geändertem Text aktualisieren)
+   ================================================================ */
+const vEls = ["vT", "vF", "vOm", "vUh", "vUe", "vUt", "vPh"].map(id => document.getElementById(id));
+const vCache = ["", "", "", "", "", "", ""];
+function setTile(i, s) {
+  if (vCache[i] !== s) { vCache[i] = s; vEls[i].textContent = s; }
+}
+function updateTiles() {
+  const T = 1 / S.f, om = 2 * Math.PI * S.f;
+  const Ue = S.Uhat / Math.SQRT2;
+  const u = S.Uhat * Math.sin(om * S.t + S.phi);
+  const ph = Math.round(S.phi * 180 / Math.PI);
+  setTile(0, fmtT(T));
+  setTile(1, fmtF(S.f));
+  setTile(2, fmt(om, om < 10 ? 2 : 1) + " rad/s");
+  setTile(3, fmt(S.Uhat, 0) + " V");
+  setTile(4, fmt(Ue, 1) + " V");
+  setTile(5, fmt(u, 1) + " V");
+  setTile(6, (ph > 0 ? "+" : "") + ph + "°");
+}
+
+/* ================================================================
+   6) Steuerung (Slider & Buttons, alle Eingaben wirken sofort)
+   ================================================================ */
+const inU = document.getElementById("inU");
+const inF = document.getElementById("inF");
+const inP = document.getElementById("inP");
+const outU = document.getElementById("outU");
+const outF = document.getElementById("outF");
+const outP = document.getElementById("outP");
+const btnRun = document.getElementById("btnRun");
+const btnReset = document.getElementById("btnReset");
+
+function updateOutputs() {
+  outU.textContent = fmt(S.Uhat, 0) + " V";
+  outF.textContent = fmtF(S.f);
+  const ph = Math.round(S.phi * 180 / Math.PI);
+  outP.textContent = (ph > 0 ? "+" : "") + ph + "°";
+}
+
+inU.addEventListener("input", () => { S.Uhat = +inU.value; updateOutputs(); });
+
+// Frequenz logarithmisch: f = 0,1 · 10^(3x) mit x ∈ [0,1] → 0,1 Hz … 100 Hz
+inF.addEventListener("input", () => { S.f = 0.1 * Math.pow(10, 3 * (+inF.value)); updateOutputs(); });
+
+inP.addEventListener("input", () => { S.phi = (+inP.value) * Math.PI / 180; updateOutputs(); });
+
+function refreshRunBtn() {
+  btnRun.textContent = I18N[S.lang][S.running ? "ctl.stop" : "ctl.start"];
+}
+btnRun.addEventListener("click", () => { S.running = !S.running; refreshRunBtn(); });
+
+// Reset: Zeiger zurück auf φ = 0 und t = 0
+btnReset.addEventListener("click", () => {
+  S.t = 0; S.phi = 0; inP.value = 0; updateOutputs();
+});
+
+/* ---------- Sprachumschalter ---------- */
+function setLang(lang) {
+  S.lang = lang;
+  document.documentElement.lang = lang;
+  document.title = I18N[lang]["app.title"] + " – Simulation";
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const k = el.getAttribute("data-i18n");
+    if (I18N[lang][k] !== undefined) el.textContent = I18N[lang][k];
+  });
+  document.getElementById("btnDE").classList.toggle("on", lang === "de");
+  document.getElementById("btnEN").classList.toggle("on", lang === "en");
+  updateOutputs(); refreshRunBtn();
+  vCache.fill(""); updateTiles();            // Kacheln neu formatieren
+}
+document.getElementById("btnDE").addEventListener("click", () => setLang("de"));
+document.getElementById("btnEN").addEventListener("click", () => setLang("en"));
+
+/* ================================================================
+   7) Animationsloop (~60 FPS über requestAnimationFrame)
+   ================================================================ */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);   // gegen Tab-Hintergrund begrenzen
+  last = now;
+  if (S.running) {
+    S.t += dt;
+    // Zahlenstabilität: t modulo T (die Kurve ist periodisch, nichts springt)
+    const T = 1 / S.f;
+    if (S.t > 50 * T) S.t %= T;
+  }
+  updateTiles();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+/* ---------- Start ---------- */
+setLang("de");
+resize();
+updateOutputs();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

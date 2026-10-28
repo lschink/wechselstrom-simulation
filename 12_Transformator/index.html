@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Interaktive Simulation: Transformator – Spannungsübersetzung, magnetische Kopplung, Leistungserhaltung und Hochspannungsübertragung.">
+<title>Transformator – Simulation</title>
+<style>
+  /* ============================================================
+     Farbschema / Basis-Layout (dunkles Design, wie bisherige Sims)
+     ============================================================ */
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel2: #1c2330;
+    --border: #30363d;
+    --text: #e6edf3;
+    --dim: #8b949e;
+    --p1-col: #f0883e;  /* Primärseite (u₁, i₁) – orange   */
+    --p2-col: #ff5c5c;  /* Sekundärseite (u₂, i₂) – rot    */
+    --flux-col: #e3b341;/* Magnetfluss im Kern – gelb      */
+    --el-col: #79c0ff;  /* Elektronen – hellblau           */
+    --iron: #6e6255;    /* Eisenkern                       */
+    --i-col: #39c5cf;   /* Strom allgemein – cyan          */
+    --good: #3fb950;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.5;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 22px; border-bottom: 1px solid var(--border);
+    background: var(--panel); position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 1.15rem; font-weight: 600; }
+  header .sub { color: var(--dim); font-size: 0.8rem; }
+  #langBtn {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 0.85rem;
+  }
+  #langBtn:hover { border-color: var(--dim); }
+
+  main { max-width: 1400px; margin: 0 auto; padding: 18px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; margin-bottom: 18px;
+  }
+  .panel h2 {
+    font-size: 0.95rem; margin-bottom: 10px; color: var(--dim);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  canvas { display: block; width: 100%; border-radius: 6px; }
+  .canvasBox { background: var(--panel2); border-radius: 6px; padding: 6px; }
+
+  .diagramGrid {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  }
+
+  /* ============================================================
+     Steuerung (Schieberegler)
+     ============================================================ */
+  .ctrlRow {
+    display: grid; grid-template-columns: 180px 1fr 110px;
+    align-items: center; gap: 12px; margin: 8px 0;
+  }
+  .ctrlRow label { font-size: 0.9rem; color: var(--text); }
+  .ctrlRow .val {
+    font-family: Consolas, "Courier New", monospace; font-size: 0.85rem;
+    text-align: right; color: var(--flux-col);
+  }
+  input[type="range"] { width: 100%; accent-color: var(--p1-col); cursor: pointer; }
+  .checkRow { display: flex; align-items: center; gap: 8px; margin: 10px 0 2px; font-size: 0.88rem; }
+  .checkRow input { accent-color: var(--p2-col); width: 16px; height: 16px; cursor: pointer; }
+
+  .presetRow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .presetBtn {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 16px; cursor: pointer; font-size: 0.85rem;
+  }
+  .presetBtn:hover { border-color: var(--flux-col); color: var(--flux-col); }
+
+  /* Kernaussage als farbiger Hinweis */
+  #msgTrans {
+    margin-top: 12px; padding: 8px 14px; border-radius: 8px; font-size: 0.88rem;
+    background: var(--panel2); border: 1px solid var(--border); border-left: 3px solid var(--dim);
+  }
+  #msgTrans.up   { border-left-color: var(--p2-col); color: var(--p2-col); }
+  #msgTrans.down { border-left-color: var(--good);   color: var(--good); }
+
+  /* ============================================================
+     Messwert-Anzeigen
+     ============================================================ */
+  .meterGrid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  }
+  .meter {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .meter .name { font-size: 0.75rem; color: var(--dim); }
+  .meter .num {
+    font-family: Consolas, "Courier New", monospace; font-size: 1.05rem;
+  }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+
+  /* Instrumente unter der Hauptszene: Momentanwerte */
+  .instGrid {
+    display: grid; gap: 10px; margin-top: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  .inst {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; font-family: Consolas, "Courier New", monospace; font-size: 0.85rem;
+  }
+  .inst .lbl { font-family: inherit; color: var(--dim); font-size: 0.72rem; }
+
+  /* Erklärbereich */
+  #explain p { margin: 0 0 12px; font-size: 0.92rem; color: #c9d1d9; text-align: justify; }
+  #explain p:last-child { margin-bottom: 0; }
+  footer { color: var(--dim); font-size: 0.78rem; text-align: center; padding: 16px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 data-de="Transformator: Spannungsübersetzung &amp; Energieübertragung" data-en="Transformer: Voltage Conversion &amp; Energy Transfer">Transformator: Spannungsübersetzung &amp; Energieübertragung</h1>
+    <div class="sub" data-de="Interaktive Simulation · Wechselstromtechnik" data-en="Interactive simulation · AC circuits">Interaktive Simulation · Wechselstromtechnik</div>
+  </div>
+  <button id="langBtn">EN</button>
+</header>
+
+<main>
+
+  <!-- ==================== Hauptszene: Transformator ==================== -->
+  <section class="panel">
+    <h2 data-de="Transformator (animiert)" data-en="Transformer (animated)">Transformator (animiert)</h2>
+    <div class="canvasBox"><canvas id="sceneCv"></canvas></div>
+    <div class="instGrid">
+      <div class="inst"><span class="lbl">u₁(t)</span><br><span id="instU1" style="color:var(--p1-col)">0 V</span></div>
+      <div class="inst"><span class="lbl">i₁(t)</span><br><span id="instI1" style="color:var(--p1-col)">0 A</span></div>
+      <div class="inst"><span class="lbl">u₂(t)</span><br><span id="instU2" style="color:var(--p2-col)">0 V</span></div>
+      <div class="inst"><span class="lbl">i₂(t)</span><br><span id="instI2" style="color:var(--p2-col)">0 A</span></div>
+    </div>
+  </section>
+
+  <!-- ==================== Steuerung ==================== -->
+  <section class="panel">
+    <h2 data-de="Steuerung" data-en="Controls">Steuerung</h2>
+
+    <div class="ctrlRow">
+      <label>N₁ – <span data-de="Primärwicklung" data-en="primary turns">Primärwicklung</span></label>
+      <input type="range" id="slN1" min="10" max="2000" step="1" value="1000">
+      <span class="val" id="vN1">1000</span>
+    </div>
+    <div class="ctrlRow">
+      <label>N₂ – <span data-de="Sekundärwicklung" data-en="secondary turns">Sekundärwicklung</span></label>
+      <input type="range" id="slN2" min="10" max="2000" step="1" value="200">
+      <span class="val" id="vN2">200</span>
+    </div>
+    <div class="ctrlRow">
+      <label>U₁ (eff)</label>
+      <input type="range" id="slU1" min="0" max="1000" value="930">
+      <span class="val" id="vU1">10.0 kV</span>
+    </div>
+    <div class="ctrlRow">
+      <label>R – <span data-de="Last (Sekundärseite)" data-en="load (secondary side)">Last (Sekundärseite)</span></label>
+      <input type="range" id="slR" min="0" max="1000" value="800">
+      <span class="val" id="vR">10.0 kΩ</span>
+    </div>
+    <div class="ctrlRow">
+      <label>R_Cu – <span data-de="Kupferwiderstand (Wicklungsverluste)" data-en="copper resistance (winding losses)">Kupferwiderstand (Wicklungsverluste)</span></label>
+      <input type="range" id="slRcu" min="0" max="1000" value="250">
+      <span class="val" id="vRcu">1.0 Ω</span>
+    </div>
+
+    <div class="checkRow">
+      <input type="checkbox" id="chkSense" checked>
+      <label for="chkSense" style="font-size:0.88rem;cursor:pointer"
+             data-de="Gleichsinnige Wicklung (Haken entfernen → u₂ um 180° phasenverschoben)"
+             data-en="Same winding sense (untick → u₂ shifted by 180°)">Gleichsinnige Wicklung (Haken entfernen → u₂ um 180° phasenverschoben)</label>
+    </div>
+
+    <div class="presetRow">
+      <button class="presetBtn" id="pHV" data-de="⚡ Trafostation (20 kV → 1 kV)" data-en="⚡ Grid substation (20 kV → 1 kV)">⚡ Trafostation (20 kV → 1 kV)</button>
+      <button class="presetBtn" id="pNT" data-de="🔌 Netzteil-Prinzip (10 kV → 400 V)" data-en="🔌 Power-supply principle (10 kV → 400 V)">🔌 Netzteil-Prinzip (10 kV → 400 V)</button>
+      <button class="presetBtn" id="pUP" data-de="⬆ Hochspannung erzeugen (1 kV → 20 kV)" data-en="⬆ Generating high voltage (1 kV → 20 kV)">⬆ Hochspannung erzeugen (1 kV → 20 kV)</button>
+    </div>
+
+    <div id="msgTrans"></div>
+  </section>
+
+  <!-- ==================== Messwerte ==================== -->
+  <section class="panel">
+    <h2 data-de="Messwerte (live)" data-en="Measurements (live)">Messwerte (live)</h2>
+    <div class="meterGrid">
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--p1-col)"></span>U₁ (eff)</div><div class="num" id="mU1">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--p2-col)"></span>U₂ = U₁·N₂/N₁</div><div class="num" id="mU2">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--p1-col)"></span>I₁ (eff)</div><div class="num" id="mI1">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--p2-col)"></span>I₂ = I₁·N₁/N₂</div><div class="num" id="mI2">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--flux-col)"></span>ü = N₁/N₂</div><div class="num" id="mUeber">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--p1-col)"></span>S₁ = U₁·I₁</div><div class="num" id="mS1">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--p2-col)"></span>S₂ = U₂·I₂</div><div class="num" id="mS2">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--good)"></span><span data-de="P₂ = I₂²·R (Last)" data-en="P₂ = I₂²·R (load)">P₂ = I₂²·R (Last)</span></div><div class="num" id="mP2">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:#d29922"></span>P_V = I₂²·R_Cu</div><div class="num" id="mPV">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--dim)"></span>η</div><div class="num" id="mEta">–</div></div>
+    </div>
+  </section>
+
+  <!-- ==================== Diagramme ==================== -->
+  <section class="panel">
+    <h2 data-de="Diagramme" data-en="Diagrams">Diagramme</h2>
+    <div class="diagramGrid">
+      <div>
+        <div class="canvasBox"><canvas id="scopeCv"></canvas></div>
+        <div style="font-size:0.78rem;color:var(--dim);margin-top:6px" id="scopeLbl"></div>
+      </div>
+      <div>
+        <div class="canvasBox"><canvas id="barCv"></canvas></div>
+        <div style="font-size:0.78rem;color:var(--dim);margin-top:6px" id="barLbl"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Erklärbereich ==================== -->
+  <section class="panel" id="explain">
+    <h2 data-de="Erklärung" data-en="Explanation">Erklärung</h2>
+    <p data-de="Ein Transformator überträgt elektrische Energie ohne galvanische Verbindung: Zwei Wicklungen mit den Windungszahlen N₁ und N₂ sitzen auf einem gemeinsamen, geschlossenen Eisenkern. Die Primärspannung u₁ treibt einen Wechselstrom i₁, der einen magnetischen Wechselfluss Φ im Kern erzeugt. Weil der Kern geschlossen ist, durchsetzt derselbe Fluss beide Wicklungen – und nach dem Induktionsgesetz u = −N·dΦ/dt wird in der Sekundärwicklung die Spannung u₂ induziert. Der Eisenkern ist lediglich ein besonders leitfähiger „Weg" für den Fluss; die Energie wandert magnetisch vom Primär- zum Sekundärstromkreis."
+       data-en="A transformer transfers electrical energy without any galvanic connection: two windings with turn counts N₁ and N₂ share a common, closed iron core. The primary voltage u₁ drives an alternating current i₁, which creates a magnetic alternating flux Φ in the core. Because the core is closed, the same flux links both windings – and according to the law of induction u = −N·dΦ/dt a voltage u₂ is induced in the secondary winding. The iron core is merely a particularly easy „path" for the flux; the energy travels magnetically from the primary to the secondary circuit.">Ein Transformator überträgt elektrische Energie ohne galvanische Verbindung: Zwei Wicklungen mit den Windungszahlen N₁ und N₂ sitzen auf einem gemeinsamen, geschlossenen Eisenkern. Die Primärspannung u₁ treibt einen Wechselstrom i₁, der einen magnetischen Wechselfluss Φ im Kern erzeugt. Weil der Kern geschlossen ist, durchsetzt derselbe Fluss beide Wicklungen – und nach dem Induktionsgesetz u = −N·dΦ/dt wird in der Sekundärwicklung die Spannung u₂ induziert. Der Eisenkern ist lediglich ein besonders leitfähiger „Weg" für den Fluss; die Energie wandert magnetisch vom Primär- zum Sekundärstromkreis.</p>
+    <p data-de="Aus u = −N·dΦ/dt folgt direkt das Übersetzungsverhältnis: Da beide Wicklungen vom selben Fluss durchsetzt werden, verhalten sich die Spannungen wie die Windungszahlen, U₂/U₁ = N₂/N₁, bzw. mit ü = N₁/N₂: U₂ = U₁/ü. Mehr Windungen auf der Sekundärseite (N₂ &gt; N₁) heben die Spannung, weniger senken sie. Gleichzeitig kehrt sich das Stromverhältnis um – Leistungserhaltung verlangt U₁·I₁ ≈ U₂·I₂, also I₂ = I₁·N₁/N₂ = I₁·ü: Die Spannung wird „hoch" transformiert, der Strom „runter" – und umgekehrt. Die tatsächliche Phasenlage von u₂ hängt vom Wicklungssinn ab: gleichsinnig gewickelt sind u₁ und u₂ in Phase, gegensinnig um 180° verschoben (Punkte im Schaltbild kennzeichnen die gleichnamigen Anschlüsse)."
+       data-en="From u = −N·dΦ/dt the turns ratio follows directly: since the same flux links both windings, the voltages are proportional to the turn counts, U₂/U₁ = N₂/N₁, or with ü = N₁/N₂: U₂ = U₁/ü. More turns on the secondary side (N₂ &gt; N₁) raise the voltage, fewer turns lower it. At the same time the current ratio inverts – conservation of power demands U₁·I₁ ≈ U₂·I₂, so I₂ = I₁·N₁/N₂ = I₁·ü: the voltage is stepped up, the current stepped down – and vice versa. The actual phase of u₂ depends on the winding sense: wound in the same direction, u₁ and u₂ are in phase; wound oppositely they are shifted by 180° (dots in circuit diagrams mark the like-named terminals).">Aus u = −N·dΦ/dt folgt direkt das Übersetzungsverhältnis: Da beide Wicklungen vom selben Fluss durchsetzt werden, verhalten sich die Spannungen wie die Windungszahlen, U₂/U₁ = N₂/N₁, bzw. mit ü = N₁/N₂: U₂ = U₁/ü. Mehr Windungen auf der Sekundärseite (N₂ &gt; N₁) heben die Spannung, weniger senken sie. Gleichzeitig kehrt sich das Stromverhältnis um – Leistungserhaltung verlangt U₁·I₁ ≈ U₂·I₂, also I₂ = I₁·N₁/N₂ = I₁·ü: Die Spannung wird „hoch" transformiert, der Strom „runter" – und umgekehrt. Die tatsächliche Phasenlage von u₂ hängt vom Wicklungssinn ab: gleichsinnig gewickelt sind u₁ und u₂ in Phase, gegensinnig um 180° verschoben (Punkte im Schaltbild kennzeichnen die gleichnamigen Anschlüsse).</p>
+    <p data-de="Warum funktioniert das nur mit Wechselspannung? Induktion entsteht nur durch eine Flussänderung – bei konstantem Gleichstrom ist Φ zeitlich konstant, dΦ/dt = 0, und es wird gar keine Sekundärspannung induziert. Erst das periodisch umkehrende Wechselfeld „rührt" den Fluss ständig neu an. (Beim Einschalten eines Gleichstroms entsteht zwar ein kurzer Impuls – das ist aber keine übertragbare Dauerbetriebsform.) Ein Transformator ist daher auf AC festgelegt; Gleichspannung kann er nicht transformieren, sie würde den Kern nur in Sättigung treiben und die Wicklung erwärmen."
+       data-en="Why does this only work with alternating voltage? Induction requires a changing flux – with steady direct current Φ is constant in time, dΦ/dt = 0, and no secondary voltage is induced at all. Only the periodically reversing alternating field keeps „stirring" the flux. (Switching on a DC current does produce a brief impulse – but that is no sustainable mode of operation.) A transformer is therefore tied to AC; it cannot transform DC, which would only drive the core into saturation and heat the winding.">Warum funktioniert das nur mit Wechselspannung? Induktion entsteht nur durch eine Flussänderung – bei konstantem Gleichstrom ist Φ zeitlich konstant, dΦ/dt = 0, und es wird gar keine Sekundärspannung induziert. Erst das periodisch umkehrende Wechselfeld „rührt" den Fluss ständig neu an. (Beim Einschalten eines Gleichstroms entsteht zwar ein kurzer Impuls – das ist aber keine übertragbare Dauerbetriebsform.) Ein Transformator ist daher auf AC festgelegt; Gleichspannung kann er nicht transformieren, sie würde den Kern nur in Sättigung treiben und die Wicklung erwärmen.</p>
+    <p data-de="Der ideale Trafo „zieht nur, was er abgibt": ohne Last fließt auf der Sekundärseite praktisch kein Strom, und auf der Primärseite bleibt nur ein kleiner Magnetisierungsstrom (er magnetisiert den Kern, verursacht aber nahezu keine Wirkleistung). Wird die Last R angeschlossen, fließt I₂ = U₂/R, und der Kern sieht einen gegenwirkenden Ampère-Windungs-Abbau N₂·I₂ – die Primärseite reagiert sofort mit einem zusätzlichen Strom I₁ = I₂·N₂/N₁, der diesen Abbau ausgleicht. Vergrößert man die Last (kleineres R), wächst der Primärstrom proportional mit: Die Quelle spürt die Belastung, als läge sie selbst hinter einem um ü² transformierten Widerstand. Kupferverluste P_V = I²·R_Cu in den Wicklungen mindern die Effizienz etwas; im Idealbild gilt S₁ ≈ S₂ und η ≈ 100 %."
+       data-en="An ideal transformer „only draws what it delivers": with no load, practically no current flows on the secondary side, and on the primary side only a small magnetising current remains (it magnetises the core but consumes almost no real power). When the load R is connected, I₂ = U₂/R flows, and the core experiences a counteracting ampere-turn reduction N₂·I₂ – the primary side reacts instantly with an additional current I₁ = I₂·N₂/N₁ that compensates for it. Increasing the load (smaller R) makes the primary current grow proportionally: the source feels the load as if it sat behind a resistance transformed by ü². Copper losses P_V = I²·R_Cu in the windings reduce the efficiency slightly; ideally S₁ ≈ S₂ and η ≈ 100 %.">Der ideale Trafo „zieht nur, was er abgibt": ohne Last fließt auf der Sekundärseite praktisch kein Strom, und auf der Primärseite bleibt nur ein kleiner Magnetisierungsstrom (er magnetisiert den Kern, verursacht aber nahezu keine Wirkleistung). Wird die Last R angeschlossen, fließt I₂ = U₂/R, und der Kern sieht einen gegenwirkenden Ampère-Windungs-Abbau N₂·I₂ – die Primärseite reagiert sofort mit einem zusätzlichen Strom I₁ = I₂·N₂/N₁, der diesen Abbau ausgleicht. Vergrößert man die Last (kleineres R), wächst der Primärstrom proportional mit: Die Quelle spürt die Belastung, als läge sie selbst hinter einem um ü² transformierten Widerstand. Kupferverluste P_V = I²·R_Cu in den Wicklungen mindern die Effizienz etwas; im Idealbild gilt S₁ ≈ S₂ und η ≈ 100 %.</p>
+    <p data-de="Praxis: Weil Leitungsverluste ~ I² wachsen, überträgt man Fernleitungsenergie bei hoher Spannung und geringem Strom (z. B. 380 kV statt 230 V – der Strom sinkt um denselben Faktor, die I²R-Verluste um dessen Quadrat) und transformiert erst am Verbrauchsort herunter. Netzteile, Schweißtransformatoren (sehr niedrige Spannung, sehr hoher Strom) und Teslatransformatoren (sehr hohe Spannung) nutzen bewusst entgegengesetzte Übersetzungsrichtungen. Trafos brummen, weil der wechselnde Fluss die Bleche magnetostriktiv zum Schwingen anregt (100 Hz beim 50-Hz-Netz), und sie werden warm durch Wicklungsverluste (I²R) und Ummagnetisierungsverluste im Eisen (Wirbelströme, Hysterese) – deshalb werden sie oft ölgekühlt aufgebaut."
+       data-en="In practice: because line losses grow ~ I², grid energy is transmitted at high voltage and low current (e.g. 380 kV instead of 230 V – the current drops by the same factor, the I²R losses by its square) and only stepped down near the consumer. Power supplies, welding transformers (very low voltage, very high current) and Tesla transformers (very high voltage) deliberately use opposite conversion directions. Transformers hum because the alternating flux magnetostrictively excites the laminations to vibrate (100 Hz on a 50 Hz grid), and they get warm due to winding losses (I²R) and core losses from remagnetisation (eddy currents, hysteresis) – which is why large units are oil-cooled.">Praxis: Weil Leitungsverluste ~ I² wachsen, überträgt man Fernleitungsenergie bei hoher Spannung und geringem Strom (z. B. 380 kV statt 230 V – der Strom sinkt um denselben Faktor, die I²R-Verluste um dessen Quadrat) und transformiert erst am Verbrauchsort herunter. Netzteile, Schweißtransformatoren (sehr niedrige Spannung, sehr hoher Strom) und Teslatransformatoren (sehr hohe Spannung) nutzen bewusst entgegengesetzte Übersetzungsrichtungen. Trafos brummen, weil der wechselnde Fluss die Bleche magnetostriktiv zum Schwingen anregt (100 Hz beim 50-Hz-Netz), und sie werden warm durch Wicklungsverluste (I²R) und Ummagnetisierungsverluste im Eisen (Wirbelströme, Hysterese) – deshalb werden sie oft ölgekühlt aufgebaut.</p>
+  </section>
+
+</main>
+
+<footer>
+  Transformator-Simulation · Offline-fähig · Canvas 2D ·
+  <span data-de="keine externen Abhängigkeiten" data-en="no external dependencies">keine externen Abhängigkeiten</span>
+</footer>
+
+<script>
+"use strict";
+/* ================================================================
+   Transformator – gesamte Logik in einer Datei
+   Modell: idealer Transformator (50-Hz-Netzfrequenz) mit
+   Magnetisierungsstrom I₀ und einstellbarem Kupferwiderstand.
+   Die Animation läuft absichtlich in Zeitlupe (sichtbare Frequenz
+   ~1,6 Hz statt 50 Hz) – Kurvenform und Phasenlage sind exakt.
+   ================================================================ */
+
+/* ---------- 1. Globale Zustandsvariablen ---------- */
+let N1 = 1000, N2 = 200;      // Windungszahlen
+let U1 = 10000;               // Primärspannung (eff) [V]
+let Rload = 10000;            // Lastwiderstand (Sekundärseite) [Ω]
+let Rcu = 1;                  // Kupferwiderstand der Wicklungen [Ω]
+let sameSense = true;         // Wicklungssinn (true → u₂ in Phase mit u₁)
+let phase = 0;                // laufende Phase der Animation [rad]
+let lang = "de";
+
+const F_NET = 50;             // Netzfrequenz [Hz] (nur für die Rechnung)
+const VIS_F = 1.6;            // sichtbare Animationsfrequenz [Hz] (Zeitlupe)
+const L_MU = 2000;            // Magnetisierungsinduktivität [H] → kleiner I₀
+const TWO_PI = 2 * Math.PI;
+
+/* Texte für Canvas-Beschriftungen und dynamische Meldungen */
+const T = {
+  slowmo:    { de: v => "⏱ Zeitlupe ×" + v + " · f = 50 Hz (Netz)", en: v => "⏱ slow motion ×" + v + " · f = 50 Hz (grid)" },
+  core:      { de: "geschlossener Eisenkern", en: "closed iron core" },
+  flux:      { de: "Φ(t) pendelt", en: "Φ(t) swings" },
+  ac:        { de: "AC-Netz", en: "AC grid" },
+  load:      { de: "Last", en: "load" },
+  induced:   { de: "induziert", en: "induced" },
+  noLoad:    { de: "Leerlauf: I₂ ≈ 0 – nur I₀ magnetisiert den Kern", en: "No load: I₂ ≈ 0 – only I₀ magnetises the core" },
+  scopeTitle:{ de: "Oszilloskop: u₁(t) und u₂(t)", en: "Oscilloscope: u₁(t) and u₂(t)" },
+  inPhase:   { de: "u₂ in Phase (gleichsinnig)", en: "u₂ in phase (same sense)" },
+  antiPhase: { de: "u₂ um 180° verschoben (gegensinnig)", en: "u₂ shifted 180° (opposite sense)" },
+  barsTitle: { de: "Übersetzung im Vergleich (log. Skala)", en: "Conversion compared (log scale)" },
+  barsCap:   { de: (u, s1, s2) => "ü = " + u + " · S₁ = " + s1 + " ≈ S₂ = " + s2 + " (Leistungserhaltung)",
+               en: (u, s1, s2) => "ü = " + u + " · S₁ = " + s1 + " ≈ S₂ = " + s2 + " (power conserved)" },
+  msgUp:     { de: "N₂ > N₁: Spannung wird hochtransformiert – der Strom sinkt im selben Verhältnis (Leistung bleibt!)",
+               en: "N₂ > N₁: voltage stepped up – the current drops by the same ratio (power conserved!)" },
+  msgDown:   { de: "N₂ < N₁: Spannung wird heruntertransformiert – der Strom steigt im selben Verhältnis (Leistung bleibt!)",
+               en: "N₂ < N₁: voltage stepped down – the current rises by the same ratio (power conserved!)" },
+  msgEq:     { de: "N₂ = N₁: Übersetzung 1:1 – Trenntransformator (Potentialtrennung, gleiche Spannung)",
+               en: "N₂ = N₁: 1:1 ratio – isolation transformer (galvanic separation, same voltage)" }
+};
+
+/* ---------- 2. Hilfsfunktionen ---------- */
+function si(v, unit) {
+  if (!isFinite(v)) return "–";
+  const a = Math.abs(v);
+  const p = [[1e9,"G"],[1e6,"M"],[1e3,"k"],[1,""],[1e-3,"m"],[1e-6,"µ"],[1e-9,"n"],[1e-12,"p"]];
+  for (const [f, s] of p) if (a >= f) return trim3(v / f) + " " + s + unit;
+  return trim3(v / 1e-12) + " p" + unit;
+}
+function trim3(x) {
+  let s = x.toPrecision(3);
+  if (s.includes(".")) s = s.replace(/\.?0+$/, "");
+  return s;
+}
+/* Canvas für scharfe Darstellung auf HiDPI-Skalieren */
+function fitCanvas(cv, cssH) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cssH;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+function getCss(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/* ---------- 3. Physik des idealen Transformators ---------- */
+function computeTrafo() {
+  const ueb = N1 / N2;                        // ü = N₁/N₂
+  const U2 = U1 * N2 / N1;                    // induzierte Sekundärspannung (eff)
+  const I2 = U2 / (Rload + Rcu);              // Sekundärstrom (eff)
+  const U2load = I2 * Rload;                  // Klemmenspannung an der Last
+  const P2 = I2 * I2 * Rload;                 // Wirkleistung an der Last
+  const PV = I2 * I2 * Rcu;                   // Kupferverluste
+  /* Primärseite: Laststrom rückübersetzt + Magnetisierungsstrom I₀
+     (I₀ ist rein induktiv und nahezu verlustfrei) */
+  const I1L = I2 * N2 / N1;
+  const I0 = U1 / (TWO_PI * F_NET * L_MU);
+  const I1 = Math.hypot(I1L, I0);
+  const S1 = U1 * I1, S2 = U2 * I2;
+  return { ueb, U2, I2, U2load, P2, PV, I1L, I0, I1, S1, S2,
+           eta: (P2 + PV) > 0 ? P2 / (P2 + PV) : 1 };
+}
+
+/* ---------- 4. DOM-Referenzen ---------- */
+const $ = id => document.getElementById(id);
+const sceneCv = $("sceneCv"), scopeCv = $("scopeCv"), barCv = $("barCv");
+
+/* ---------- 5. Schieberegler & Presets ---------- */
+$("slN1").addEventListener("input", e => { N1 = +e.target.value; updateLabels(); });
+$("slN2").addEventListener("input", e => { N2 = +e.target.value; updateLabels(); });
+$("slU1").addEventListener("input", e => { U1 = Math.pow(10, 4.30103 * e.target.value / 1000); updateLabels(); });
+$("slR").addEventListener("input",  e => { Rload = Math.pow(10, 5 * e.target.value / 1000); updateLabels(); });
+$("slRcu").addEventListener("input", e => { Rcu = Math.pow(10, -1 + 4 * e.target.value / 1000); updateLabels(); });
+$("chkSense").addEventListener("change", e => { sameSense = e.target.checked; });
+
+function setPreset(n1, n2, u1, r) {
+  N1 = n1; N2 = n2; U1 = u1; Rload = r;
+  $("slN1").value = n1; $("slN2").value = n2;
+  $("slU1").value = Math.round(Math.log10(u1) / 4.30103 * 1000);
+  $("slR").value = Math.round(Math.log10(r) / 5 * 1000);
+  updateLabels();
+}
+$("pHV").addEventListener("click", () => setPreset(2000, 100, 20000, 1000));
+$("pNT").addEventListener("click", () => setPreset(1000, 40, 10000, 50));
+$("pUP").addEventListener("click", () => setPreset(100, 2000, 1000, 100000));
+
+/* Regler-Anzeigen und statische Messwerte aktualisieren */
+function updateLabels() {
+  const c = computeTrafo();
+  $("vN1").textContent = N1;
+  $("vN2").textContent = N2;
+  $("vU1").textContent = si(U1, "V");
+  $("vR").textContent = si(Rload, "Ω");
+  $("vRcu").textContent = si(Rcu, "Ω");
+  $("mU1").textContent = si(U1, "V");
+  $("mU2").textContent = si(c.U2, "V");
+  $("mI1").textContent = si(c.I1, "A");
+  $("mI2").textContent = si(c.I2, "A");
+  $("mUeber").textContent = trim3(c.ueb) + " : 1";
+  $("mS1").textContent = si(c.S1, "VA");
+  $("mS2").textContent = si(c.S2, "VA");
+  $("mP2").textContent = si(c.P2, "W");
+  $("mPV").textContent = si(c.PV, "W");
+  $("mEta").textContent = Rcu < 0.15 ? "≈ 100 %" : (100 * c.eta).toFixed(1).replace(".", ",") + " %";
+  /* Kernaussage je nach Übersetzungsrichtung */
+  const msg = $("msgTrans");
+  if (N2 > N1)      { msg.className = "up";   msg.textContent = "▲ " + T.msgUp[lang]; }
+  else if (N2 < N1) { msg.className = "down"; msg.textContent = "▼ " + T.msgDown[lang]; }
+  else              { msg.className = "";     msg.textContent = "＝ " + T.msgEq[lang]; }
+}
+
+/* ---------- 6. Hauptszene: Kern, Wicklungen, Quelle, Last ---------- */
+/* Design-Koordinaten 940×560, werden gleichmäßig skaliert gezeichnet */
+const SW = 940, SH = 560;
+const CORE = { x1: 380, y1: 170, x2: 560, y2: 370, r: 42, w: 44 }; // Mittellinie des Kerns
+const SRC  = { x: 110, y: 270, r: 40 };                             // AC-Quelle
+const RBOX = { x: 800, y: 270, w: 70, h: 56 };                      // Lastwiderstand
+const TURNS_Y = [200, 228, 256, 284, 312, 340];                     // y der 6 Windungen
+
+/* Mittellinie des Kernes als Punktliste (für Fluss-Striche) */
+function buildCorePath() {
+  const { x1, y1, x2, y2, r } = CORE;
+  const pts = [];
+  const arc = (cx, cy, a0, a1) => {
+    for (let i = 0; i <= 12; i++) {
+      const a = a0 + (a1 - a0) * i / 12;
+      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+  };
+  pts.push([x1 + r, y1]);                       // obere Kante
+  for (let x = x1 + r + 4; x <= x2 - r; x += 4) pts.push([x, y1]);
+  arc(x2 - r, y1 + r, -Math.PI / 2, 0);         // Ecke rechts oben
+  for (let y = y1 + r + 4; y <= y2 - r; y += 4) pts.push([x2, y]); // rechte Kante
+  arc(x2 - r, y2 - r, 0, Math.PI / 2);          // Ecke rechts unten
+  for (let x = x2 - r - 4; x >= x1 + r; x -= 4) pts.push([x, y2]); // untere Kante
+  arc(x1 + r, y2 - r, Math.PI / 2, Math.PI);    // Ecke links unten
+  for (let y = y2 - r - 4; y >= y1 + r; y -= 4) pts.push([x1, y]); // linke Kante
+  arc(x1 + r, y1 + r, Math.PI, Math.PI * 1.5);  // Ecke links oben
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++)
+    cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  return { pts, cum, len: cum[cum.length - 1] };
+}
+const COREP = buildCorePath();
+function pointOnPath(path, s) {
+  s = ((s % path.len) + path.len) % path.len;
+  let i = 1;
+  while (i < path.cum.length - 1 && path.cum[i] < s) i++;
+  const t = (s - path.cum[i - 1]) / (path.cum[i] - path.cum[i - 1]);
+  const a = path.pts[i - 1], b = path.pts[i];
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+}
+
+/* Elektronen-Pfade (Primär- und Sekundärstromkreis, je als Punktliste) */
+function buildLoop(pts) {
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++)
+    cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  return { pts, cum, len: cum[cum.length - 1] };
+}
+/* Primärkreis: Quelle → obere Zuleitung → durch die Wicklung (vertikal) → Rückleitung → Quelle */
+const LOOP1 = buildLoop([
+  [SRC.x, SRC.y - SRC.r], [SRC.x, 200], [330, 200], [330, 340], [SRC.x, 340], [SRC.x, SRC.y + SRC.r]
+]);
+/* Sekundärkreis: Wicklung → obere Leitung → durch die Last → untere Leitung → Wicklung */
+const LOOP2 = buildLoop([
+  [610, 200], [RBOX.x, 200], [RBOX.x, RBOX.y - RBOX.h / 2],
+  [RBOX.x, RBOX.y + RBOX.h / 2], [RBOX.x, 340], [610, 340]
+]);
+
+/* Elektronen entlang eines Pfades pendeln lassen (Auslenkung ∝ Momentanstrom) */
+function drawElectrons(ctx, path, n, amp, iRel) {
+  for (let i = 0; i < n; i++) {
+    const s0 = i / n * path.len;
+    const [x, y] = pointOnPath(path, s0 + amp * iRel);
+    ctx.beginPath(); ctx.arc(x, y, 3.4, 0, TWO_PI); ctx.fill();
+  }
+}
+
+/* Strom-/Leistungspfeile auf einer horizontalen Leitung */
+function drawChevrons(ctx, x1, x2, y, dir, alpha, col) {
+  if (alpha < 0.04) return;
+  ctx.save();
+  ctx.strokeStyle = col; ctx.lineWidth = 2.6;
+  ctx.globalAlpha = Math.min(1, alpha);
+  const n = Math.max(1, Math.floor((x2 - x1) / 46));
+  for (let i = 0; i < n; i++) {
+    const x = x1 + (i + 0.5) * (x2 - x1) / n + dir * 8;
+    const a = dir >= 0 ? 0 : Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(x - 8 * Math.cos(a - 0.5), y - 8 * Math.sin(a - 0.5));
+    ctx.lineTo(x, y);
+    ctx.lineTo(x - 8 * Math.cos(a + 0.5), y - 8 * Math.sin(a + 0.5));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* Vertikaler Momentanwert-Pfeil (Spannungsanzeige) */
+function drawVArrow(ctx, x, yBase, inst, peak, col) {
+  const len = peak > 0 ? Math.max(-34, Math.min(34, inst / peak * 34)) : 0;
+  if (Math.abs(len) < 1) return;
+  ctx.save();
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3;
+  const yTip = yBase - 14 - len;
+  ctx.beginPath(); ctx.moveTo(x, yBase - 14); ctx.lineTo(x, yTip); ctx.stroke();
+  const dir = len > 0 ? -1 : 1;
+  ctx.beginPath();
+  ctx.moveTo(x, yTip); ctx.lineTo(x - 6, yTip + dir * 11); ctx.lineTo(x + 6, yTip + dir * 11);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function drawScene(c) {
+  const cssH = Math.max(320, sceneCv.clientWidth * SH / SW);
+  const { ctx, w, h } = fitCanvas(sceneCv, cssH);
+  const s = Math.min(w / SW, h / SH);
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.translate((w - SW * s) / 2, (h - SH * s) / 2);
+  ctx.scale(s, s);
+  ctx.lineCap = "round";
+
+  /* Momentanwerte (Phase der sichtbaren Zeitlupe) */
+  const wt = phase;
+  const sgn = sameSense ? 1 : -1;
+  const u1pk = U1 * Math.SQRT2, u2pk = c.U2 * Math.SQRT2;
+  const i1pk = c.I1 * Math.SQRT2, i2pk = c.I2 * Math.SQRT2;
+  const u1i = u1pk * Math.sin(wt);
+  const u2i = sgn * u2pk * Math.sin(wt);
+  /* Fluss hinkt u₁ um 90° nach; Primärstrom = Lastanteil (phasengleich zu u₁)
+     + Magnetisierungsstrom (phasengleich zum Fluss) */
+  const flux = Math.sin(wt - Math.PI / 2);
+  const i1i = c.I1L * Math.SQRT2 * Math.sin(wt) + c.I0 * Math.SQRT2 * flux;
+  const i2i = u2pk / (Rload + Rcu) * Math.sin(wt);   // ohmsch: i₂ ∝ u₂
+
+  /* ---- Eisenkern (geschlossener Ring, Fluss-Leuchten ∝ |Φ|) ---- */
+  const corePath2d = () => {
+    ctx.beginPath();
+    ctx.moveTo(CORE.x1 + CORE.r, CORE.y1);
+    ctx.arcTo(CORE.x2, CORE.y1, CORE.x2, CORE.y1 + CORE.r, CORE.r);
+    ctx.arcTo(CORE.x2, CORE.y2, CORE.x2 - CORE.r, CORE.y2, CORE.r);
+    ctx.arcTo(CORE.x1, CORE.y2, CORE.x1, CORE.y2 - CORE.r, CORE.r);
+    ctx.arcTo(CORE.x1, CORE.y1, CORE.x1 + CORE.r, CORE.y1, CORE.r);
+    ctx.closePath();
+  };
+  ctx.lineWidth = CORE.w;
+  ctx.strokeStyle = getCss("--iron");
+  corePath2d(); ctx.stroke();
+  /* gelbe Überlagerung: Sichtbarmachen des Wechselfeldes */
+  ctx.save();
+  ctx.strokeStyle = getCss("--flux-col");
+  ctx.globalAlpha = 0.05 + 0.28 * Math.abs(flux);
+  ctx.shadowColor = getCss("--flux-col");
+  ctx.shadowBlur = 18 * Math.abs(flux);
+  corePath2d(); ctx.stroke();
+  ctx.restore();
+
+  /* ---- Fluss-Striche auf der Kern-Mittellinie (pendeln mit u₁) ----
+     Alle Striche zeigen im selben Umlaufsinn; Richtung und „Leuchtkraft"
+     folgen dem Fluss Φ(t), die Position pendelt sinförmig. */
+  const nDash = 22, drift = 46 * flux;
+  for (let k = 0; k < nDash; k++) {
+    const sC = k / nDash * COREP.len + drift;
+    const [ax, ay] = pointOnPath(COREP, sC - 9);
+    const [bx, by] = pointOnPath(COREP, sC + 9);
+    const al = 0.12 + 0.8 * Math.abs(flux);
+    ctx.strokeStyle = getCss("--flux-col");
+    ctx.globalAlpha = al; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    if (Math.abs(flux) > 0.12) {           // Richtungspfeilspitze
+      const dirS = flux >= 0 ? 1 : -1;
+      const [px, py] = pointOnPath(COREP, sC + 9 * dirS);
+      const [qx, qy] = pointOnPath(COREP, sC + 17 * dirS);
+      const a = Math.atan2(qy - py, qx - px);
+      ctx.fillStyle = getCss("--flux-col");
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px - 8 * Math.cos(a - 0.45), py - 8 * Math.sin(a - 0.45));
+      ctx.lineTo(px - 8 * Math.cos(a + 0.45), py - 8 * Math.sin(a + 0.45));
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  /* ---- Fluss-Anzeige in der Kernöffnung ---- */
+  ctx.fillStyle = getCss("--flux-col");
+  ctx.font = "italic 700 20px Consolas, monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.globalAlpha = 0.35 + 0.65 * Math.abs(flux);
+  ctx.fillText("Φ", 470, 244);
+  ctx.globalAlpha = 1;
+  ctx.font = "12px system-ui";
+  ctx.fillStyle = getCss("--dim");
+  ctx.fillText(T.flux[lang], 470, 296);
+
+  /* ---- Wicklungen: je 6 Windungslinien stellvertretend für N₁/N₂ ---- */
+  for (const side of [0, 1]) {
+    const cx = side === 0 ? 380 : 560;
+    const col = side === 0 ? getCss("--p1-col") : getCss("--p2-col");
+    ctx.strokeStyle = col; ctx.lineWidth = 4;
+    for (const ty of TURNS_Y) {
+      ctx.beginPath(); ctx.ellipse(cx, ty, 52, 15, 0, 0, TWO_PI); ctx.stroke();
+    }
+  }
+  /* Wicklungsetiketten + Windungszahlen */
+  ctx.font = "600 14px system-ui";
+  ctx.fillStyle = getCss("--p1-col");
+  ctx.fillText("Primär · N₁ = " + N1, 380, 428);
+  ctx.fillStyle = getCss("--p2-col");
+  ctx.fillText("Sekundär · N₂ = " + N2, 560, 428);
+  ctx.fillStyle = getCss("--dim");
+  ctx.font = "12px system-ui";
+  ctx.fillText(T.core[lang], 470, 148);
+
+  /* ---- Zuleitungen ---- */
+  ctx.strokeStyle = "#8b949e"; ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(SRC.x, SRC.y - SRC.r); ctx.lineTo(SRC.x, 200); ctx.lineTo(328, 200);
+  ctx.moveTo(SRC.x, SRC.y + SRC.r); ctx.lineTo(SRC.x, 340); ctx.lineTo(328, 340);
+  ctx.moveTo(612, 200); ctx.lineTo(RBOX.x, 200); ctx.lineTo(RBOX.x, RBOX.y - RBOX.h / 2);
+  ctx.moveTo(612, 340); ctx.lineTo(RBOX.x, 340); ctx.lineTo(RBOX.x, RBOX.y + RBOX.h / 2);
+  ctx.stroke();
+  /* Polpunkte (gleichnamige Anschlüsse): Wicklungssinn */
+  ctx.fillStyle = "#e6edf3";
+  ctx.beginPath(); ctx.arc(330, 191, 4, 0, TWO_PI); ctx.fill();           // Primär oben
+  ctx.beginPath(); ctx.arc(610, sameSense ? 191 : 349, 4, 0, TWO_PI); ctx.fill();
+
+  /* ---- AC-Quelle ---- */
+  ctx.strokeStyle = getCss("--p1-col"); ctx.lineWidth = 2.6;
+  ctx.beginPath(); ctx.arc(SRC.x, SRC.y, SRC.r, 0, TWO_PI); ctx.stroke();
+  ctx.beginPath();                                       // ~-Symbol
+  for (let i = 0; i <= 40; i++) {
+    const a = i / 40 * TWO_PI;
+    const rr = SRC.r * 0.55 + 7 * Math.sin(2 * a + wt);
+    const x = SRC.x + rr * Math.cos(a), y = SRC.y + rr * Math.sin(a);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = getCss("--p1-col"); ctx.font = "italic 700 18px Consolas, monospace";
+  ctx.fillText("u₁", SRC.x, SRC.y - SRC.r - 14);
+  ctx.font = "11px system-ui"; ctx.fillStyle = getCss("--dim");
+  ctx.fillText(T.ac[lang] + " · U₁ = " + si(U1, "V"), SRC.x, SRC.y + SRC.r + 18);
+
+  /* ---- Lastwiderstand mit Glühen ∝ P₂(t) ---- */
+  const p2i = Math.abs(u2i * i2i);
+  const glow = Math.min(1, p2i / (c.U2 * c.I2 * 2 || 1));
+  const grad = ctx.createRadialGradient(RBOX.x, RBOX.y, 4, RBOX.x, RBOX.y, 62);
+  grad.addColorStop(0, "rgba(255,92,92," + (0.12 + 0.5 * glow) + ")");
+  grad.addColorStop(1, "rgba(255,92,92,0)");
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(RBOX.x, RBOX.y, 62, 0, TWO_PI); ctx.fill();
+  ctx.strokeStyle = getCss("--p2-col"); ctx.lineWidth = 2.6;
+  ctx.strokeRect(RBOX.x - RBOX.w / 2, RBOX.y - RBOX.h / 2, RBOX.w, RBOX.h);
+  ctx.fillStyle = getCss("--p2-col"); ctx.font = "italic 700 18px Consolas, monospace";
+  ctx.fillText("R", RBOX.x, RBOX.y);
+  ctx.font = "11px system-ui"; ctx.fillStyle = getCss("--dim");
+  ctx.fillText(si(Rload, "Ω"), RBOX.x, RBOX.y + RBOX.h / 2 + 16);
+  ctx.fillText("P₂ = " + si(c.P2, "W"), RBOX.x, RBOX.y - RBOX.h / 2 - 12);
+
+  /* ---- Elektronen: primär pendelnd (Netzstrom), sekundär nur induziert ----
+     Auslenkung ∝ Momentanstrom: bei I₂ ≈ 0 (Leerlauf) bleibt die
+     Sekundärseite praktisch still – der Kern „treibt" sie erst an,
+     wenn ein Stromkreis geschlossen ist. */
+  const amp1 = Math.min(30, 400 * c.I1);      // Skalierung nur bildlich
+  const amp2 = Math.min(30, 85 * c.I2);
+  const i1rel = i1pk > 0 ? i1i / i1pk : 0;
+  const i2rel = i2pk > 0 ? i2i / i2pk : 0;
+  ctx.fillStyle = getCss("--el-col");
+  drawElectrons(ctx, LOOP1, 30, amp1, i1rel);
+  drawElectrons(ctx, LOOP2, 22, amp2, i2rel);
+  /* „induziert"-Hinweis an der Sekundärwicklung */
+  ctx.font = "11px system-ui";
+  ctx.fillStyle = getCss("--p2-col");
+  ctx.globalAlpha = 0.3 + 0.7 * Math.abs(flux);
+  ctx.fillText(T.induced[lang], 688, 372);
+  ctx.globalAlpha = 1;
+
+  /* ---- Leistungspfeile: links hinein (S₁), rechts hinaus (P₂) ---- */
+  const p1rel = u1pk * c.I1 > 0 ? u1i * i1i / (u1pk * c.I1) : 0;
+  const p2rel = c.U2 * c.I2 > 0 ? (u2i * i2i) / (c.U2 * c.I2) : 0;
+  drawChevrons(ctx, 150, 320, 200, p1rel >= 0 ? 1 : -1, Math.abs(p1rel), getCss("--p1-col"));
+  drawChevrons(ctx, 150, 320, 340, p1rel >= 0 ? 1 : -1, Math.abs(p1rel), getCss("--p1-col"));
+  drawChevrons(ctx, 640, 760, 200, p2rel >= 0 ? 1 : -1, Math.abs(p2rel), getCss("--p2-col"));
+  drawChevrons(ctx, 640, 760, 340, p2rel >= 0 ? 1 : -1, Math.abs(p2rel), getCss("--p2-col"));
+
+  /* ---- Momentanwert-Pfeile u₁ / u₂ ---- */
+  drawVArrow(ctx, SRC.x - 62, SRC.y - 10, u1i, u1pk, getCss("--p1-col"));
+  drawVArrow(ctx, RBOX.x + 62, RBOX.y - 10, u2i, u2pk, getCss("--p2-col"));
+
+  /* ---- Strom-Richtungsanzeige in den Wicklungen (Chevron im Band) ---- */
+  const chevBand = (cx, iRel, col) => {
+    const a = Math.abs(iRel);
+    if (a < 0.05) return;
+    ctx.save();
+    ctx.strokeStyle = col; ctx.lineWidth = 2.4; ctx.globalAlpha = 0.25 + 0.75 * a;
+    const dir = iRel >= 0 ? 1 : -1;
+    for (const dy of [-40, 0, 40]) {
+      const y = 270 + dy, x = cx + 0;
+      ctx.beginPath();
+      ctx.moveTo(x - 8 * dir, y - 7); ctx.lineTo(x, y); ctx.lineTo(x - 8 * dir, y + 7);
+      ctx.stroke();
+    }
+    ctx.restore();
+  };
+  chevBand(330, i1rel, getCss("--p1-col"));
+  chevBand(610, i2rel, getCss("--p2-col"));
+
+  /* ---- Zeitlupe-Badge + Leerlauf-Hinweis ---- */
+  ctx.font = "12px system-ui";
+  const slowTxt = T.slowmo[lang](trim3(F_NET / VIS_F));
+  const tw = ctx.measureText(slowTxt).width + 18;
+  ctx.fillStyle = "#21262d"; ctx.strokeStyle = "#30363d"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(14, 14, tw, 24, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = getCss("--dim"); ctx.textAlign = "left";
+  ctx.fillText(slowTxt, 23, 31);
+  if (c.I2 < c.I0 * 0.05) {
+    ctx.textAlign = "center";
+    ctx.fillStyle = getCss("--dim");
+    ctx.fillText(T.noLoad[lang], 470, 480);
+  }
+  ctx.restore();
+}
+
+/* ---------- 7. Oszilloskop: u₁(t) und u₂(t) in zwei Spuren ---------- */
+function drawScope(c) {
+  const cssH = 230;
+  const { ctx, w, h } = fitCanvas(scopeCv, cssH);
+  ctx.clearRect(0, 0, w, h);
+  const padL = 46, padR = 14, padT = 30, padB = 24;
+  const pw = w - padL - padR, ph = h - padT - padB;
+  const laneH = ph / 2;
+  /* Fenster: 2 Perioden der sichtbaren Frequenz */
+  const tWin = 2 / VIS_F, tEnd = phase / (TWO_PI * VIS_F);
+  const sgn = sameSense ? 1 : -1;
+  const u1pk = U1 * Math.SQRT2, u2pk = c.U2 * Math.SQRT2;
+  const amp = laneH * 0.38;
+
+  /* Raster */
+  ctx.strokeStyle = "#21262d"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 8; i++) {
+    ctx.beginPath(); ctx.moveTo(padL + i * pw / 8, padT); ctx.lineTo(padL + i * pw / 8, padT + ph); ctx.stroke();
+  }
+  for (let l = 0; l < 2; l++) {
+    const mid = padT + laneH * (l + 0.5);
+    ctx.strokeStyle = "#30363d";
+    ctx.beginPath(); ctx.moveTo(padL, mid); ctx.lineTo(padL + pw, mid); ctx.stroke();
+  }
+
+  /* Spuren: beide auf den eigenen Scheitelwert normiert → gleiche
+     Kurvenform, Amplitude als Wert beschriftet (Skalierung mit ü) */
+  const traces = [
+    { fn: t => Math.sin(TWO_PI * VIS_F * t), col: getCss("--p1-col"), mid: padT + laneH * 0.5,
+      lbl: "u₁", peak: u1pk },
+    { fn: t => sgn * Math.sin(TWO_PI * VIS_F * t), col: getCss("--p2-col"), mid: padT + laneH * 1.5,
+      lbl: "u₂", peak: u2pk }
+  ];
+  for (const tr of traces) {
+    ctx.strokeStyle = tr.col; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    for (let x = 0; x <= pw; x++) {
+      const t = tEnd - tWin + x / pw * tWin;
+      const y = tr.mid - amp * tr.fn(t);
+      x ? ctx.lineTo(padL + x, y) : ctx.moveTo(padL + x, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = tr.col; ctx.font = "700 13px Consolas, monospace"; ctx.textAlign = "left";
+    ctx.fillText(tr.lbl + " (Û = " + si(tr.peak, "V") + ")", padL + 8, tr.mid - amp - 8);
+  }
+
+  /* Zeitcursor + Momentanwertpunkte */
+  const xC = padL + pw;
+  ctx.strokeStyle = "#6e7681"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xC, padT); ctx.lineTo(xC, padT + ph); ctx.stroke();
+  ctx.setLineDash([]);
+  for (const tr of traces) {
+    ctx.fillStyle = tr.col;
+    ctx.beginPath(); ctx.arc(xC, tr.mid - amp * tr.fn(tEnd), 4, 0, TWO_PI); ctx.fill();
+  }
+
+  /* Titel + Phasenhinweis */
+  ctx.fillStyle = getCss("--dim"); ctx.font = "12px Consolas, monospace";
+  ctx.textAlign = "left";
+  ctx.fillText(T.scopeTitle[lang], padL, 18);
+  ctx.textAlign = "right";
+  ctx.fillText(sameSense ? T.inPhase[lang] : T.antiPhase[lang], padL + pw, 18);
+  ctx.fillText("Δt = 2 T", padL + pw, padT + ph - 6);
+}
+
+/* ---------- 8. Balkendiagramm: Spannung & Strom beider Seiten ---------- */
+function drawBars(c) {
+  const cssH = 230;
+  const { ctx, w, h } = fitCanvas(barCv, cssH);
+  ctx.clearRect(0, 0, w, h);
+  const padL = 54, padR = 14, padT = 30, padB = 34;
+  const pw = w - padL - padR, ph = h - padT - padB;
+
+  const data = [
+    { v: U1, col: getCss("--p1-col"), lbl: "U₁" },
+    { v: c.U2, col: getCss("--p2-col"), lbl: "U₂" },
+    { v: c.I1, col: "#58a6ff", lbl: "I₁" },
+    { v: c.I2, col: getCss("--i-col"), lbl: "I₂" }
+  ];
+  /* Log-Skala über alle vier Werte hinweg */
+  let lo = Math.min(...data.map(d => d.v));
+  let hi = Math.max(...data.map(d => d.v));
+  lo = Math.pow(10, Math.floor(Math.log10(lo)));
+  hi = Math.pow(10, Math.ceil(Math.log10(hi)));
+  if (hi <= lo) hi = lo * 100;
+  const Y = v => padT + ph - (Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo)) * ph;
+
+  /* Dekaden-Raster */
+  ctx.font = "11px Consolas, monospace"; ctx.lineWidth = 1;
+  for (let e = Math.log10(lo); e <= Math.log10(hi) + 1e-9; e++) {
+    const val = Math.pow(10, e), y = Y(val);
+    ctx.strokeStyle = "#21262d";
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + pw, y); ctx.stroke();
+    ctx.fillStyle = "#8b949e"; ctx.textAlign = "right";
+    ctx.fillText(si(val, ""), padL - 6, y + 4);
+  }
+  /* Null-Linie */
+  ctx.strokeStyle = "#484f58";
+  ctx.beginPath(); ctx.moveTo(padL, padT + ph); ctx.lineTo(padL + pw, padT + ph); ctx.stroke();
+
+  /* Balken */
+  const bw = Math.min(64, pw / 5);
+  data.forEach((d, i) => {
+    const x = padL + pw * (i + 0.5) / 4 - bw / 2;
+    const y = Y(d.v);
+    ctx.fillStyle = d.col; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.roundRect(x, y, bw, padT + ph - y, [4, 4, 0, 0]); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#e6edf3"; ctx.font = "700 13px Consolas, monospace"; ctx.textAlign = "center";
+    ctx.fillText(si(d.v, i < 2 ? "V" : "A"), x + bw / 2, Math.max(y - 8, padT + 10));
+    ctx.fillStyle = d.col;
+    ctx.fillText(d.lbl, x + bw / 2, padT + ph + 16);
+  });
+
+  /* Überschrift */
+  ctx.fillStyle = getCss("--dim"); ctx.font = "12px Consolas, monospace"; ctx.textAlign = "left";
+  ctx.fillText(T.barsTitle[lang], padL, 18);
+  ctx.textAlign = "right";
+  ctx.fillText("U₁/U₂ = N₁/N₂ · I₁/I₂ = N₂/N₁", padL + pw, 18);
+}
+
+/* ---------- 9. Sprachumschaltung DE/EN ---------- */
+$("langBtn").addEventListener("click", () => {
+  lang = lang === "de" ? "en" : "de";
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-de]").forEach(el => { el.textContent = el.dataset[lang]; });
+  $("langBtn").textContent = lang === "de" ? "EN" : "DE";
+  updateLabels();
+});
+
+/* ---------- 10. Haupt-Schleife (ca. 60 FPS) ---------- */
+let lastTs = performance.now(), uiAcc = 0;
+function frame(ts) {
+  const dt = Math.min(0.05, (ts - lastTs) / 1000);   // gegen Tab-Rücksprung gedrosselt
+  lastTs = ts;
+  phase += TWO_PI * VIS_F * dt;                      // Zeitlupe, Phasenlage exakt
+  if (phase > 1e7) phase %= TWO_PI;
+  const c = computeTrafo();
+
+  drawScene(c);
+  drawScope(c);
+  drawBars(c);
+
+  /* Momentanwerte + Bildunterschriften (20×/s, gegen DOM-Churn) */
+  uiAcc += dt;
+  if (uiAcc > 0.05) {
+    uiAcc = 0;
+    const wt = phase, sgn = sameSense ? 1 : -1;
+    const u1i = U1 * Math.SQRT2 * Math.sin(wt);
+    const u2i = sgn * c.U2 * Math.SQRT2 * Math.sin(wt);
+    const flux = Math.sin(wt - Math.PI / 2);
+    const i1i = c.I1L * Math.SQRT2 * Math.sin(wt) + c.I0 * Math.SQRT2 * flux;
+    const i2i = u2i / (Rload + Rcu);
+    $("instU1").textContent = trim3(u1i) + " V";
+    $("instI1").textContent = trim3(i1i) + " A";
+    $("instU2").textContent = trim3(u2i) + " V";
+    $("instI2").textContent = trim3(i2i) + " A";
+    setCap("scopeLbl", (sameSense ? T.inPhase[lang] : T.antiPhase[lang])
+      + " · Û₂/Û₁ = N₂/N₁ = " + trim3(N2 / N1));
+    setCap("barLbl", T.barsCap[lang](trim3(c.ueb), si(c.S1, "VA"), si(c.S2, "VA")));
+  }
+  requestAnimationFrame(frame);
+}
+function setCap(id, txt) {
+  const el = $(id);
+  if (el.textContent !== txt) el.textContent = txt;
+}
+
+/* Start */
+updateLabels();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
