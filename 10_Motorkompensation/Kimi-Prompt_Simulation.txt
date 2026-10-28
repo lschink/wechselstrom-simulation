@@ -1,3 +1,6 @@
+ To resume this session: kimi -r session_11f45c5b-236b-420b-9273-475dbdb144c8
+
+
 KIMI-CODE-PROMPT – Simulation: Motorkompensation (Leistungsfaktorkorrektur)
 Ziel: Eine vollständig clientseitige, eigenständige Website (eine einzelne HTML-Datei, Canvas-Rendering), die die Kompensation des Blindleistungsbedarfs eines Asynchronmotors durch einen parallel geschalteten Kondensator visualisiert – mit Schalter zum Ein-/Ausschalten, Sichtbarkeit der Ströme und Leistungen, cos φ-Anzeige und Netzentlastung. Im gleichen Stil und mit dem gleichen Funktionsumfang wie 04_Kondensator_Wechselstrom. GitHub-Pages-tauglich.
 Physikalischer Kern (Abweichungen zur Spulen-Simulation beachten!)
