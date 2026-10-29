@@ -54,6 +54,7 @@
   #cvPhasor{aspect-ratio:1/1}
   #cvImp{aspect-ratio:1/1}
   #cvScope{aspect-ratio:1000/560}
+  #cvDeriv{aspect-ratio:1000/400}
   .note{color:var(--muted); font-size:13px; margin:10px 2px 0}
   .note strong{color:var(--text)}
   .chiprow{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
@@ -82,6 +83,23 @@
   .callout{margin-top:12px; font-size:13px; color:var(--text); background:var(--panel2);
            border:1px solid var(--border); border-left:3px solid var(--r); border-radius:8px; padding:9px 12px}
   .callout code{font-family:ui-monospace,Menlo,monospace}
+
+  /* ---------- Formelzeile unter dem Oszilloskop ---------- */
+  .fstrip{display:flex; flex-direction:column; gap:4px; margin-top:10px; font-size:12.5px; color:#c9d1d9}
+  .fstrip .frow{display:flex; align-items:baseline; gap:8px}
+  .fstrip .frow span:last-child{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  /* ---------- Voreinstellungen ---------- */
+  .presets{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; align-items:stretch}
+  .presets .plab{width:100%; font-size:12.5px; color:var(--muted); margin-bottom:-2px}
+  .preset{display:flex; flex-direction:column; gap:2px; align-items:flex-start; text-align:left;
+    background:var(--panel2); border:1px solid var(--border); border-radius:10px;
+    padding:7px 12px; cursor:pointer; color:var(--text); font:600 13px system-ui}
+  .preset small{font-size:11.5px; color:var(--muted); font-weight:400; max-width:220px}
+  .preset.lo small{color:#79c0ff}
+  .preset.hi small{color:#3fb950}
+  .preset:hover{border-color:var(--accent)}
+  .preset.active{border-color:var(--accent); background:rgba(88,166,255,0.10)}
 
   /* ---------- Erklärung ---------- */
   .explain p{margin:0 0 12px; color:#c9d1d9; text-align:justify}
@@ -161,6 +179,7 @@
       </div>
     </div>
     <canvas id="cvScope"></canvas>
+    <div class="fstrip" data-i18n-html="scopeFormulas"></div>
   </section>
 
   <!-- ========== Steuerung ========== -->
@@ -181,7 +200,22 @@
       </div>
       <button id="btnRun" class="btn"><span id="icRun">⏸</span> <span data-i18n="btnStop">Stopp</span></button>
     </div>
+    <div class="presets">
+      <span class="plab" data-i18n="tPresets">Voreinstellungen</span>
+      <button class="preset lo" id="pr1" data-i18n-html="pB1"></button>
+      <button class="preset lo" id="pr2" data-i18n-html="pB2"></button>
+      <button class="preset"    id="pr3" data-i18n-html="pB3"></button>
+      <button class="preset hi" id="pr4" data-i18n-html="pB4"></button>
+      <button class="preset hi" id="pr5" data-i18n-html="pB5"></button>
+    </div>
     <div class="callout" data-i18n-html="callout"></div>
+  </section>
+
+  <!-- ========== Ableitungs- & Integral-Demo: u_L = L·di/dt · i = (1/L)∫u_L dt ========== -->
+  <section class="panel">
+    <div class="panel-head"><h2 data-i18n="tDeriv">Ableitung &amp; Integral: u_L = L·di/dt ↔ i = (1/L)·∫u_L dt</h2></div>
+    <canvas id="cvDeriv"></canvas>
+    <p class="note" data-i18n-html="derivNote"></p>
   </section>
 
   <!-- ========== Erklärung ========== -->
@@ -221,6 +255,26 @@ de:{
   tMeas:"Messwerte", tCtrl:"Steuerung", tExplain:"Erklärung",
   lgU:"u_L(t) Spule", lgI:"i(t) Strom", lgP:"p_L(t) Blindleistung", lgR:"u_R(t) Widerstand", lgPR:"p_R(t) Wirkleistung",
   scopeHint:"Strom hinkt um 90° nach",
+  tDeriv:"Ableitung & Integral: u_L = L·di/dt ↔ i = (1/L)·∫u_L dt",
+  derivNote:'<strong>In beide Richtungen betrachtet:</strong> <b>Vom Strom zur Spannung (Ableitung):</b> <b>u<sub>L</sub>(t) = L·di/dt</b> — '
+    +'die graue Tangente an der blauen Stromkurve liefert die Steigung di/dt (grün, Steigungsdreieck Δi/Δt), und die rote '
+    +'Spannungskurve hat exakt dieselbe Form, nur mit dem Faktor L multipliziert. <b>Von der Spannung zum Strom (Integral):</b> '
+    +'<b>i(t) = (1/L)·∫u<sub>L</sub> dt</b> — die rot schattierte Fläche unter der Spannungskurve läuft am Zeitcursor auf und bestimmt '
+    +'den blauen Strom: Weil das Integral der Spannung zu Beginn null ist, <b>startet i bei seinem Minimum I<sub>min</sub> = −Î</b> — '
+    +'erst die aufintegrierte Fläche hebt den Strom aus dem Minimum. An den Stromspitzen ist die Steigung null → u<sub>L</sub> = 0; '
+    +'an den steilsten Flanken (bei i = 0) ist die Spannung maximal.',
+  tPresets:"Voreinstellungen — Standardwerte",
+  scopeFormulas:
+    "<div class='frow'><span class='dot' style='background:var(--u)'></span><span>u<sub>L</sub>(t) = Û<sub>L</sub>·sin(ωt) = Û<sub>L</sub>·sin(2πf·t) &nbsp;→&nbsp; Û<sub>L</sub> = Î·X<sub>L</sub> = 2πfL·Î</span></div>"
+    +"<div class='frow'><span class='dot' style='background:var(--i)'></span><span>i(t) = (1/L)·∫u<sub>L</sub> dt = −Î·cos(ωt) = −Î·cos(2πf·t) &nbsp;→&nbsp; Î = Û/Z = Û/√(R²+(2πfL)²)</span></div>"
+    +"<div class='frow'><span class='dot' style='background:var(--p)'></span><span>p<sub>L</sub>(t) = u<sub>L</sub>·i = −(Û<sub>L</sub>·Î/2)·sin(2ωt) = −(Û<sub>L</sub>·Î/2)·sin(4πf·t) &nbsp;→&nbsp; P̄<sub>L</sub> = 0 (Blindleistung)</span></div>"
+    +"<div class='frow'><span class='dot' style='background:var(--r)'></span><span>u<sub>R</sub>(t) = R·i = −Û<sub>R</sub>·cos(ωt) = −Û<sub>R</sub>·cos(2πf·t) &nbsp;→&nbsp; Û<sub>R</sub> = Î·R</span></div>"
+    +"<div class='frow'><span class='dot' style='background:#fb8500'></span><span>p<sub>R</sub>(t) = R·i²(t) &nbsp;→&nbsp; P̄<sub>R</sub> = I<sub>eff</sub>²·R = Û²·R/(2(R²+(2πfL)²)) (Wirkleistung)</span></div>",
+  pB1:"<b>10 Hz · 1 H</b><small>tiefe Frequenz, kleines X<sub>L</sub> — Signal kommt durch (X<sub>L</sub> ≈ 63 Ω ≪ R, P ≈ 53 W)</small>",
+  pB2:"<b>50 Hz · 10 H</b><small>Netzfrequenz, aber große L — die Drossel schluckt (X<sub>L</sub> ≈ 3,1 kΩ, cos φ ≈ 0,3)</small>",
+  pB3:"<b>≈159 Hz · 1 H</b><small>Grenzfrequenz: X<sub>L</sub> = R → cos φ = 0,707, halbe Leistung kommt durch</small>",
+  pB4:"<b>1 kHz · 1 mH</b><small>hohe Frequenz, aber kleine L — kommt durch (X<sub>L</sub> ≈ 6,3 Ω, Achtung L-Falle!)</small>",
+  pB5:"<b>10 kHz · 1 H</b><small>volle Sperrung — der Widerstand bleibt kalt: P ≈ 13 mW, cos φ ≈ 0,016</small>",
   mU:"U<sub>eff</sub> = Û/√2 (Quelle)", mI:"I<sub>eff</sub> = U<sub>eff</sub>/√(R²+X<sub>L</sub>²)",
   mX:"X<sub>L</sub> = ωL = 2πfL", mQ:"Q = I<sub>eff</sub>²·X<sub>L</sub> (Blindleistung)",
   mP:"P = I<sub>eff</sub>²·R (Wirkleistung am R)", mCos:"cos φ = R/Z (Wirkanteil an R)",
@@ -228,6 +282,8 @@ de:{
   btnStart:"Start", btnStop:"Stopp",
   slowmo:"Zeitlupe",
   markUMax:"u_L = Û bei i = 0", avgZero:"Mittelwert = 0",
+  derivArea:"Fläche = ∫u_L dt → i = (1/L)·∫u_L dt + I_min",
+  derivStart:"Start: ∫u_L dt = 0 → i = I_min = −Î",
   rVal:"R = 1 kΩ",
   lenz:"Gegenfeld (Lenz)",
   stThrough:"Signal kommt durch", stPartial:"teilweise gekoppelt", stBlocked:"Signal wird geschluckt",
@@ -291,6 +347,26 @@ en:{
   tMeas:"Measurements", tCtrl:"Controls", tExplain:"Explanation",
   lgU:"u_L(t) inductor", lgI:"i(t) current", lgP:"p_L(t) reactive", lgR:"u_R(t) resistor", lgPR:"p_R(t) real power",
   scopeHint:"Current lags by 90°",
+  tDeriv:"Derivative & integral: u_L = L·di/dt ↔ i = (1/L)·∫u_L dt",
+  derivNote:'<strong>Both directions:</strong> <b>From current to voltage (derivative):</b> <b>u<sub>L</sub>(t) = L·di/dt</b> — the grey '
+    +'tangent to the blue current curve gives the slope di/dt (green, slope triangle Δi/Δt), and the red voltage curve has '
+    +'exactly the same shape, only scaled by the factor L. <b>From voltage to current (integral):</b> <b>i(t) = (1/L)·∫u<sub>L</sub> dt</b> '
+    +'— the red shaded area under the voltage curve accumulates up to the time cursor and drives the blue current: because '
+    +'the integral of the voltage is zero at the start, <b>i starts at its minimum I<sub>min</sub> = −Î</b> — only the accumulated '
+    +'area lifts the current out of the minimum. At the current peaks the slope is zero → u<sub>L</sub> = 0; at the steepest '
+    +'flanks (i = 0) the voltage is maximal.',
+  tPresets:"Presets — standard values",
+  scopeFormulas:
+    "<div class='frow'><span class='dot' style='background:var(--u)'></span><span>u<sub>L</sub>(t) = Û<sub>L</sub>·sin(ωt) = Û<sub>L</sub>·sin(2πf·t) &nbsp;→&nbsp; Û<sub>L</sub> = Î·X<sub>L</sub> = 2πfL·Î</span></div>"
+    +"<div class='frow'><span class='dot' style='background:var(--i)'></span><span>i(t) = (1/L)·∫u<sub>L</sub> dt = −Î·cos(ωt) = −Î·cos(2πf·t) &nbsp;→&nbsp; Î = Û/Z = Û/√(R²+(2πfL)²)</span></div>"
+    +"<div class='frow'><span class='dot' style='background:var(--p)'></span><span>p<sub>L</sub>(t) = u<sub>L</sub>·i = −(Û<sub>L</sub>·Î/2)·sin(2ωt) = −(Û<sub>L</sub>·Î/2)·sin(4πf·t) &nbsp;→&nbsp; P̄<sub>L</sub> = 0 (reactive power)</span></div>"
+    +"<div class='frow'><span class='dot' style='background:var(--r)'></span><span>u<sub>R</sub>(t) = R·i = −Û<sub>R</sub>·cos(ωt) = −Û<sub>R</sub>·cos(2πf·t) &nbsp;→&nbsp; Û<sub>R</sub> = Î·R</span></div>"
+    +"<div class='frow'><span class='dot' style='background:#fb8500'></span><span>p<sub>R</sub>(t) = R·i²(t) &nbsp;→&nbsp; P̄<sub>R</sub> = I<sub>rms</sub>²·R = Û²·R/(2(R²+(2πfL)²)) (real power)</span></div>",
+  pB1:"<b>10 Hz · 1 H</b><small>low frequency, small X<sub>L</sub> — signal passes (X<sub>L</sub> ≈ 63 Ω ≪ R, P ≈ 53 W)</small>",
+  pB2:"<b>50 Hz · 10 H</b><small>mains frequency, but large L — the choke swallows it (X<sub>L</sub> ≈ 3.1 kΩ, cos φ ≈ 0.3)</small>",
+  pB3:"<b>≈159 Hz · 1 H</b><small>cutoff frequency: X<sub>L</sub> = R → cos φ = 0.707, half the power passes</small>",
+  pB4:"<b>1 kHz · 1 mH</b><small>high frequency, but small L — passes (X<sub>L</sub> ≈ 6.3 Ω, the L-trap!)</small>",
+  pB5:"<b>10 kHz · 1 H</b><small>full blocking — the resistor stays cold: P ≈ 13 mW, cos φ ≈ 0.016</small>",
   mU:"U<sub>rms</sub> = Û/√2 (source)", mI:"I<sub>rms</sub> = U<sub>rms</sub>/√(R²+X<sub>L</sub>²)",
   mX:"X<sub>L</sub> = ωL = 2πfL", mQ:"Q = I<sub>rms</sub>²·X<sub>L</sub> (reactive)",
   mP:"P = I<sub>rms</sub>²·R (real power at R)", mCos:"cos φ = R/Z (real-power share)",
@@ -298,6 +374,8 @@ en:{
   btnStart:"Start", btnStop:"Pause",
   slowmo:"slow motion",
   markUMax:"u_L = Û at i = 0", avgZero:"average = 0",
+  derivArea:"Area = ∫u_L dt → i = (1/L)·∫u_L dt + I_min",
+  derivStart:"Start: ∫u_L dt = 0 → i = I_min = −Î",
   rVal:"R = 1 kΩ",
   lenz:"counter-field (Lenz)",
   stThrough:"Signal passes through", stPartial:"partially coupled", stBlocked:"Signal is swallowed",
@@ -806,6 +884,122 @@ function drawScope(cv){
   });
 }
 
+/* ---------- 7b. Ableitungs- & Integral-Demo: u_L = L·di/dt  bzw.  i = (1/L)∫u_L dt ----------
+   Läuft synchron zur Hauptanimation und zeigt BEIDE Richtungen:
+   Ableitung: blau i(t) mit Tangente und Steigungsdreieck, grün di/dt,
+   rot u_L — rot und grün sind deckungsgleich, die Spannung ist die mit
+   dem Faktor L multiplizierte zeitliche Ableitung des Stroms.
+   Integral: die rot schattierte Fläche ∫u_L dt läuft am Zeitcursor auf,
+   i = (1/L)·∫u_L dt + I_min — der Strom startet bei I_min = −Î, weil das
+   Integral der Spannung zu Beginn null ist. */
+function drawDeriv(cv){
+  const {ctx,W,H}=fit(cv);
+  ctx.clearRect(0,0,W,H);
+  const L=46, Rp=150, Tp=20, Bp=24;
+  const plotW=W-L-Rp, laneH=(H-Tp-Bp)/2, T=1/state.f;
+  const mid=[0,1].map(k=>Tp+laneH*(k+0.5));
+  const amp=laneH*0.4;
+  const t2x=t=>L+t/(2*T)*plotW;
+  const A=M.Ihat, dMax=A*M.w;               // Î bzw. max |di/dt|
+  const tCur=mod(state.phi/M.w,2*T), xC=t2x(tCur);
+  const iCur=-A*Math.cos(state.phi);
+  const dCur=A*M.w*Math.sin(state.phi);     // di/dt am Cursor
+  const uCur=state.L*dCur;                  // u_L = L·di/dt
+  const intU=(M.ULA/M.w)*(1-Math.cos(state.phi));  // ∫u_L dt ab t=0 = L·(i − I_min)
+
+  /* Gitter + Zeitachse (gleiche Zeitskala wie das Oszilloskop) */
+  ctx.font="11px ui-monospace,monospace"; ctx.textAlign="center"; ctx.textBaseline="top";
+  const unit=T>=0.5?"s":T>=5e-4?"ms":"µs", mul=unit==="s"?1:unit==="ms"?1e3:1e6;
+  ctx.strokeStyle="#21262d"; ctx.lineWidth=1;
+  for(let k=0;k<=4;k++){
+    const x=L+k*plotW/4;
+    ctx.beginPath(); ctx.moveTo(x,Tp); ctx.lineTo(x,H-Bp); ctx.stroke();
+    ctx.fillStyle="#8b949e"; ctx.fillText(fmtNum(k*T/2*mul,3), x, H-Bp+6);
+  }
+  ctx.textAlign="right"; ctx.fillText(unit, W-6, H-Bp+6);
+  ctx.textBaseline="middle";
+
+  /* Nulllinien + Beschriftung der Spuren links */
+  for(let k=0;k<2;k++){
+    ctx.setLineDash([3,4]); ctx.strokeStyle="#484f58";
+    ctx.beginPath(); ctx.moveTo(L,mid[k]); ctx.lineTo(L+plotW,mid[k]); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.font="700 13px system-ui"; ctx.textAlign="left";
+  ctx.fillStyle="#58a6ff"; ctx.fillText("i", 10, mid[0]);
+  ctx.fillStyle="#3fb950"; ctx.fillText("di/dt", 10, mid[1]-9);
+  ctx.fillStyle="#ff5c5c"; ctx.fillText("u_L", 10, mid[1]+9);
+
+  /* Kurven: i(t) blau; di/dt grün mit deckungsgleicher roter u_L-Kurve */
+  const iFn=t=>-A*Math.cos(M.w*t);
+  const dFn=t=>A*M.w*Math.sin(M.w*t);
+  ctx.lineJoin="round";
+  ctx.strokeStyle="#58a6ff"; ctx.lineWidth=2; ctx.beginPath();
+  for(let x=0;x<=plotW;x+=2){
+    const y=mid[0]-iFn(x/plotW*2*T)/A*amp;
+    x===0?ctx.moveTo(L+x,y):ctx.lineTo(L+x,y);
+  }
+  ctx.stroke();
+  /* Startpunkt-Marker: bei t=0 ist ∫u_L dt = 0 → i startet am Minimum I_min = −Î */
+  ctx.fillStyle="#58a6ff";
+  ctx.beginPath(); ctx.arc(L, mid[0]+amp, 4, 0, 7); ctx.fill();
+  ctx.font="11px system-ui"; ctx.textAlign="left"; ctx.fillStyle="#8b949e";
+  ctx.fillText(I18N[lang].derivStart, L+8, Tp+12);
+  ctx.strokeStyle="rgba(63,185,80,0.5)"; ctx.lineWidth=4.5; ctx.beginPath();
+  for(let x=0;x<=plotW;x+=2){
+    const y=mid[1]-dFn(x/plotW*2*T)/dMax*amp;
+    x===0?ctx.moveTo(L+x,y):ctx.lineTo(L+x,y);
+  }
+  ctx.stroke();
+  /* Integral-Richtung: Fläche unter u_L von t=0 bis zum Cursor läuft auf;
+     sie beträgt ∫u_L dt = L·(i − I_min) und hebt den Strom aus dem Minimum. */
+  ctx.fillStyle="rgba(255,92,92,0.13)";
+  for(let x=0;x<=xC-L;x+=2){
+    const y=mid[1]-dFn(x/plotW*2*T)/dMax*amp;
+    y<mid[1]?ctx.fillRect(L+x,y,2,mid[1]-y):ctx.fillRect(L+x,mid[1],2,y-mid[1]);
+  }
+  ctx.font="11px system-ui"; ctx.fillStyle="rgba(255,92,92,0.9)"; ctx.textAlign="left";
+  ctx.fillText(I18N[lang].derivArea, L+8, Tp+laneH+11);
+  ctx.strokeStyle="rgba(255,92,92,0.92)"; ctx.lineWidth=2; ctx.beginPath();
+  for(let x=0;x<=plotW;x+=2){
+    const y=mid[1]-dFn(x/plotW*2*T)/dMax*amp;   // u_L = L·di/dt: exakt gleiche Form
+    x===0?ctx.moveTo(L+x,y):ctx.lineTo(L+x,y);
+  }
+  ctx.stroke();
+
+  /* Tangente + Steigungsdreieck Δi/Δt an der Cursor-Position */
+  const yC=mid[0]-iCur/A*amp;
+  const slopePy=-(dCur/A)*amp*(2*T/plotW);      // Kurvensteigung in Bildpunkten
+  ctx.strokeStyle="rgba(139,148,158,0.85)"; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.moveTo(xC-40, yC-40*slopePy); ctx.lineTo(xC+40, yC+40*slopePy); ctx.stroke();
+  const dx=plotW/16, x2=xC+dx, y2=yC+slopePy*dx;  // festes Δt = T/8
+  ctx.setLineDash([4,3]); ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(xC,yC); ctx.lineTo(x2,yC); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font="11px system-ui"; ctx.fillStyle="#8b949e";
+  ctx.textAlign="center";
+  ctx.fillText("Δt",(xC+x2)/2, yC+(slopePy>=0?-9:16));
+  ctx.textAlign="left";
+  ctx.fillText("Δi",x2+6,(yC+y2)/2);
+
+  /* Zeitcursor, Verbinder Tangente→Ableitung, Punkte */
+  ctx.setLineDash([3,4]); ctx.strokeStyle="rgba(139,148,158,0.5)"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(xC,Tp); ctx.lineTo(xC,H-Bp); ctx.stroke();
+  const yD=mid[1]-dCur/dMax*amp;
+  ctx.beginPath(); ctx.moveTo(xC,yC); ctx.lineTo(xC,yD); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle="#58a6ff"; ctx.beginPath(); ctx.arc(xC,yC,4,0,7); ctx.fill();
+  ctx.fillStyle="#3fb950"; ctx.beginPath(); ctx.arc(xC,yD,5.5,0,7); ctx.fill();
+  ctx.fillStyle="#ff5c5c"; ctx.beginPath(); ctx.arc(xC,yD,3.5,0,7); ctx.fill();
+
+  /* Live-Werte rechts */
+  ctx.font="11px ui-monospace,monospace";
+  ctx.fillStyle="#58a6ff"; ctx.fillText("i = "+fmtSI(iCur,"A"), L+plotW+10, mid[0]);
+  ctx.fillStyle="#3fb950"; ctx.fillText("di/dt = "+fmtSI(dCur,"A/s"), L+plotW+10, mid[1]-9);
+  ctx.fillStyle="#ff5c5c"; ctx.fillText("u_L = L·di/dt = "+fmtSI(uCur,"V"), L+plotW+10, mid[1]+12);
+  ctx.fillText("∫u_L dt = "+fmtSI(intU,"V·s"), L+plotW+10, mid[1]+30);
+}
+
 /* ---------- 8. Messwerte-Panel ---------- */
 const el=id=>document.getElementById(id);
 function updatePanel(){
@@ -845,9 +1039,25 @@ function readSliders(){
   state.L =Math.pow(10,-3+4*(sL.value/1000));    // 1 mH … 10 H (log)
   state.f =Math.pow(10, 1+3*(sF.value/1000));    // 10 Hz … 10 kHz (log)
   state.Uhat=+sV.value;                          // 1 … 325 V (linear)
-  recompute(); updatePanel();
+  recompute(); updatePanel(); markPreset();
 }
 sL.oninput=sF.oninput=sV.oninput=readSliders;
+
+/* ---------- 10b. Voreinstellungen: Sliderpositionen (l,f ∈ 0…1000, v in V) ----------
+   Zwei tiefe Frequenzen (Tiefpass: kommt durch / Drossel schluckt),
+   Grenzfrequenz, zwei Hochfrequenzfälle (L-Falle / volle Sperrung). */
+const PRESETS=[
+  {l:750,  f:0,    v:325},   // 10 Hz, 1 H   → X_L ≈ 63 Ω ≪ R (kommt durch)
+  {l:1000, f:233,  v:325},   // 50 Hz, 10 H  → X_L ≈ 3,1 kΩ ≫ R (Drossel schluckt)
+  {l:750,  f:400,  v:325},   // ≈159 Hz, 1 H → X_L = R (Grenzfrequenz)
+  {l:0,    f:667,  v:325},   // 1 kHz, 1 mH  → X_L ≈ 6,3 Ω ≪ R (L-Falle)
+  {l:750,  f:1000, v:325}    // 10 kHz, 1 H  → X_L ≈ 62,8 kΩ ≫ R (geschluckt)
+];
+function markPreset(){
+  const act=PRESETS.findIndex(p=>+sL.value===p.l && +sF.value===p.f && +sV.value===p.v);
+  document.querySelectorAll(".preset").forEach((b,k)=>b.classList.toggle("active",k===act));
+}
+PRESETS.forEach((p,k)=>{ el("pr"+(k+1)).onclick=()=>{ sL.value=p.l; sF.value=p.f; sV.value=p.v; readSliders(); }; });
 
 el("btnRun").onclick=()=>{
   state.running=!state.running;
@@ -871,6 +1081,7 @@ function loop(now){
   drawPhasor(el("cvPhasor"));
   drawImp(el("cvImp"));
   drawScope(el("cvScope"));
+  drawDeriv(el("cvDeriv"));
   updatePanel();
   requestAnimationFrame(loop);
 }
@@ -902,13 +1113,14 @@ span.sn-num{background:var(--accent,#f59e0b);color:#1a1206;border-color:var(--ac
 </style>
 <footer class="sn-bar">
   <a class="sn-home" href="../index.html">← Startseite</a>
-  <nav class="sn-nums" aria-label="Simulationen 1 bis 13">
+  <nav class="sn-nums" aria-label="Simulationsnavigation">
     <a class="sn-num" href="../01_Einfuehrung_Wechselstrom/" title="Wechselstromerzeugung">1</a>
     <a class="sn-num" href="../02_Kennwerte_Sinusschwingung/" title="Kennwerte der Sinusschwingung">2</a>
     <a class="sn-num" href="../03_Widerstand_Wechselstrom/" title="Ohmscher Widerstand im Wechselstromkreis">3</a>
-    <a class="sn-num" href="../04_Kondensator_Wechselstrom/" title="Kondensator im Wechselstromkreis">4</a>
-    <span class="sn-num" title="Spule im Wechselstromkreis (aktive Simulation)">5</span>
-    <a class="sn-num" href="../06_Oszilloskop/" title="Digitales Speicheroszilloskop (DSO)">6</a>
+    <a class="sn-num" href="../04a_Kondensator_Wechselstrom/" title="Kondensator im Wechselstromkreis">04a</a>
+    <span class="sn-num" title="Spule im Wechselstromkreis (aktive Simulation)">04b</span>
+    <a class="sn-num" href="../05_Ladungstransports/" title="Exkurs: Strom ohne Spannung – Ladungstransport">05</a>
+    <a class="sn-num" href="../06_Oszilloskop/" title="Exkurs: Digitales Speicheroszilloskop (DSO)">6</a>
     <a class="sn-num" href="../07_Leistung_Wechselstrom/" title="Leistung im Wechselstromkreis">7</a>
     <a class="sn-num" href="../08_RLC_Zeigerdiagramm/" title="Zeigerdiagramm RLC-Reihenschaltung">8</a>
     <a class="sn-num" href="../09_Impedanz_Dreieck/" title="Impedanz-Dreieck (RLC)">9</a>

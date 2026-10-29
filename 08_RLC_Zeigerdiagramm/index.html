@@ -52,6 +52,10 @@
   .buttons{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
   .hint{color:var(--muted);font-size:.75rem;margin-top:.4rem}
 
+  /* Voreinstellungen */
+  .presetbtns{display:grid;grid-template-columns:1fr;gap:.4rem}
+  .presetbtns button{padding:.4rem .2rem;font-size:.85rem}
+
   /* ---------- Formelzeile und Erklärung ---------- */
   .formulas{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
   .formula{background:var(--panel2);border:1px solid var(--border);border-radius:10px;
@@ -136,6 +140,17 @@
         </div>
         <div class="hint" data-i18n="opHint">Drehung: Alle Zeiger rotieren gemeinsam mit ω (Zeitlupe); ihre Projektion auf die senkrechte Achse liefert u(t) und i(t). Resonanz: stellt f = f₀ ein.</div>
       </div>
+      <div class="card">
+        <h3 data-i18n="presets">Standardeinstellungen</h3>
+        <div class="presetbtns">
+          <button id="bPNet" class="secondary" data-i18n="pNet">Netz 50 Hz</button>
+          <button id="bPOhm" class="secondary" data-i18n="pOhm">Fast ohmsch (φ ≈ −2°)</button>
+          <button id="bPCap" class="secondary" data-i18n="pCap">Kapazitiv (φ ≈ −52°)</button>
+          <button id="bPInd" class="secondary" data-i18n="pInd">Induktiv (φ ≈ +48°)</button>
+          <button id="bPRes" class="secondary" data-i18n="pRes">Resonanz (Überhöhung)</button>
+        </div>
+        <div class="hint" data-i18n="presetsHint">Setzt R, L, C, f und U auf typische Betriebspunkte – danach frei veränderbar. „Resonanz" verwendet R = 20 Ω: U_L und U_C werden größer als die Quelle!</div>
+      </div>
     </div>
   </section>
 
@@ -196,6 +211,10 @@ const I18N = {
     opCard: "Anzeige & Betrieb",
     rotStart: "▶ Drehung", rotStop: "❚❚ Stopp", resF0: "f → f₀ (Resonanz)",
     opHint: "Drehung: Alle Zeiger rotieren gemeinsam mit ω (Zeitlupe); ihre Projektion auf die senkrechte Achse liefert u(t) und i(t). Resonanz: stellt f = f₀ ein.",
+    presets: "Standardeinstellungen",
+    pNet: "Netz 50 Hz", pOhm: "Fast ohmsch (φ ≈ −2°)", pCap: "Kapazitiv (φ ≈ −52°)",
+    pInd: "Induktiv (φ ≈ +48°)", pRes: "Resonanz (Überhöhung)",
+    presetsHint: "Setzt R, L, C, f und U auf typische Betriebspunkte – danach frei veränderbar. „Resonanz“ verwendet R = 20 Ω: U_L und U_C werden größer als die Quelle!",
     tagInd: "(ind)", tagKap: "(kap)",
     formulas: "Formeln", explanation: "Erklärung",
     /* Zeigerdiagramm */
@@ -210,7 +229,7 @@ const I18N = {
     exp2: `<strong>Reihenschaltung – Strom als Bezug:</strong> Durch alle drei Bauelemente fließt derselbe Strom, deshalb zeichnet man den <strong>Stromzeiger I waagrecht</strong> als Bezugsgröße. Am Widerstand fällt <strong>U_R = R·I gleichphasig</strong> ab (parallel zu I). Die Spannung an der Spule <strong>eilt dem Strom um +90° voraus</strong> (U_L senkrecht nach oben), die am Kondensator <strong>hinkt um −90° hinterher</strong> (U_C senkrecht nach unten).`,
     exp3: `<strong>Zeigersumme und Spannungsdreieck:</strong> Die Quellenspannung ist die <strong>geometrische Summe</strong> U = U_R + U_L + U_C: Die Zeiger werden aneinandergehängt (Polygon im Diagramm), vom Ursprung zur Endspitze zeigt U. Weil U_L und U_C in <strong>entgegengesetzte Richtungen</strong> zeigen, löschen sie sich teilweise; übrig bleibt ein <strong>rechtwinkliges Spannungsdreieck</strong> mit den Katheten U_R und U_L − U_C sowie der Hypotenuse U. Damit: tan φ = (X_L − X_C)/R.`,
     exp4: `<strong>Resonanz:</strong> Bei <strong>f₀ = 1/(2π·√(L·C))</strong> ist X_L = X_C: U_L und U_C sind gleich groß und heben sich auf – es gilt U = U_R und φ = 0 (Spannungsresonanz). Achtung: Weil der Strom bei kleinem Z sehr groß wird, können <strong>U_L und U_C einzeln größer als die Quellenspannung U sein</strong> (Spannungsüberhöhung) – im Diagramm ragen ihre Zeiger weit über U hinaus.`,
-    exp5: `<strong>Abhängigkeit von der Frequenz:</strong> Unterhalb f₀ dominiert X_C – der Kreis ist <strong>kapazitiv</strong>, U zeigt unterhalb von I (φ < 0). Oberhalb f₀ dominiert X_L – der Kreis ist <strong>induktiv</strong>. Mit den Reglern R, L, C und f lässt sich jeder Betriebspunkt einstellen; die Taste <strong>f → f₀</strong> springt direkt in die Resonanz. Mit <strong>▶ Drehung</strong> rotieren die Zeiger in Zeitlupe, und die Projektion auf die senkrechte Achse liefert die Momentanwerte u(t) und i(t).`
+    exp5: `<strong>Abhängigkeit von der Frequenz:</strong> Unterhalb f₀ dominiert X_C – der Kreis ist <strong>kapazitiv</strong>, U zeigt unterhalb von I (φ < 0). Oberhalb f₀ dominiert X_L – der Kreis ist <strong>induktiv</strong>. Mit den Reglern R, L, C und f lässt sich jeder Betriebspunkt einstellen; die Taste <strong>f → f₀</strong> springt direkt in die Resonanz. Mit <strong>▶ Drehung</strong> rotieren die Zeiger in Zeitlupe, und die Projektion auf die senkrechte Achse liefert die Momentanwerte u(t) und i(t). <strong>Standardeinstellungen:</strong> Fünf Buttons in der Steuerung setzen typische Betriebspunkte – Netz, fast ohmsch, kapazitiv, induktiv und Resonanz.`
   },
   en: {
     title: "Phasor Diagram – Series RLC Circuit",
@@ -231,6 +250,10 @@ const I18N = {
     opCard: "Display & Operation",
     rotStart: "▶ Rotate", rotStop: "❚❚ Stop", resF0: "f → f₀ (resonance)",
     opHint: "Rotation: all phasors rotate together with ω (slow motion); their projection onto the vertical axis gives u(t) and i(t). Resonance: sets f = f₀.",
+    presets: "Default presets",
+    pNet: "Grid 50 Hz", pOhm: "Near resistive (φ ≈ −2°)", pCap: "Capacitive (φ ≈ −52°)",
+    pInd: "Inductive (φ ≈ +48°)", pRes: "Resonance (overvoltage)",
+    presetsHint: "Sets R, L, C, f and U to typical operating points – tweak freely afterwards. \"Resonance\" uses R = 20 Ω: U_L and U_C exceed the source voltage!",
     tagInd: "(ind)", tagKap: "(cap)",
     formulas: "Formulas", explanation: "Explanation",
     zdTitle: "Phasor diagram – RMS values",
@@ -243,7 +266,7 @@ const I18N = {
     exp2: `<strong>Series circuit – current as reference:</strong> The same current flows through all three components, so the <strong>current phasor I is drawn horizontally</strong> as the reference. The resistor drops <strong>U_R = R·I in phase</strong> (parallel to I). The inductor voltage <strong>leads the current by +90°</strong> (U_L straight up), the capacitor voltage <strong>lags by −90°</strong> (U_C straight down).`,
     exp3: `<strong>Phasor sum and voltage triangle:</strong> The source voltage is the <strong>geometric sum</strong> U = U_R + U_L + U_C: chain the phasors tip-to-tail (the polygon), and the arrow from the origin to the final tip is U. Because U_L and U_C point in <strong>opposite directions</strong>, they partially cancel; what remains is a <strong>right-angled voltage triangle</strong> with legs U_R and U_L − U_C and hypotenuse U. Hence: tan φ = (X_L − X_C)/R.`,
     exp4: `<strong>Resonance:</strong> At <strong>f₀ = 1/(2π·√(L·C))</strong> we get X_L = X_C: U_L and U_C are equal and cancel – so U = U_R and φ = 0 (series resonance). Caution: since the current grows very large at small Z, <strong>U_L and U_C can individually exceed the source voltage U</strong> (voltage magnification) – in the diagram their phasors stick out far beyond U.`,
-    exp5: `<strong>Frequency dependence:</strong> Below f₀, X_C dominates – the circuit is <strong>capacitive</strong> and U points below I (φ < 0). Above f₀, X_L dominates – the circuit is <strong>inductive</strong>. The sliders R, L, C and f set any operating point; the <strong>f → f₀</strong> button jumps straight to resonance. With <strong>▶ Rotate</strong> the phasors spin in slow motion, and their projection onto the vertical axis yields the instantaneous values u(t) and i(t).`
+    exp5: `<strong>Frequency dependence:</strong> Below f₀, X_C dominates – the circuit is <strong>capacitive</strong> and U points below I (φ < 0). Above f₀, X_L dominates – the circuit is <strong>inductive</strong>. The sliders R, L, C and f set any operating point; the <strong>f → f₀</strong> button jumps straight to resonance. With <strong>▶ Rotate</strong> the phasors spin in slow motion, and their projection onto the vertical axis yields the instantaneous values u(t) and i(t). <strong>Default presets:</strong> Five buttons in the controls set typical operating points – grid, near resistive, capacitive, inductive and resonance.`
   }
 };
 let lang = "de";
@@ -641,6 +664,22 @@ $("btnF0").addEventListener("click", () => {
   el.dispatchEvent(new Event("input"));
 });
 
+/* Voreinstellungen: typische Betriebspunkte mit einem Klick */
+const PRESETS = {
+  bPNet: { R: 100, LmH: 100, CuF: 50,  f: 50,  U: 230 },   // Standard: Netz, leicht kapazitiv
+  bPOhm: { R: 100, LmH: 10,  CuF: 500, f: 50,  U: 230 },   // φ ≈ −2°: fast phasengleich
+  bPCap: { R: 100, LmH: 100, CuF: 20,  f: 50,  U: 230 },   // φ ≈ −52°: kapazitiv
+  bPInd: { R: 100, LmH: 100, CuF: 50,  f: 200, U: 230 },   // φ ≈ +48°: induktiv
+  bPRes: { R: 20,  LmH: 100, CuF: 50,  f: 71,  U: 230 }    // Resonanz mit Spannungsüberhöhung
+};
+function applyPreset(p){
+  for (const [id, key] of [["rR", "R"], ["rL", "LmH"], ["rC", "CuF"], ["rU", "U"]]){
+    const el = $(id); el.value = p[key]; el.dispatchEvent(new Event("input"));
+  }
+  const elF = $("rF"); elF.value = Math.round(posFromF(p.f)); elF.dispatchEvent(new Event("input"));
+}
+for (const id in PRESETS) $(id).addEventListener("click", () => applyPreset(PRESETS[id]));
+
 /* ---------------- 9. Sprachumschalter ---------------- */
 function applyLang(){
   document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T(el.dataset.i18n); });
@@ -678,13 +717,14 @@ span.sn-num{background:var(--accent,#f59e0b);color:#1a1206;border-color:var(--ac
 </style>
 <footer class="sn-bar">
   <a class="sn-home" href="../index.html">← Startseite</a>
-  <nav class="sn-nums" aria-label="Simulationen 1 bis 13">
+  <nav class="sn-nums" aria-label="Simulationsnavigation">
     <a class="sn-num" href="../01_Einfuehrung_Wechselstrom/" title="Wechselstromerzeugung">1</a>
     <a class="sn-num" href="../02_Kennwerte_Sinusschwingung/" title="Kennwerte der Sinusschwingung">2</a>
     <a class="sn-num" href="../03_Widerstand_Wechselstrom/" title="Ohmscher Widerstand im Wechselstromkreis">3</a>
-    <a class="sn-num" href="../04_Kondensator_Wechselstrom/" title="Kondensator im Wechselstromkreis">4</a>
-    <a class="sn-num" href="../05_Spule_Wechselstrom/" title="Spule im Wechselstromkreis">5</a>
-    <a class="sn-num" href="../06_Oszilloskop/" title="Digitales Speicheroszilloskop (DSO)">6</a>
+    <a class="sn-num" href="../04a_Kondensator_Wechselstrom/" title="Kondensator im Wechselstromkreis">04a</a>
+    <a class="sn-num" href="../04b_Spule_Wechselstrom/" title="Spule im Wechselstromkreis">04b</a>
+    <a class="sn-num" href="../05_Ladungstransports/" title="Exkurs: Strom ohne Spannung – Ladungstransport">05</a>
+    <a class="sn-num" href="../06_Oszilloskop/" title="Exkurs: Digitales Speicheroszilloskop (DSO)">6</a>
     <a class="sn-num" href="../07_Leistung_Wechselstrom/" title="Leistung im Wechselstromkreis">7</a>
     <span class="sn-num" title="Zeigerdiagramm RLC-Reihenschaltung (aktive Simulation)">8</span>
     <a class="sn-num" href="../09_Impedanz_Dreieck/" title="Impedanz-Dreieck (RLC)">9</a>

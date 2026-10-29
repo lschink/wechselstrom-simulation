@@ -1,0 +1,1656 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Exkurs: Strom ohne Spannung – die drei Mechanismen des Ladungstransports. Interaktive Simulation zu ohmscher Drift, Diffusionsstrom am pn-Übergang und persistierendem Supraleitungsstrom.">
+<title>Exkurs: Strom ohne Spannung – die drei Mechanismen des Ladungstransports – Simulation</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+<style>
+  /* ============================================================
+     Physik-Labor-Dark-Design (Palette wie die übrigen Simulationen)
+     ============================================================ */
+  :root{
+    --bg:#0d1117;
+    --panel:#161b22;
+    --panel2:#1c2128;
+    --border:#30363d;
+    --text:#e6edf3;
+    --muted:#8b949e;
+    --amber:#f0b429;   /* Panel 1: ohmscher Transport   */
+    --cyan:#22d3ee;    /* Panel 2: Diffusion            */
+    --green:#3fb950;   /* Panel 3: Supraleitung         */
+    --violet:#bb86fc;  /* Panel 4: Kondensator          */
+    --pink:#f778ba;    /* Panel 5: Spule                */
+    --red:#ff5c5c;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+         padding:16px 22px;border-bottom:1px solid var(--border)}
+  h1{font-size:20px;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin:2px 0 0}
+  .exkurs-chip{display:inline-block;background:var(--violet);color:#160b22;border-radius:999px;
+               font-size:11px;font-weight:800;letter-spacing:.08em;padding:2px 10px;margin-right:8px;
+               vertical-align:2px;text-transform:uppercase}
+  .master{display:flex;gap:8px}
+  main{max-width:1560px;margin:0 auto;padding:16px 22px 30px;display:grid;gap:14px}
+
+  /* ---------- Intro & Fazit ---------- */
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .intro p{margin:0 0 10px;color:#c9d1d9;max-width:110ch}
+  .intro p:last-child{margin-bottom:0}
+  .intro strong{color:var(--text)}
+  .chiprow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);
+        background:var(--panel2);border:1px solid var(--border);border-radius:999px;padding:3px 10px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+  /* ---------- Die drei Szenario-Panels ---------- */
+  .panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(370px,1fr));gap:14px;align-items:start}
+  .scen{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;
+        display:grid;gap:10px}
+  .p-ohm{border-top:3px solid var(--amber)}
+  .p-diff{border-top:3px solid var(--cyan)}
+  .p-supra{border-top:3px solid var(--green)}
+  .p-cond{border-top:3px solid var(--violet)}
+  .p-coil{border-top:3px solid var(--pink)}
+  .p-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  h2{font-size:15.5px;margin:0;display:flex;align-items:center;gap:8px}
+  .pn{display:inline-flex;align-items:center;justify-content:center;width:1.55rem;height:1.55rem;
+      border-radius:8px;font-size:.85rem;font-weight:800;color:#0d1117}
+  .p-ohm .pn{background:var(--amber)} .p-diff .pn{background:var(--cyan)} .p-supra .pn{background:var(--green)}
+  .p-cond .pn{background:var(--violet)} .p-coil .pn{background:var(--pink)}
+  h2 small{color:var(--muted);font-weight:500;font-size:12px}
+  .tag{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;
+       padding:2px 9px;border:1px solid var(--border);color:var(--muted)}
+  .p-ohm .tag{color:var(--amber);border-color:var(--amber)}
+  .p-diff .tag{color:var(--cyan);border-color:var(--cyan)}
+  .p-supra .tag{color:var(--green);border-color:var(--green)}
+  .p-cond .tag{color:var(--violet);border-color:var(--violet)}
+  .p-coil .tag{color:var(--pink);border-color:var(--pink)}
+
+  canvas{display:block;width:100%;background:#0b0f14;border:1px solid var(--border);border-radius:8px}
+  .viz{aspect-ratio:460/310}
+  .graph{aspect-ratio:460/86}
+
+  /* ---------- Steuerung ---------- */
+  .ctrl{display:grid;gap:8px}
+  .ctrl label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:-4px}
+  .ctrl output{font:600 13px var(--mono);color:var(--text)}
+  .p-ohm .ctrl output{color:var(--amber)} .p-diff .ctrl output{color:var(--cyan)}
+  .p-supra .ctrl output{color:var(--green)}
+  input[type=range]{width:100%;accent-color:var(--muted);cursor:pointer}
+  .p-ohm input[type=range]{accent-color:var(--amber)} .p-diff input[type=range]{accent-color:var(--cyan)}
+  .p-supra input[type=range]{accent-color:var(--green)}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .btn{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:9px;
+       padding:8px 14px;font:700 13px system-ui;cursor:pointer}
+  .btn:hover{border-color:var(--muted)}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{border-color:transparent;color:#0d1117}
+  .p-ohm .btn.primary{background:var(--amber)} .p-diff .btn.primary{background:var(--cyan)}
+  .p-supra .btn.primary{background:var(--green)}
+  .btn.on{background:var(--red);border-color:transparent;color:#1a0505}
+  /* Segment-Umschalter (pn-Modi) */
+  .seg{display:flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+  .seg button{flex:1;background:var(--panel2);color:var(--muted);border:none;padding:8px 4px;
+              font:700 12px system-ui;cursor:pointer}
+  .seg button + button{border-left:1px solid var(--border)}
+  .seg button.on{background:rgba(34,211,238,.16);color:var(--cyan)}
+  .tc-zone{position:relative}
+  .tc-mark{position:absolute;top:-3px;bottom:-3px;left:30.6%;border-left:2px dashed var(--green);pointer-events:none}
+  .tc-lab{position:absolute;top:-22px;left:30.6%;transform:translateX(-50%);font-size:10.5px;color:var(--green);white-space:nowrap}
+
+  /* ---------- Live-Dashboard ---------- */
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tile{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:7px 10px}
+  .t-lab{font-size:11px;color:var(--muted);letter-spacing:.02em}
+  .t-val{font:600 15.5px var(--mono);margin-top:1px}
+  .t-val small{font-size:11px;color:var(--muted);font-weight:400}
+  .t-val.pos{color:var(--green)} .t-val.neg{color:var(--red)}
+  .t-val.accent-o{color:var(--amber)} .t-val.accent-d{color:var(--cyan)} .t-val.accent-s{color:var(--green)}
+  .gross{font-size:11.5px;color:var(--muted);font-family:var(--mono);margin-top:-2px}
+
+  /* ---------- Formelbox & Erklärung ---------- */
+  .formula{background:#0b0f14;border:1px dashed var(--border);border-radius:10px;padding:10px 12px;
+           font:13px var(--mono);color:#c9d1d9;display:grid;gap:4px}
+  .f-big{font-size:14.5px}
+  .p-ohm .f-big{color:var(--amber)} .p-diff .f-big{color:var(--cyan)} .p-supra .f-big{color:var(--green)}
+  .lv{color:var(--text);font-weight:700}
+  .lv.o{color:var(--amber)} .lv.d{color:var(--cyan)} .lv.s{color:var(--green)} .lv.r{color:var(--red)}
+  .explain{font-size:12.8px;color:#c9d1d9;margin:0}
+  .explain strong{color:var(--text)}
+  .em-o{color:var(--amber);font-weight:700} .em-d{color:var(--cyan);font-weight:700} .em-s{color:var(--green);font-weight:700}
+  .em-k{color:var(--violet);font-weight:700} .em-p{color:var(--pink);font-weight:700}
+  .p-cond input[type=range]{accent-color:var(--violet)} .p-coil input[type=range]{accent-color:var(--pink)}
+  .p-cond .ctrl output{color:var(--violet)} .p-coil .ctrl output{color:var(--pink)}
+  .p-cond .btn.primary{background:var(--violet)} .p-coil .btn.primary{background:var(--pink)}
+  .t-val.accent-k{color:var(--violet)} .t-val.accent-p{color:var(--pink)}
+  .lv.k{color:var(--violet)} .lv.p{color:var(--pink)}
+  select.mat{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:9px;
+             padding:8px 10px;font:600 13px system-ui;width:100%;cursor:pointer}
+  select.mat:hover{border-color:var(--muted)}
+  .matinfo{font-size:12px;color:var(--muted);margin-top:-2px}
+  .matinfo strong{color:var(--text)}
+  .panels-sub{margin:2px 0 -4px;font-size:14px;color:var(--muted)}
+  .panels-sub strong{color:var(--text)}
+
+  /* ---------- Fazit-Tabelle ---------- */
+  .fazit h2{font-size:15.5px;margin-bottom:10px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  tr:last-child td{border-bottom:none}
+  td.fm{font-family:var(--mono);white-space:nowrap;color:var(--text)}
+  .fazit p{margin:10px 0 0;color:#c9d1d9;font-size:13px}
+  .foot-note{color:var(--muted);font-size:12px;margin:0 2px}
+
+  footer{color:var(--muted);font-size:12.5px;text-align:center;padding:6px 20px 26px}
+
+  @media (max-width:900px){ .tiles{grid-template-columns:1fr 1fr} }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1><span class="exkurs-chip">Exkurs</span>Strom ohne Spannung – die drei Mechanismen des Ladungstransports</h1>
+    <p class="sub">Warum das Ohmsche Gesetz j&nbsp;=&nbsp;σE nur ein Sonderfall ist · Drift · Diffusion · Supraleitung · Kondensator · Spule</p>
+  </div>
+  <div class="master">
+    <button id="btnPause" class="btn">⏸ Pause</button>
+    <button id="btnReset" class="btn">↺ Zurücksetzen</button>
+  </div>
+</header>
+
+<main>
+  <!-- ================= Intro ================= -->
+  <section class="panel intro">
+    <p>
+      Im Grundlagenteil gilt das Ohmsche Gesetz <strong>j&nbsp;=&nbsp;σ·E</strong>: Ladungen fließen, weil ein
+      elektrisches Feld sie <strong>driftet</strong>. Das ist aber nur <strong>ein</strong> Transportmechanismus –
+      und nicht einmal der häufigste. Die drei Panels unten laufen synchron und zeigen nebeneinander:
+    </p>
+    <p>
+      <strong>1&nbsp;·</strong> Ohmscher <strong>Driftstrom</strong>: ein Feld beschleunigt Thermik-Teilchen, ein winziger
+      Netto-Rest bleibt übrig. <strong>2&nbsp;·</strong> <strong>Diffusionsstrom</strong>: ein Konzentrationsgradient
+      treibt Ladungen <strong>ohne jedes Feld</strong> (E&nbsp;=&nbsp;0) – Triebkraft ist die Entropie, nicht die Spannung.
+      <strong>3&nbsp;·</strong> <strong>Supraleitung</strong>: ein einmal angestoßener Strom fließt bei E&nbsp;=&nbsp;0 ewig
+      weiter, weil das kondensierte Elektronenpaar keine Streuung erfährt. Danach zwei Bauelement-Studien: der
+      <strong>Kondensator</strong> – Strom fließt trotz isolierter Lücke (Verschiebungsstrom, Energie im E-Feld) –
+      und die <strong>Spule</strong> – jede Stromänderung wird vom Magnetfeld gebremst (Selbstinduktion, Energie im B-Feld).
+    </p>
+    <div class="chiprow">
+      <span class="chip"><span class="dot" style="background:#7dd3fc"></span>Elektron (Szenario 1)</span>
+      <span class="chip"><span class="dot" style="background:#38bdf8"></span>Elektron aus n-reichem Gebiet (2)</span>
+      <span class="chip"><span class="dot" style="background:#fb923c"></span>Elektron aus niedrigem Gebiet (2)</span>
+      <span class="chip"><span class="dot" style="background:#3fb950"></span>Cooper-Paar / supraleitend (3)</span>
+      <span class="chip"><span class="dot" style="background:#f0b429"></span>Normalleiter-Zustand (3)</span>
+      <span class="chip"><span class="dot" style="background:#bb86fc"></span>Elektron im Kondensator (4)</span>
+      <span class="chip"><span class="dot" style="background:#f778ba"></span>Elektron in der Spule (5)</span>
+    </div>
+  </section>
+
+  <!-- ================= Drei Szenarien ================= -->
+  <div class="panels">
+
+    <!-- ---------- SZENARIO 1: Ohmscher Transport ---------- -->
+    <section class="scen p-ohm">
+      <div class="p-head">
+        <h2><span class="pn">1</span> Ohmscher Transport <small>Drift im elektrischen Feld</small></h2>
+        <span class="tag">Referenz: j = σE</span>
+      </div>
+
+      <canvas id="cvOhm" class="viz"></canvas>
+
+      <div class="ctrl">
+        <label>Spannung U <output id="outU">5,0 V</output></label>
+        <input id="sldU" type="range" min="0" max="10" step="0.1" value="5">
+      </div>
+
+      <div class="tiles">
+        <div class="tile"><div class="t-lab">Elektrisches Feld E</div><div class="t-val" id="tOhmE">–</div></div>
+        <div class="tile"><div class="t-lab">Stromdichte j = σE</div><div class="t-val accent-o" id="tOhmJ">–</div></div>
+        <div class="tile"><div class="t-lab">Driftgeschwindigkeit v_d</div><div class="t-val" id="tOhmV">–</div></div>
+        <div class="tile"><div class="t-lab">Nettofluss am Messdraht</div><div class="t-val" id="tOhmFlux">–</div></div>
+      </div>
+
+      <canvas id="gOhm" class="graph"></canvas>
+
+      <div class="formula" id="fOhm">
+        <div class="f-big">j = σ · E = <span class="lv o" id="fOhmJ">–</span></div>
+        <div>E = U / d = <span class="lv" id="fOhmE">–</span> · v_d = μ · E = <span class="lv" id="fOhmV">–</span></div>
+        <div>σ = n·q·μ = <span class="lv" id="fOhmSigma">–</span> (Kupfer, n = 8,5·10²⁸ m⁻³)</div>
+      </div>
+
+      <p class="explain">
+        Die Elektronen sind durch die <strong>Wärmebewegung</strong> permanent zufällig unterwegs (Brownsches Rauschen).
+        Das Feld <strong>E</strong> überlagert dieser Thermik eine winzige, <strong>gerichtete</strong> Driftgeschwindigkeit
+        v<sub>d</sub>&nbsp;=&nbsp;μ·E. Erst die gerichtete Komponente zählt: <span class="em-o">j&nbsp;=&nbsp;n·q·v<sub>d</sub>&nbsp;=&nbsp;σ·E</span>.
+        Bei <strong>U&nbsp;=&nbsp;0</strong> bleibt nur Rauschen übrig – der gezählte Nettofluss schwankt statistisch um <strong>Null</strong>.
+      </p>
+    </section>
+
+    <!-- ---------- SZENARIO 2: Diffusionsstrom ---------- -->
+    <section class="scen p-diff">
+      <div class="p-head">
+        <h2><span class="pn">2</span> Diffusionsstrom <small>Konzentrationsgradient, E = 0</small></h2>
+        <span class="tag">Strom ohne Spannung</span>
+      </div>
+
+      <canvas id="cvDiff" class="viz"></canvas>
+
+      <div class="ctrl">
+        <label>Diffusionskoeffizient D <output id="outD">1,8</output></label>
+        <input id="sldD" type="range" min="0.2" max="4" step="0.1" value="1.8">
+      </div>
+      <div class="btnrow">
+        <div class="seg" id="segPn" role="group" aria-label="pn-Übergang-Modus">
+          <button data-m="diffus" class="on">Diffusion<br>E = 0</button>
+          <button data-m="drift">Drift<br>E ≠ 0</button>
+          <button data-m="komp">Kompensation</button>
+        </div>
+      </div>
+
+      <div class="tiles">
+        <div class="tile"><div class="t-lab">Elektrisches Feld E</div><div class="t-val" id="tDiffE">–</div></div>
+        <div class="tile"><div class="t-lab">Nettofluss über Grenze (Ø/s)</div><div class="t-val accent-d" id="tDiffFlux">–</div></div>
+        <div class="tile"><div class="t-lab">Konzentration n links · rechts</div><div class="t-val" id="tDiffN">–</div></div>
+        <div class="tile"><div class="t-lab">Gradient ∇n</div><div class="t-val" id="tDiffGrad">–</div></div>
+      </div>
+      <div class="gross" id="tDiffGross">Übergänge gesamt: –</div>
+
+      <canvas id="gDiff" class="graph"></canvas>
+
+      <div class="formula" id="fDiff">
+        <div class="f-big">j = −q · D · ∇n</div>
+        <div>∇n = (n<sub>rechts</sub> − n<sub>links</sub>)/d = <span class="lv d" id="fDiffGrad">–</span></div>
+        <div id="fDiffMode">E = <span class="lv r">0 V/m</span> → trotzdem Strom: die Entropie treibt die Teilchen vom dichten ins dünne Gebiet.</div>
+      </div>
+
+      <p class="explain" id="xDiff">
+        Zwei <strong>gerührte Kammern</strong> (Reservoirs) mit einer durchlässigen Grenze dazwischen:
+        links <strong>hohe</strong>, rechts <strong>niedrige</strong> Elektronendichte – wie die n- und p-Seite einer
+        <strong>Diode</strong>. Die Thermik bewegt die Teilchen ungeordnet; weil links einfach <strong>mehr</strong>
+        Teilchen zufällig Richtung Grenze laufen als von rechts zurück, entsteht ein
+        <span class="em-d">Nettofluss vom Dichten ins Dünne</span> – bei exakt <strong>E&nbsp;=&nbsp;0</strong>.
+        Triebkraft ist der Wunsch nach <strong>Entropie</strong> (Ficksches Gesetz), nicht Batterie-Energie:
+        j&nbsp;=&nbsp;−q·D·∇n. Die Kammern ersetzen überquerende Teilchen – Dichten und Fluss bleiben konstant.
+      </p>
+    </section>
+
+    <!-- ---------- SZENARIO 3: Supraleitung ---------- -->
+    <section class="scen p-supra">
+      <div class="p-head">
+        <h2><span class="pn">3</span> Supraleitung <small>Persistenzstrom bei E = 0</small></h2>
+        <span class="tag">Strom für immer</span>
+      </div>
+
+      <canvas id="cvSupra" class="viz"></canvas>
+
+      <div class="ctrl">
+        <div class="tc-zone">
+          <span class="tc-lab" id="tcLab">Tc = 92 K (YBCO)</span><span class="tc-mark" id="tcMark"></span>
+          <label>Temperatur T <output id="outT">77 K</output></label>
+          <input id="sldT" type="range" min="4" max="300" step="1" value="77">
+        </div>
+        <label style="font-size:13px">Materialbeispiel – setzt T<sub>c</sub></label>
+        <select id="selMat" class="mat" aria-label="Supraleiter-Material"></select>
+        <div class="matinfo" id="matInfo"></div>
+      </div>
+      <div class="btnrow">
+        <button id="btnStart" class="btn primary">▶ Strom starten</button>
+        <button id="btnNormal" class="btn">Normalleiter umschalten</button>
+      </div>
+
+      <div class="tiles">
+        <div class="tile"><div class="t-lab">Elektrisches Feld E</div><div class="t-val" id="tSupE">–</div></div>
+        <div class="tile"><div class="t-lab">Ringstrom I</div><div class="t-val accent-s" id="tSupI">–</div></div>
+        <div class="tile"><div class="t-lab">Temperatur T</div><div class="t-val" id="tSupT">–</div></div>
+        <div class="tile"><div class="t-lab">Zustand</div><div class="t-val" id="tSupState">–</div></div>
+      </div>
+
+      <canvas id="gSupra" class="graph"></canvas>
+
+      <div class="formula" id="fSupra">
+        <div class="f-big">j = n<sub>s</sub> · q · v<sub>s</sub> = konst. <span class="lv s">bei E = 0</span></div>
+        <div>I(t) = <span class="lv s" id="fSupI">–</span> · im Normalleiter: I(t) = I₀·e<sup>−t/τ</sup> (Reibung)</div>
+        <div>T = <span class="lv" id="fSupT">–</span> → <span class="lv" id="fSupState">–</span></div>
+      </div>
+
+      <p class="explain">
+        Einmal angestoßen, laufen die Elektronen im <strong>geschlossenen Ring</strong> endlos weiter: Der
+        supraleitende Zustand ist eine <strong>kondensierte Quantenphase</strong> (Cooper-Paare verhalten sich
+        bosonisch). Es gibt <strong>keine Streuung an Gitterfehlern</strong> – also keine „Reibung", die ein Feld
+        aufrechterhalten müsste. Folge: <span class="em-s">E&nbsp;=&nbsp;0, aber j&nbsp;≠&nbsp;0</span> – der
+        Persistenzstrom fließt Jahre lang ungeschwächt. Erst oberhalb der Sprungtemperatur T<sub>c</sub> (oder per
+        Schalter als Normalleiter) klingt er exponentiell ab.
+      </p>
+    </section>
+  </div>
+
+  <p class="panels-sub"><strong>Anwendung auf die Bauelemente:</strong> Wohin mit der Energie – und wie „kommt der Strom
+  über die Lücke“ bzw. „warum trödelt die Spule“? Felder als Energiespeicher.</p>
+
+  <div class="panels">
+
+    <!-- ---------- SZENARIO 4: Kondensator ---------- -->
+    <section class="scen p-cond">
+      <div class="p-head">
+        <h2><span class="pn">4</span> Kondensator <small>E-Feld als „Strombrücke“</small></h2>
+        <span class="tag">Verschiebungsstrom</span>
+      </div>
+
+      <canvas id="cvCond" class="viz"></canvas>
+
+      <div class="ctrl">
+        <label>Quellspannung U<sub>q</sub> <output id="outUq">6,0 V</output></label>
+        <input id="sldUq" type="range" min="1" max="10" step="0.5" value="6">
+        <label>Zeitkonstante τ = R·C <output id="outTau">1,0 s</output></label>
+        <input id="sldTau" type="range" min="0.3" max="3" step="0.1" value="1">
+      </div>
+
+      <div class="tiles">
+        <div class="tile"><div class="t-lab">Kondensatorspannung u_C</div><div class="t-val" id="tCondU">–</div></div>
+        <div class="tile"><div class="t-lab">Strom i = C·du/dt</div><div class="t-val accent-k" id="tCondI">–</div></div>
+        <div class="tile"><div class="t-lab">Ladung Q = C·u_C</div><div class="t-val" id="tCondQ">–</div></div>
+        <div class="tile"><div class="t-lab">Energie W = ½·C·u²</div><div class="t-val" id="tCondW">–</div></div>
+        <div class="tile"><div class="t-lab">Elektrisches Feld E = u_C/d (d = 1 mm)</div><div class="t-val" id="tCondE">–</div></div>
+        <div class="tile"><div class="t-lab">Kapazität C</div><div class="t-val" id="tCondC">1,0 µF</div></div>
+      </div>
+      <div class="gross" id="tCondPhase">Phase: –</div>
+
+      <canvas id="gCond" class="graph"></canvas>
+
+      <div class="formula" id="fCond">
+        <div class="f-big">i = C · du<sub>C</sub>/dt</div>
+        <div>u<sub>C</sub> = <span class="lv k" id="fCondU">–</span> · i = <span class="lv" id="fCondI">–</span> · Q = <span class="lv k" id="fCondQ">–</span></div>
+        <div>E = u<sub>C</sub>/d = <span class="lv k" id="fCondE">–</span> · C = 1,0 µF · d = 1 mm</div>
+        <div>In der Lücke: kein Ladungstransport – die E-Feld-Änderung wirkt als <strong>Verschiebungsstrom</strong> j = ∂D/∂t.</div>
+      </div>
+
+      <p class="explain">
+        Der Zyklus hat zwei Phasen: <strong>1 · Laden</strong> – die Quelle wirkt, Elektronen
+        <strong>verschieben</strong> sich im Draht und stauen sich auf der rechten Platte (negative Ladung),
+        die linke wird positiv; dazwischen wächst das <strong>elektrische Feld</strong> – kein einziges
+        Elektron überquert die Lücke, die <strong>Änderung</strong> des Feldes übernimmt den „Transport“
+        <span class="em-k">(Verschiebungsstrom)</span>. <strong>2 · Entladen</strong> – die Quelle ist
+        <strong>abgetrennt</strong> (u<sub>q</sub> = 0) und der Kondensator gibt seine Energie über den
+        Widerstand R ab: Der Strom kehrt um, die Elektronen fließen zurück, das E-Feld kollabiert.
+        Gespeichert war sie <strong>im E-Feld zwischen den Platten</strong>: W = ½·C·u².
+      </p>
+    </section>
+
+    <!-- ---------- SZENARIO 5: Spule ---------- -->
+    <section class="scen p-coil">
+      <div class="p-head">
+        <h2><span class="pn">5</span> Spule <small>B-Feld speichert die Energie</small></h2>
+        <span class="tag">Selbstinduktion</span>
+      </div>
+
+      <canvas id="cvCoil" class="viz"></canvas>
+
+      <div class="ctrl">
+        <label>Soll-Strom I <output id="outCi">60 mA</output></label>
+        <input id="sldCi" type="range" min="0" max="100" step="1" value="60">
+        <label>Trägheit τ = L/R <output id="outCt">1,2 s</output></label>
+        <input id="sldCt" type="range" min="0.3" max="3" step="0.1" value="1.2">
+      </div>
+
+      <div class="tiles">
+        <div class="tile"><div class="t-lab">Strom i</div><div class="t-val accent-p" id="tCoilI">–</div></div>
+        <div class="tile"><div class="t-lab">Spannung u_L = L·di/dt</div><div class="t-val" id="tCoilU">–</div></div>
+        <div class="tile"><div class="t-lab">Stromänderung di/dt</div><div class="t-val" id="tCoilD">–</div></div>
+        <div class="tile"><div class="t-lab">Energie W = ½·L·i²</div><div class="t-val" id="tCoilW">–</div></div>
+        <div class="tile"><div class="t-lab">Magnetfeld B = µ₀·(N/l)·i (N/l = 10⁴ m⁻¹)</div><div class="t-val" id="tCoilB">–</div></div>
+        <div class="tile"><div class="t-lab">Induktivität L</div><div class="t-val" id="tCoilL">1,0 H (sim)</div></div>
+      </div>
+
+      <canvas id="gCoil" class="graph"></canvas>
+
+      <div class="formula" id="fCoil">
+        <div class="f-big">u<sub>L</sub> = L · di/dt</div>
+        <div>L = <span class="lv">1,0 H (sim)</span> · di/dt = <span class="lv p" id="fCoilD">–</span> → u<sub>L</sub> = <span class="lv p" id="fCoilU">–</span></div>
+        <div>W = ½·L·i² = <span class="lv p" id="fCoilW">–</span> · B = µ₀·(N/l)·i = <span class="lv p" id="fCoilB">–</span> · B-Feld ∝ i</div>
+      </div>
+
+      <p class="explain">
+        Fließt Strom, baut sich in und um der Spule ein <strong>Magnetfeld</strong> auf (B&nbsp;∝&nbsp;i). Ändert sich
+        der Strom, <strong>ändert sich das B-Feld</strong> – und das Induktionsgesetz erzeugt eine Spannung, die der
+        Änderung <strong>entgegenwirkt</strong> (Lenzsche Regel): Die Spule bremst Ein- und Ausschalten und „weigert
+        sich“ förmlich gegen Stromänderungen. Bei konstantem Strom: u<sub>L</sub> = 0 – die Energie liegt
+        <strong>im B-Feld</strong>: W = ½·L·i².
+      </p>
+    </section>
+  </div>
+
+  <!-- ================= Fazit ================= -->
+  <section class="panel fazit">
+    <h2>Fazit: Transportmechanismen und Feld-Speicher im Überblick</h2>
+    <table>
+      <thead>
+        <tr><th>Mechanismus</th><th>Triebkraft</th><th>Feld nötig?</th><th>Gesetz</th><th>Typischer Ort</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong class="em-o">Drift</strong> (ohmsch)</td>
+          <td>Elektrisches Feld</td>
+          <td><strong>Ja</strong>, E ≠ 0</td>
+          <td class="fm">j = σ·E</td>
+          <td>Leiter, Widerstand</td>
+        </tr>
+        <tr>
+          <td><strong class="em-d">Diffusion</strong></td>
+          <td>Konzentrationsgradient (Entropie)</td>
+          <td><strong>Nein</strong>, E = 0 möglich</td>
+          <td class="fm">j = −q·D·∇n</td>
+          <td>pn-Übergang, Solarzelle, Chemie</td>
+        </tr>
+        <tr>
+          <td><strong class="em-s">Supraleitung</strong></td>
+          <td>Kondensierte Phase (kein Verlust)</td>
+          <td><strong>Nein</strong>, E = 0 bei Persistenz</td>
+          <td class="fm">j = n<sub>s</sub>·q·v<sub>s</sub> = konst.</td>
+          <td>MR-Tomographie, Supra-Magnete</td>
+        </tr>
+        <tr>
+          <td><strong class="em-k">Verschiebungsstrom</strong> (Kondensator)</td>
+          <td>Änderung des E-Felds</td>
+          <td>Ladung passiert die Lücke nie</td>
+          <td class="fm">i = C·du/dt · j = ∂D/∂t</td>
+          <td>Kondensator, Kabelkapazität</td>
+        </tr>
+        <tr>
+          <td><strong class="em-p">Selbstinduktion</strong> (Spule)</td>
+          <td>Änderung des B-Felds (Lenz)</td>
+          <td>Bremst jede Stromänderung</td>
+          <td class="fm">u = L·di/dt · W = ½·L·i²</td>
+          <td>Spule, Drossel, Transformator</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      Das Ohmsche Gesetz beschreibt also nur den <strong>Drift-Sonderfall</strong>. Sobald Dichtegradienten existieren
+      oder Ladungen kondensiert sind, fließt Strom <strong>ohne Spannung</strong> – bei der Diode, der Solarzelle und
+      im Supra-Magneten jeden Tag. In <strong>Kondensator</strong> und <strong>Spule</strong> entscheidet zudem, ob die
+      Energie im <strong>E-Feld</strong> oder im <strong>B-Feld</strong> gespeichert wird – das eine brückt die Lücke,
+      das andere bremst jede Änderung.
+    </p>
+  </section>
+
+  <p class="foot-note">
+    Hinweis: Alle fünf Szenarien zeigen eine stark vergrößerte und verlangsamte Darstellung. Die berechneten
+    Zahlenwerte (E, j, v<sub>d</sub>, V<sub>diff</sub>, B) sind echte Materialgrößen; die Teilchenbewegung ist
+    schematisch, damit Drift und Diffusion sichtbar werden. Kondensator: C = 1 µF, d = 1 mm (i in µA);
+    Spule: L = 1 H (sim), 1000 Windungen auf 10 cm.
+  </p>
+</main>
+
+<script>
+"use strict";
+
+/* ==================================================================
+   Physik-Kern: drei unabhängige Teilchenmodelle, ein gemeinsamer
+   Simulations-Takt (alle Panels laufen synchron, ein rAF-Loop).
+   ================================================================== */
+
+/* ---------- Physikalische Konstanten ---------- */
+const QE = 1.602176634e-19;   // Elementarladung q (C)
+const VT = 25.85e-3;          // Thermische Spannung V_T = kT/q bei 300 K (V)
+const MU0 = 4 * Math.PI * 1e-7; // Magnetische Feldkonstante µ₀ (Vs/Am)
+
+/* Supraleiter-Materialbeispiele (Sprungtemperatur Tc in K).
+   Die Auswahl im Panel setzt die aktuelle Tc der Simulation. */
+const MATERIALS = [
+  { id: "ybco",  name: "YBCO – Kupferoxid-Keramik (92 K)",      tc: 92,   info: "Hochtemperatur-Supraleiter (1987). T = 77 K (flüssiger Stickstoff) genügt – deshalb der Standard dieser Simulation." },
+  { id: "hg",    name: "Quecksilber (Hg) – 4,15 K",             tc: 4.15, info: "Der <strong>erste Supraleiter überhaupt</strong> – 1911 entdeckt von <strong>Heike Kamerlingh Onnes</strong> in Leiden." },
+  { id: "al",    name: "Aluminium (Al) – 1,14 K",               tc: 1.14, info: "Klassischer Metall-Supraleiter mit sehr niedriger Sprungtemperatur (Helium-Kühlung nötig)." },
+  { id: "sn",    name: "Zinn (Sn) – 3,7 K",                     tc: 3.72, info: "Metall-Supraleiter – die oft genannten „ca. 4 K“ passen zu Zinn und Indium." },
+  { id: "in",    name: "Indium (In) – 3,4 K",                   tc: 3.41, info: "Weiches Metall, ebenfalls ein klassischer Tieftemperatur-Supraleiter." },
+  { id: "pb",    name: "Blei (Pb) – 7,2 K",                     tc: 7.19, info: "Hinweis: Blei wird häufig fälschlich mit „4 K“ zitiert – der korrekte Wert ist <strong>7,2 K</strong>." },
+  { id: "nb",    name: "Niob (Nb) – 9,2 K",                     tc: 9.25, info: "Die höchste Sprungtemperatur aller reinen Metalle." },
+  { id: "nbti",  name: "NbTi-Legierung – 10 K",                 tc: 10,   info: "Standardmaterial für Supramagnete: MRT-Tomographen und Teilchenbeschleuniger." },
+  { id: "nb3sn", name: "Nb₃Sn – 18,3 K",                        tc: 18.3, info: "Energietechnik: Magnete für Fusionsanlagen und Beschleuniger." },
+  { id: "mgb2",  name: "Magnesiumdiborid (MgB₂) – 39 K",        tc: 39,   info: "Hochtemperatur-Supraleiter (entdeckt 2001) – einfach und günstig herzustellen." },
+  { id: "bi",    name: "Bi-2223-Keramik – 110 K",               tc: 110,  info: "Höchste Sprungtemperatur ohne Hochdruck (unter Druck bis ca. 164 K)." },
+];
+let curTc = 92;   // aktuell gewählte Sprungtemperatur (setzt das Material)
+
+/* Kupfer-Modell (Szenario 1) */
+const N_CU  = 8.5e28;         // Elektronendichte Kupfer (m^-3)
+const MU_CU = 4.5e-3;         // Beweglichkeit der Elektronen (m^2/Vs)
+const D_LEITER = 1e-3;        // Länge d des dargestellten Leiterstücks (m)
+const SIGMA = N_CU * QE * MU_CU;   // Leitfähigkeit σ ≈ 6,1·10^7 S/m
+
+const DT_REF = 1 / 60;        // Referenz-Zeitschritt (s); px/Frame-Angaben beziehen sich darauf
+
+/* ---------- Zufallszahl: annähernd Gauss-verteilt (Irwin–Hall, 3 Stufen) ---------- */
+function gauss() {
+  return (Math.random() + Math.random() + Math.random()) - 1.5; // ~N(0, 0,5)
+}
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+
+/* ---------- Canvas-Hilfen (HiDPI-scharf zeichnen) ---------- */
+function fitCanvas(cv) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(50, cv.clientWidth), h = Math.max(30, cv.clientHeight);
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, W: w, H: h };
+}
+function drawGrid(ctx, W, H, step) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(139,148,158,.10)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = step; x < W; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+  for (let y = step; y < H; y += step) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+  ctx.stroke();
+  ctx.restore();
+}
+function arrow(ctx, x0, y0, x1, y1, color, width) {
+  const a = Math.atan2(y1 - y0, x1 - x0);
+  ctx.save();
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 1.6;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 - 7 * Math.cos(a - 0.45), y1 - 7 * Math.sin(a - 0.45));
+  ctx.lineTo(x1 - 7 * Math.cos(a + 0.45), y1 - 7 * Math.sin(a + 0.45));
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+/* ---------- Zahlenformatierung (deutsch) ---------- */
+function fmtF(x, d) {
+  return x.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+const SUP = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+function sup(n) {
+  if (n === 0) return "⁰";
+  let s = "", neg = n < 0; n = Math.abs(n);
+  while (n > 0) { s = SUP[n % 10] + s; n = Math.floor(n / 10); }
+  return (neg ? "⁻" : "") + s;
+}
+function sci(x, d) {                       // z. B. 6,1·10⁷
+  if (!isFinite(x)) return "–";
+  if (x === 0) return "0";
+  const e = Math.floor(Math.log10(Math.abs(x)));
+  if (e >= -2 && e < 4) return fmtF(x, d === undefined ? 1 : d);
+  return fmtF(x / Math.pow(10, e), d === undefined ? 1 : d) + "·10" + sup(e);
+}
+
+/* ---------- Globaler Simulationszustand ---------- */
+const sim = { t: 0, running: true };
+const views = {};   // canvas-Id -> {ctx, W, H}
+
+/* ==================================================================
+   SZENARIO 1 – OHMSCHER TRANSPORT (Referenz)
+   ------------------------------------------------------------------
+   Thermik = Zufallsbewegung ohne bevorzugte Richtung (Mittel = 0).
+   Das Feld E überlagert eine kleine GERICHTETE Geschwindigkeit
+   v_d = μ·E (Elektronen: entgegen Feldrichtung).
+   Nettostrom = nur die gerichtete Komponente:  j = n·q·v_d = σ·E.
+   Bei U = 0 bleibt reines Rauschen → Nettofluss ≈ 0 (statistisch).
+   ================================================================== */
+const ohm = {
+  N: 320,
+  U: 5,                 // Regler 0…10 V
+  parts: [],            // {x, y, px, py}
+  events: [],           // Messdraht-Ereignisse {t, s}: +1 = Ladung in +x
+  hist: [],             // Verlauf für Mini-Graph
+  vMax: 40,             // Graph-Skalierung (läuft mit)
+};
+
+function ohmSeed(W, H) {
+  ohm.parts = [];
+  for (let i = 0; i < ohm.N; i++) {
+    const x = Math.random() * W, y = 20 + Math.random() * (H - 34);
+    ohm.parts.push({ x, y, px: x, py: y });
+  }
+  ohm.events = []; ohm.hist = [];
+}
+
+function ohmStep(dt, W, H) {
+  /* Echte Größen für das Dashboard (Meter, Sekunde) */
+  const E  = ohm.U / D_LEITER;   // E = U/d
+  const vd = MU_CU * E;          // v_d = μ·E (Betragsanzeige im Dashboard)
+  /* Sichtbare Geschwindigkeiten: schematisch vergrößert, damit
+     Thermik UND Drift auf dem Bildschirm sichtbar werden. */
+  const f     = dt / DT_REF;     // vergangene Referenz-Frames
+  const THERM = 2.6;             // Thermik-Schrittweite (px/√Frame)
+  const DRIFT = 0.34 * ohm.U;    // Drift (px/Frame), U = 10 → 3,4 px/Frame → links
+  const mid = W / 2;
+  for (const p of ohm.parts) {
+    p.px = p.x; p.py = p.y;
+    // 1) Diffusion (Thermik): Zufallsschritt, Mittelwert 0
+    const st = THERM * Math.sqrt(f);
+    let nx = p.x + gauss() * st;
+    let ny = p.y + gauss() * st;
+    // 2) Drift: gerichtete Zusatzgeschwindigkeit entgegen E (−x)
+    nx -= DRIFT * f;
+    // Wände: periodisch in x (langer Draht), reflektierend in y
+    let wrapped = false;
+    if (nx < 0)     { nx += W; wrapped = true; }
+    if (nx >= W)    { nx -= W; wrapped = true; }
+    if (ny < 14)    ny = 28 - ny;
+    if (ny > H - 6) ny = 2 * (H - 6) - ny;
+    p.wrapped = wrapped;   // für den Zeichenstrich (kein Strich über den Wrap)
+    // Messdraht in der Mitte: Seitenwechsel zählen (Wrap-Austritte ignorieren)
+    if (!wrapped) {
+      const a = p.x < mid, b = nx < mid;
+      if (a !== b) {
+        // Elektron nach links (−x)  ⇒ konventioneller Strom +x (s = +1)
+        ohm.events.push({ t: sim.t, s: (a === false && b === true) ? +1 : -1 });
+      }
+    }
+    p.x = nx; p.y = ny;
+  }
+  while (ohm.events.length && ohm.events[0].t < sim.t - 1.0) ohm.events.shift();
+  ohm.hist.push({ t: sim.t, v: ohmNetRate() });
+  while (ohm.hist.length && ohm.hist[0].t < sim.t - 14) ohm.hist.shift();
+}
+function ohmNetRate() {   // gemessener Nettofluss (Ladungen/s am Messdraht)
+  let s = 0;
+  for (const e of ohm.events) s += e.s;
+  return s / 1.0;
+}
+
+/* ==================================================================
+   SZENARIO 2 – DIFFUSIONSSTROM  („Strom ohne Spannung")
+   ------------------------------------------------------------------
+   Triebkraft ist der Konzentrationsgradient ∇n, NICHT das Feld.
+   Jedes Teilchen macht nur einen Zufallsschritt (Ficksches Gesetz:
+   mittlere Verschiebung ∝ √(2·D·t)). Weil auf der dichten Seite
+   schlicht mehr Teilchen zufällig Richtung Grenze laufen, entsteht
+   ein Nettofluss vom Dichten ins Dünne – bei exakt E = 0.
+   Die ZÄHLUNG der Grenzübergänge (links→rechts vs. rechts→links)
+   macht diesen Nettofluss direkt sichtbar.
+   ================================================================== */
+const diff = {
+  mode: "diffus",       // "diffus" | "drift" | "komp"
+  N: 520, N_L: 340,     // Teilchen gesamt, davon links (Rest rechts) → Anfangs-Gradient
+  BAND: 70,             // Breite der Reservoir-Kammern an der Grenze (px)
+  Ds: 1.8,              // Diffusionskoeffizient (Regler, Einheiten des Sichtmaßstabs)
+  parts: [],            // {x, y, home: "L"|"R"}
+  events: [],           // Grenz-Ereignisse {t, dir}: +1 = L→R, −1 = R→L (Gleitfenster fürs Diagramm)
+  cum: { lr: 0, rl: 0, t0: 0 },  // kumulative Übergänge seit Seed → rauscharme Fluss-Mittelung
+  hist: [],
+  vMax: 30,
+};
+
+/* Start: zwei „gerührte Reservoirs" = Kammern an der Grenze (Standard-
+   Fick-Experiment). Schmale Kammern, weil reale Diffusion über große
+   Distanzen Minuten bräuchte – in den Kammern ist der Fluss sofort
+   messbar, und das Rühren hält die Dichten konstant. */
+function diffSeed(W, H) {
+  diff.parts = [];
+  const xb = W / 2, B = diff.BAND;
+  for (let i = 0; i < diff.N; i++) {
+    const homeL = i < diff.N_L;
+    diff.parts.push({
+      home: homeL ? "L" : "R",
+      x: homeL ? xb - B + 6 + Math.random() * (B - 12)
+              : xb + 6 + Math.random() * (B - 12),
+      y: 22 + Math.random() * (H - 40),
+    });
+  }
+  diff.events = []; diff.hist = [];
+  diff.cum = { lr: 0, rl: 0, t0: sim.t };
+}
+/* Beim Drift-Modus: gleichmäßige Verteilung → reine Feldwirkung zeigen */
+function diffSeedUniform(W, H) {
+  for (const p of diff.parts) {
+    p.x = 6 + Math.random() * (W - 12);
+    p.y = 22 + Math.random() * (H - 40);
+  }
+  diff.events = []; diff.hist = [];
+  diff.cum = { lr: 0, rl: 0, t0: sim.t };
+}
+
+function diffNetRate() {  // gemessener Nettofluss, Gleitfenster 1,2 s (für das Diagramm)
+  let s = 0;
+  for (const e of diff.events) s += e.dir;
+  return s / 1.2;
+}
+/* Rauscharme Flussanzeige: kumulierte Übergänge, gemittelt seit Start.
+   Das statistische Rauschen fällt mit 1/√t, das systematische
+   Diffusionssignal (dicht → dünn) bleibt stehen → Wert bleibt > 0. */
+function diffNetAvg() {
+  const dt = Math.max(0.5, sim.t - diff.cum.t0);
+  return (diff.cum.lr - diff.cum.rl) / dt;
+}
+function diffGross() {    // Bruttoflüsse je Richtung (Gleitfenster, für die Anzeige)
+  let lr = 0, rl = 0;
+  for (const e of diff.events) (e.dir > 0 ? lr++ : rl++);
+  return { lr: lr / 1.2, rl: rl / 1.2 };
+}
+
+function diffStep(dt, W, H) {
+  const f = dt / DT_REF;
+  const xb = W / 2;
+  /* Momentane Dichten links/rechts messen (Grundlage für ∇n und Kompensation) */
+  let nL = 0, nR = 0;
+  for (const p of diff.parts) (p.x < xb ? nL++ : nR++);
+  /* Modus-abhängige Drift-Komponente (px/Frame, +x = rechts):
+     – diffus: E = 0 → KEINE Drift, nur Zufallsbewegung
+     – drift : reiner Driftstrom (wie Szenario 1, aber n = konstant)
+     – komp  : Die Diffusionsspannung baut ein Gegenfeld auf, dessen
+               Drift den Diffusionsfluss exakt kompensiert:
+               j_net = j_diff + j_drift = 0, das Dichteprofil bleibt
+               stehen (Gleichgewicht am pn-Übergang). */
+  let vd = 0;
+  if (diff.mode === "drift") {
+    vd = 2.4;
+  } else if (diff.mode === "komp") {
+    /* Aufbau der Diffusionsspannung (Ladungsmodell des pn-Übergangs):
+       Jeder NETTO übergetretene Träger lädt den Übergang auf; das
+       wachsende Gegenfeld treibt den Drift-Rückstrom. Im Gleichgewicht
+       gilt j_diff + j_drift = 0, und V_diff strebt dabei dem Boltzmann-
+       Wert V_T·ln(n_L/n_R) zu (über die q-Skala darauf normiert). */
+    const q = clamp(diff.cum.lr - diff.cum.rl, -300, 300);  // „Ladung" = Netto-Übertritte
+    vd = -6.4e-4 * q;    // kalibriert: Gleichgewicht bei |vd| ≈ 0,012 px/Frame
+  }
+
+  /* Reale Diffusion mischt 235 px breite Gebiete erst in Minuten –
+     für die Demo rechnen wir im diffus-/komp-Modus mehrere kleine
+     Teilschritte pro Frame (physikalisch äquivalent zu größerem D,
+     aber die Einzelschritte bleiben fein und glatt). */
+  const SUB = diff.mode === "drift" ? 1 : 8;
+  const fs = f / SUB;                                 // Zeit je Teilschritt
+  /* Zufallsschritt-Weite je Teilschritt: <x²> = 2·D·t (Einstein) */
+  const stepD = Math.sqrt(2 * diff.Ds) * Math.sqrt(fs);
+  for (let s = 0; s < SUB; s++) {
+    for (const p of diff.parts) {
+      const nx0 = p.x;
+      let nx = p.x + gauss() * stepD + vd * fs;
+      let ny = p.y + gauss() * stepD;
+      /* Wände: Im Drift-Modus volle Breite, sonst Kammerwände der
+         Reservoir-Zelle (das „Rühren" hält die Teilchen in der Kammer,
+         nur die Membran in der Mitte ist durchlässig). */
+      if (diff.mode === "drift") {
+        if (nx < 3) nx = 6 - nx; else if (nx > W - 3) nx = 2 * (W - 3) - nx;
+      } else {
+        const xL = xb - diff.BAND + 3, xR = xb + diff.BAND - 3;
+        if (nx < xL) nx = 2 * xL - nx; else if (nx > xR) nx = 2 * xR - nx;
+      }
+      if (ny < 16) ny = 32 - ny; else if (ny > H - 6) ny = 2 * (H - 6) - ny;
+      /* Grenzübertritt erfassen (Vorzeichenwechsel der Seite) */
+      const a = nx0 < xb, b = nx < xb;
+      const crossed = (a !== b) ? (b ? -1 : +1) : 0;   // +1 = L→R, −1 = R→L
+      p.x = nx; p.y = ny;
+      if (crossed !== 0) {
+        diff.events.push({ t: sim.t, dir: crossed });
+        if (crossed > 0) diff.cum.lr++; else diff.cum.rl++;
+        /* Reservoir-Randbedingung (Diffusion & Kompensation): Das die
+           Grenze überquerende Teilchen wird in sein Herkunftsreservoir
+           zurückgesetzt – die Randdichten n_links/n_rechts bleiben
+           konstant und der Ficksche Nettofluss läuft stationär weiter
+           (Standard-Gedankenexperiment: zwei unendliche Reservoirs).
+           Injektion nahe der Grenze: dort ist das Reservoir mit dem
+           Transport verbunden (tief im Bulk müsste das Teilchen erst
+           Minuten zur Grenze diffundieren). */
+        if (diff.mode !== "drift") {
+          const d0 = 4 + 18 * Math.random();
+          p.x = crossed > 0 ? xb - d0        // L→R ⇒ zurück in Reservoir links
+                            : xb + d0;       // R→L ⇒ zurück in Reservoir rechts
+          p.y = 22 + Math.random() * (H - 40);
+        }
+      }
+    }
+  }
+  while (diff.events.length && diff.events[0].t < sim.t - 1.2) diff.events.shift();
+  diff.hist.push({ t: sim.t, v: diffNetRate() });
+  while (diff.hist.length && diff.hist[0].t < sim.t - 14) diff.hist.shift();
+}
+
+/* ==================================================================
+   SZENARIO 3 – SUPRALEITUNG (Persistenzstrom)
+   ------------------------------------------------------------------
+   Im supraleitenden Zustand bilden die Elektronen Cooper-Paare
+   (bosonische Kondensation). Es gibt keine Streuung → keine Reibung:
+   dω/dt = 0 bei E = 0. Ein einmal angestoßener Ringstrom läuft
+   endlos. Oberhalb Tc (oder als Normalleiter) greift Reibung:
+   dω/dt = −ω/τ  →  exponentielles Abklingen.
+   ================================================================== */
+const supra = {
+  N: 220,
+  parts: [],            // {th, r} Polarposition auf dem Ring
+  omega: 0,             // Winkelgeschwindigkeit (rad/s, Sichtmaßstab)
+  OMEGA0: 22,           // Start-ω nach „Strom starten"
+  T: 77,                // Temperatur (Regler, K)
+  forceNormal: false,   // „Normalleiter umschalten"-Button
+  I0: 100,              // Modellstrom-Skala: ω = OMEGA0  ⇔  I = 100 mA
+  tau: 1.7,             // Abklingzeit τ im Normalzustand (s)
+  hist: [],
+  vMax: 120,            // Graph-Skalierung (läuft mit)
+};
+
+function supraSeed() {
+  supra.parts = [];
+  for (let i = 0; i < supra.N; i++)
+    supra.parts.push({ th: Math.random() * 2 * Math.PI, r: 0.5 + Math.random() });
+}
+function supraIsNormal() {
+  return supra.forceNormal || supra.T > curTc;   // Tc hängt vom gewählten Material ab
+}
+function supraStep(dt) {
+  if (supra.omega !== 0) {
+    if (supraIsNormal()) {
+      /* Normalleiter: Ohmsche Reibung → I(t) = I₀·e^(−t/τ) */
+      supra.omega *= Math.exp(-dt / supra.tau);
+      if (Math.abs(supra.omega) < 0.02) supra.omega = 0;
+    }
+    /* Supraleiter: KEINE Dämpfung → ω bleibt exakt konstant (E = 0) */
+    for (const p of supra.parts) p.th += supra.omega * dt;
+  }
+  supra.hist.push({ t: sim.t, v: supra.omega / supra.OMEGA0 * supra.I0 });
+  while (supra.hist.length && supra.hist[0].t < sim.t - 14) supra.hist.shift();
+}
+
+/* ==================================================================
+   SZENARIO 4 – KONDENSATOR (Verschiebungsstrom)
+   ------------------------------------------------------------------
+   Zyklus aus zwei Phasen (Phasendauer je 4·τ, τ = R·C):
+   1) LADEN – die Quelle wirkt (uq = +Uq): i = (Uq − u_C)/R lädt C
+      auf, Elektronen stauen sich auf der rechten Platte, das E-Feld
+      in der Lücke wächst.
+   2) ENTLADEN – die Quelle ist abgetrennt (uq = 0): C gibt seine
+      Energie über R ab, i = −u_C/R kehrt um, das E-Feld kollabiert.
+   Kein Träger überquert die Lücke – die Änderung des Feldes
+   (Verschiebungsstrom ∂D/∂t) „übernimmt" den Transport.
+   ================================================================== */
+const cond = {
+  Uq: 6,          // Quellspannung (Regler) – wirkt NUR in der Ladephase
+  R: 1,           // Reihenwiderstand → τ = R·C (Regler, s); dargestellt in MΩ
+  C: 1,           // Kapazität (sim-Wert 1 ≡ 1 µF → i in µA, Q in µC, W in µJ)
+  D: 1e-3,        // Plattenabstand d = 1 mm → E = u_C/d (V/m)
+  u: 0, i: 0,     // Kondensatorspannung / Strom (Zustand)
+  charging: true, // true = Quelle wirkt (Laden) · false = abgetrennt (Entladen)
+  tPhase: 0,      // Start der aktuellen Phase (sim.t)
+  PTAU: 4,        // Phasendauer = PTAU · τ  (≈ 98 % auf-/entladen)
+  N: 52,          // Elektronen auf dem Leiterweg
+  s: [],          // Bogenpositionen der Elektronen auf dem Rechteckweg
+  hist: [], vMax: 8,
+};
+function condSeed() {
+  cond.s = [];
+  for (let i = 0; i < cond.N; i++) cond.s.push(i / cond.N);
+  cond.hist = [];
+}
+function condStep(dt) {
+  /* Phasenwechsel alle 4τ: Laden → Entladen → Laden … */
+  const dur = cond.PTAU * cond.R * cond.C;
+  if (sim.t - cond.tPhase >= dur) { cond.charging = !cond.charging; cond.tPhase = sim.t; }
+  const uq = cond.charging ? cond.Uq : 0;  // abgetrennte Quelle: uq = 0
+  cond.i = (uq - cond.u) / cond.R;         // Lade-/Entladegleichung (sim)
+  cond.u += cond.i / cond.C * dt;          // du/dt = i/C
+  /* Elektronen-Drift entlang des Leiterwegs – die Elektronen (negative
+     Ladung!) bewegen sich ENTGEGEN der Stromrichtung: i > 0 (Ladephase)
+     ⇒ s nimmt ab ⇒ auf der unteren Ader fließen sie von der Quelle − weg
+     zur rechten Platte und stauen sich dort (rechte Platte = negativ);
+     i < 0 (Entladephase) ⇒ umgekehrt: Sie fließen von der rechten Platte
+     zurück über R und neutralisieren die linke. */
+  const v = -clamp(cond.i * 0.03, -0.09, 0.09);
+  cond.s = cond.s.map(p => (p + v * dt + 1) % 1);
+  cond.hist.push({ t: sim.t, v: cond.i });
+  while (cond.hist.length && cond.hist[0].t < sim.t - 14) cond.hist.shift();
+}
+
+/* ==================================================================
+   SZENARIO 5 – SPULE (Selbstinduktion)
+   ------------------------------------------------------------------
+   Der Strom „jagt" den Sollwert, gebremst von der induzierten
+   Spannung: di/dt = (I_soll − i)/τ mit τ = L/R, u_L = L·di/dt.
+   Das B-Feld folgt dem Strom (B ∝ i); seine Änderung erzeugt u_L
+   nach Lenz entgegen der Stromänderung. Energie: W = ½·L·i².
+   ================================================================== */
+const coil = {
+  It: 60,          // Soll-Strom (Regler, mA sim)
+  I: 0, dI: 0,     // Ist-Strom / Stromänderung (Zustand)
+  tau: 1.2,        // Trägheit τ = L/R (Regler, s)
+  L: 1,            // Induktivität (sim, H)
+  nD: 1e4,         // Windungsdichte N/l = 1000 Windungen auf 10 cm → B = µ₀·(N/l)·i
+  N: 130,          // Elektronen entlang der Drahtbahn
+  s: [],           // Bogenpositionen
+  hist: [], vMax: 120,
+};
+function coilSeed() {
+  coil.s = [];
+  for (let i = 0; i < coil.N; i++) coil.s.push(i / coil.N);
+  coil.hist = [];
+}
+function coilStep(dt) {
+  /* u_L bremst: der Strom nähert sich dem Sollwert verzögert an */
+  coil.dI = (coil.It - coil.I) / coil.tau;
+  coil.I += coil.dI * dt;
+  const v = clamp(coil.I * 0.004, -0.5, 0.5);
+  coil.s = coil.s.map(p => (p + v * dt + 1) % 1);
+  coil.hist.push({ t: sim.t, v: coil.I });
+  while (coil.hist.length && coil.hist[0].t < sim.t - 14) coil.hist.shift();
+}
+
+/* ==================================================================
+   ZEICHNEN
+   ================================================================== */
+function drawOhm() {
+  const v = views.cvOhm; if (!v) return;
+  const { ctx, W, H } = v;
+  ctx.clearRect(0, 0, W, H);
+  drawGrid(ctx, W, H, 26);
+  ctx.save();
+  /* Batterie: + links, − rechts → E und j zeigen nach rechts (+x),
+     die Elektronen (negativ!) driften nach links */
+  ctx.strokeStyle = "#8b949e";
+  ctx.lineWidth = 3;   ctx.beginPath(); ctx.moveTo(10, H * 0.30); ctx.lineTo(10, H * 0.70); ctx.stroke();
+  ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(W - 10, H * 0.40); ctx.lineTo(W - 10, H * 0.60); ctx.stroke();
+  ctx.fillStyle = "#8b949e"; ctx.font = "700 14px system-ui"; ctx.textAlign = "center";
+  ctx.fillText("+", 26, 22); ctx.fillText("−", W - 26, 22);
+  /* E-Feld / Stromrichtung */
+  for (const yy of [H * 0.16, H * 0.5, H * 0.84])
+    arrow(ctx, W * 0.33, yy, W * 0.45, yy, "rgba(240,180,41,.7)");
+  ctx.fillStyle = "rgba(240,180,41,.95)"; ctx.font = "italic 12px system-ui"; ctx.textAlign = "left";
+  ctx.fillText("E, j", W * 0.46 + 6, H * 0.5 + 4);
+  /* Messdraht in der Mitte */
+  ctx.strokeStyle = "rgba(139,148,158,.35)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(W / 2, 14); ctx.lineTo(W / 2, H - 4); ctx.stroke();
+  ctx.restore();
+  /* Elektronen: Punkt + kurzer Bewegungsstrich als Geschwindigkeits-Anzeige */
+  ctx.save();
+  for (const p of ohm.parts) {
+    if (!p.wrapped) {
+      ctx.strokeStyle = "rgba(125,211,252,.4)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(p.x, p.y); ctx.stroke();
+    }
+    ctx.fillStyle = "#7dd3fc";
+    ctx.beginPath(); ctx.arc(p.x, p.y, 2.1, 0, 6.2832); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawDiff() {
+  const v = views.cvDiff; if (!v) return;
+  const { ctx, W, H } = v;
+  ctx.clearRect(0, 0, W, H);
+  const xb = W / 2, mode = diff.mode, B = diff.BAND;
+  /* Reservoir-Kammern (im Drift-Modus bewusst einheitlich ohne Kammern) */
+  if (mode === "drift") {
+    ctx.fillStyle = "rgba(34,211,238,.05)"; ctx.fillRect(0, 0, W, H);
+  } else {
+    ctx.fillStyle = "rgba(56,189,248,.10)"; ctx.fillRect(xb - B, 0, B, H);
+    ctx.fillStyle = "rgba(251,146,60,.08)"; ctx.fillRect(xb, 0, B, H);
+    /* Kammer-Ränder */
+    ctx.save();
+    ctx.strokeStyle = "rgba(139,148,158,.25)"; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xb - B, 12); ctx.lineTo(xb - B, H - 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(xb + B, 12); ctx.lineTo(xb + B, H - 4); ctx.stroke();
+    ctx.restore();
+  }
+  drawGrid(ctx, W, H, 26);
+  /* Grenze (Membran) */
+  ctx.save();
+  ctx.strokeStyle = "rgba(230,237,243,.5)"; ctx.setLineDash([5, 4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xb, 12); ctx.lineTo(xb, H - 4); ctx.stroke();
+  ctx.restore();
+  /* Beschriftungen + E-Badge (der Kern der Aussage: E = 0!) */
+  ctx.save();
+  ctx.font = "700 11.5px system-ui";
+  if (mode === "drift") {
+    ctx.fillStyle = "#8b949e";
+    ctx.textAlign = "left";  ctx.fillText("n = konstant – kein Gradient", 10, 16);
+    ctx.textAlign = "right"; ctx.fillText("alle Teilchen driftieren im Feld →", W - 10, 16);
+    ctx.textAlign = "center";
+    ctx.font = "800 12px system-ui";
+    ctx.fillStyle = "#f0b429";
+    ctx.fillText("E ≠ 0", xb, 16);
+  } else {
+    /* Kammer-Labels farbig je Seite, E-Badge an die Grenze (Kernaussage!) */
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#38bdf8";
+    ctx.fillText(mode === "komp" ? "n-Gebiet" : "n hoch", xb - B + B / 2, 16);
+    ctx.fillStyle = "#fb923c";
+    ctx.fillText(mode === "komp" ? "p-Gebiet" : "n niedrig", xb + B / 2, 16);
+    ctx.font = "800 12px system-ui";
+    ctx.fillStyle = "#3fb950";
+    ctx.fillText("E = 0", xb, H - 22);
+  }
+  ctx.font = "700 11.5px system-ui"; ctx.fillStyle = "#8b949e";
+  ctx.fillText("Grenze", xb, H - 8);
+  ctx.restore();
+  /* Nettofluss-Pfeil über der Grenze: Richtung = gemessener Fluss */
+  const rate = diffNetRate();
+  if (Math.abs(rate) > 0.6) {
+    const s = Math.sign(rate);
+    arrow(ctx, xb - 30 * s, 36, xb + 30 * s, 36,
+          s > 0 ? "rgba(34,211,238,.95)" : "rgba(255,92,92,.95)", 2.2);
+  }
+  /* Teilchen – Farbe = Herkunftsseite: das Mischen wird so sichtbar */
+  ctx.save();
+  for (const p of diff.parts) {
+    ctx.fillStyle = p.home === "L" ? "#38bdf8" : "#fb923c";
+    ctx.beginPath(); ctx.arc(p.x, p.y, 2.1, 0, 6.2832); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawSupra() {
+  const v = views.cvSupra; if (!v) return;
+  const { ctx, W, H } = v;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+  const R = Math.min(W, H) / 2 - 22, band = 34;
+  const normal = supraIsNormal();
+  /* Ring-Band */
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.arc(cx, cy, R - band, 0, Math.PI * 2, true);
+  ctx.fillStyle = normal ? "rgba(240,180,41,.10)" : "rgba(63,185,80,.10)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(139,148,158,.4)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, R - band, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+  /* Teilchen (Cooper-Paare) auf dem Band */
+  ctx.save();
+  ctx.fillStyle = normal ? "#f0b429" : "#3fb950";
+  for (const p of supra.parts) {
+    const rad = R - band / 2 + (p.r - 1) * (band / 2 - 7);
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(p.th) * rad, cy + Math.sin(p.th) * rad, 2.3, 0, 6.2832);
+    ctx.fill();
+  }
+  ctx.restore();
+  /* rotierender Strompfeil außerhalb des Rings */
+  if (supra.omega !== 0) {
+    const a = -sim.t * supra.omega, rr = R + 13;
+    const x0 = cx + Math.cos(a) * rr, y0 = cy + Math.sin(a) * rr;
+    const ta = a + Math.PI / 2;   // Tangentenrichtung
+    arrow(ctx, x0 - Math.cos(ta) * 15, y0 - Math.sin(ta) * 15,
+                x0 + Math.cos(ta) * 15, y0 + Math.sin(ta) * 15,
+          normal ? "rgba(240,180,41,.9)" : "rgba(63,185,80,.9)", 2);
+  }
+  /* Zustands-Botschaft in der Ringmitte */
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.font = "800 15px system-ui";
+  ctx.fillStyle = normal ? "#f0b429" : "#3fb950";
+  ctx.fillText(normal ? "E ≠ 0 · Reibung" : "E = 0 · keine Reibung", cx, cy - 3);
+  ctx.font = "12px system-ui"; ctx.fillStyle = "#8b949e";
+  const I = Math.abs(supra.omega / supra.OMEGA0 * supra.I0);
+  ctx.fillText(supra.omega === 0 ? "kein Strom – auf „Strom starten“ drücken"
+                                 : "I = " + fmtF(I, 1) + " mA – fließt ungeschwächt weiter",
+               cx, cy + 16);
+  ctx.restore();
+}
+
+function drawCond() {
+  const v = views.cvCond; if (!v) return;
+  const { ctx, W, H } = v;
+  ctx.clearRect(0, 0, W, H);
+  drawGrid(ctx, W, H, 26);
+  const bx = 34, yT = 40, yB = H - 40;      // Batterie x, obere/untere Ader
+  const px1 = W / 2 - 26, px2 = W / 2 + 26; // Platten
+  const yP2 = H * 0.76;                     // Platten reichen von oben herab
+  /* Rechteck-Leiterweg (obere Ader ist durch die Platten unterbrochen) */
+  ctx.save();
+  ctx.strokeStyle = "rgba(139,148,158,.7)"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(bx, yT); ctx.lineTo(px1, yT);
+  ctx.moveTo(px2, yT); ctx.lineTo(W - bx, yT); ctx.lineTo(W - bx, yB); ctx.lineTo(bx, yB);
+  ctx.stroke();
+  /* Batterie-Symbol am linken Rand. Polarität fest (+ oben), aber sie
+     wirkt nur in der Ladephase: Beim Entladen gedimmt + gestrichelte
+     Brücke (Quelle abgetrennt, uq = 0 – der Kreis bleibt über R geschlossen). */
+  const act = cond.charging;
+  ctx.save();
+  ctx.globalAlpha = act ? 1 : 0.3;
+  ctx.strokeStyle = "#8b949e";
+  ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(bx - 14, yT + 12); ctx.lineTo(bx + 14, yT + 12); ctx.stroke();
+  ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(bx - 14, yB - 12); ctx.lineTo(bx + 14, yB - 12); ctx.stroke();
+  ctx.fillStyle = "#8b949e"; ctx.font = "700 13px system-ui"; ctx.textAlign = "left";
+  ctx.fillText("+", bx - 26, yT + 17); ctx.fillText("−", bx - 26, yB - 7);
+  ctx.font = "italic 11.5px system-ui";
+  ctx.fillText("Uq", bx - 26, (yT + yB) / 2 + 4);
+  ctx.restore();
+  if (!act) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(139,148,158,.5)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(bx, yT + 16); ctx.lineTo(bx, yB - 16); ctx.stroke();
+    ctx.restore();
+  }
+  /* Status direkt an der Quelle: wirkt sie oder ist sie abgetrennt? */
+  ctx.save();
+  ctx.font = "700 11px system-ui"; ctx.textAlign = "left";
+  ctx.fillStyle = act ? "rgba(187,134,252,.95)" : "rgba(139,148,158,.9)";
+  ctx.fillText(act ? "Quelle wirkt – Laden (uq = +Uq)"
+                   : "Quelle getrennt – Entladung über R (uq = 0)",
+               bx + 22, yT - 28);
+  ctx.restore();
+  /* Reihenwiderstand R auf der unteren Ader (erklärt τ = R·C) */
+  const rx = W / 2;
+  ctx.strokeStyle = "rgba(139,148,158,.7)"; ctx.lineWidth = 2;
+  ctx.strokeRect(rx - 14, yB - 5, 28, 10);
+  ctx.fillStyle = "rgba(139,148,158,.9)"; ctx.font = "italic 12px system-ui"; ctx.textAlign = "center";
+  ctx.fillText("R", rx, yB + 20);
+  /* Platten */
+  ctx.fillStyle = "#c9d1d9";
+  ctx.fillRect(px1 - 3, yT, 6, yP2 - yT);
+  ctx.fillRect(px2 - 3, yT, 6, yP2 - yT);
+  ctx.restore();
+  /* E-Feld im Zwischenraum: Richtung + ⇒ von links nach rechts */
+  const eS = clamp(cond.u / 10, -1, 1);
+  if (Math.abs(eS) > 0.03) {
+    const col = eS > 0 ? "rgba(187,134,252," : "rgba(255,92,92,";
+    for (let k = 0; k < 4; k++) {
+      const yy = yT + (yP2 - yT) * (0.2 + 0.18 * k);
+      const l = 9 + Math.abs(eS) * 8;
+      arrow(ctx, W / 2 - l * Math.sign(eS), yy, W / 2 + l * Math.sign(eS), yy, col + (0.35 + 0.55 * Math.abs(eS)) + ")", 1.8);
+    }
+    ctx.save();
+    ctx.fillStyle = col + "0.9)"; ctx.font = "italic 11px system-ui"; ctx.textAlign = "center";
+    ctx.fillText("E", W / 2, yT - 6);
+    ctx.restore();
+  }
+  /* Ladungen auf den Platten-Innenseiten: Elektronen-Überschuss blau,
+     Fehlstellen (positiv) orange. Rechte Platte ∝ +u, linke ∝ −u. */
+  const nR = Math.round(clamp(cond.u / 10, -1, 1) * 22);   // > 0 ⇒ rechts Elektronen
+  const nL = Math.round(clamp(-cond.u / 10, -1, 1) * 22);
+  ctx.save();
+  for (let k = 0; k < Math.abs(nR); k++) {
+    const yy = yP2 - 6 - k * ((yP2 - yT - 14) / 22);
+    if (nR > 0) { ctx.fillStyle = "#7dd3fc"; ctx.beginPath(); ctx.arc(px2 - 8, yy, 2.4, 0, 6.2832); ctx.fill(); }
+    else        { ctx.fillStyle = "#fb923c"; ctx.font = "700 10px system-ui"; ctx.textAlign = "center"; ctx.fillText("+", px2 - 8, yy + 3); }
+  }
+  for (let k = 0; k < Math.abs(nL); k++) {
+    const yy = yP2 - 6 - k * ((yP2 - yT - 14) / 22);
+    if (nL > 0) { ctx.fillStyle = "#7dd3fc"; ctx.beginPath(); ctx.arc(px1 + 8, yy, 2.4, 0, 6.2832); ctx.fill(); }
+    else        { ctx.fillStyle = "#fb923c"; ctx.font = "700 10px system-ui"; ctx.textAlign = "center"; ctx.fillText("+", px1 + 8, yy + 3); }
+  }
+  ctx.fillStyle = "rgba(139,148,158,.85)"; ctx.font = "10.5px system-ui"; ctx.textAlign = "center";
+  ctx.fillText("Lücke: kein Ladungsdurchtritt – Verschiebungsstrom ∂D/∂t", W / 2, yP2 + 16);
+  ctx.restore();
+  /* Elektronen auf dem Rechteckweg; in der Lücke an den Platten „gestaut" */
+  const w1 = px1 - bx, w2 = px2 - px1, w3 = W - bx - px2, h = yB - yT, w4 = W - 2 * bx;
+  const L = w1 + w2 + w3 + h + w4 + h;
+  ctx.save();
+  ctx.fillStyle = "#bb86fc";
+  cond.s.forEach((s, idx) => {
+    let d = s * L, x, y;
+    if (d < w1) { x = bx + d; y = yT; }
+    else if ((d -= w1) < w2) {   // Lücke: Stau an der jeweiligen Platte
+      const xx = px1 + d;
+      x = (xx < (px1 + px2) / 2 ? px1 - 2 : px2 + 2) + ((idx % 5) - 2) * 1.6;
+      y = yT + 10 + (idx % 3) * 3;
+    }
+    else if ((d -= w2) < w3) { x = px2 + d; y = yT; }
+    else if ((d -= w3) < h) { x = W - bx; y = yT + d; }
+    else if ((d -= h) < w4) { x = W - bx - d; y = yB; }
+    else { d -= w4; x = bx; y = yB - d; }
+    ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 6.2832); ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawCoil() {
+  const v = views.cvCoil; if (!v) return;
+  const { ctx, W, H } = v;
+  ctx.clearRect(0, 0, W, H);
+  drawGrid(ctx, W, H, 26);
+  const x0 = 56, x1 = W - 56, cy = H / 2;
+  const A = Math.min(58, H / 2 - 34), NLOOP = 7;
+  const yAt = x => cy + A * Math.sin((x - x0) / (x1 - x0) * NLOOP * 2 * Math.PI);
+  /* Drahtbahn (Wendel) */
+  ctx.save();
+  ctx.strokeStyle = "rgba(139,148,158,.75)"; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let x = x0; x <= x1; x += 2) { const y = yAt(x); x === x0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+  ctx.stroke();
+  /* Zuleitungen */
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(30, cy); ctx.lineTo(x0, cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1, cy); ctx.lineTo(W - 30, cy); ctx.stroke();
+  ctx.restore();
+  /* B-Feld: Feldlinien durchs Innere (∝ i) + Rückschluss außen */
+  const bS = clamp(coil.I / 100, -1, 1);
+  if (Math.abs(bS) > 0.02) {
+    const al = 0.25 + 0.6 * Math.abs(bS);
+    const xm = (x0 + x1) / 2;
+    ctx.save();
+    for (let k = 0; k < 3; k++) {
+      const yy = cy + (k - 1) * A * 0.5;
+      const l = (x1 - x0) * 0.30 * Math.abs(bS) + 8;
+      arrow(ctx, xm - l * Math.sign(bS), yy, xm + l * Math.sign(bS), yy, "rgba(247,120,186," + al + ")", 2);
+    }
+    /* geschlossene Feldlinien außen (oben/unten, schematisch) */
+    for (const sgn of [-1, 1]) {
+      const yy = cy + sgn * (A + 18);
+      const l = (x1 - x0) * 0.42;
+      arrow(ctx, xm + l * Math.sign(bS) * sgn, yy, xm - l * Math.sign(bS) * sgn, yy, "rgba(247,120,186," + al * 0.7 + ")", 1.4);
+    }
+    ctx.fillStyle = "rgba(247,120,186,.95)"; ctx.font = "italic 12px system-ui"; ctx.textAlign = "center";
+    ctx.fillText("B ∝ i", xm, yAt(xm) - A - 6 < 16 ? 16 : yAt(xm) - A - 6);
+    ctx.restore();
+  }
+  /* Elektronen entlang der Wendel */
+  ctx.save();
+  ctx.fillStyle = "#f778ba";
+  for (const s of coil.s) {
+    const x = x0 + s * (x1 - x0), y = yAt(x);
+    ctx.beginPath(); ctx.arc(x, y, 2.3, 0, 6.2832); ctx.fill();
+  }
+  ctx.restore();
+  /* Induktionsspannung nach Lenz: rot = bremst, grün = treibt nach */
+  if (Math.abs(coil.dI) > 1.2) {
+    const bremsend = coil.dI * coil.I > 0;   // Strom wird schneller in seiner Richtung
+    const col = bremsend ? "rgba(255,92,92,.95)" : "rgba(63,185,80,.95)";
+    const xm = (x0 + x1) / 2, yy = H - 18;
+    arrow(ctx, xm + 26 * Math.sign(coil.dI), yy, xm - 26 * Math.sign(coil.dI), yy, col, 2.2);
+    ctx.save();
+    ctx.fillStyle = col; ctx.font = "700 11px system-ui"; ctx.textAlign = "center";
+    ctx.fillText("u_L = L·di/dt (Lenz: " + (bremsend ? "bremst" : "hält aufrecht") + ")", xm, yy - 8);
+    ctx.restore();
+  }
+}
+
+/* ---------- Mini-Graph: gleitender Verlauf mit adaptiver Skalierung ---------- */
+function drawGraph(id, hist, color, o) {
+  const v = views[id]; if (!v) return;
+  const { ctx, W, H } = v;
+  ctx.clearRect(0, 0, W, H);
+  const signed = !!o.signed;
+  const y0 = signed ? H / 2 : H - 5;
+  ctx.save();
+  ctx.strokeStyle = "rgba(139,148,158,.3)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(W, y0); ctx.stroke();
+  let need = o.min || 1;
+  for (const p of hist) need = Math.max(need, Math.abs(p.v));
+  o.ref[o.key] = Math.max(o.ref[o.key] * 0.997, need * 1.18);   // langsam nachführen
+  const vmax = o.ref[o.key];
+  if (hist.length > 1 && sim.t > 0.2) {
+    const t1 = sim.t, span = Math.min(10, Math.max(2, t1));
+    ctx.beginPath();
+    let first = true;
+    for (const p of hist) {
+      if (p.t < t1 - span) continue;
+      const x = (p.t - (t1 - span)) / span * W;
+      const y = signed ? y0 - p.v / vmax * (H / 2 - 6)
+                       : y0 - p.v / vmax * (H - 16);
+      if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(139,148,158,.9)"; ctx.font = "10.5px system-ui"; ctx.textAlign = "left";
+  ctx.fillText(o.label + "  (Skal max " + fmtF(vmax, 0) + ")", 6, 12);
+  ctx.restore();
+}
+
+/* ==================================================================
+   LIVE-DASHBOARDS (Zahlen + Formeln, je Frame aktualisiert)
+   ================================================================== */
+function setVal(id, txt, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = txt;
+  el.className = "t-val" + (cls ? " " + cls : "");
+}
+function signCls(x, dead) { return Math.abs(x) < dead ? "" : (x > 0 ? "pos" : "neg"); }
+function setTxt(id, txt) { const el = document.getElementById(id); if (el) el.textContent = txt; }
+
+function updateDashboards() {
+  /* ===== Szenario 1: Drift ===== */
+  const E1 = ohm.U / D_LEITER;          // E = U/d
+  const j1 = SIGMA * E1;                // j = σE
+  const v1 = MU_CU * E1;                // |v_d| = μE
+  setVal("tOhmE", sci(E1) + " V/m");
+  setVal("tOhmJ", sci(j1) + " A/m²", "accent-o");
+  setVal("tOhmV", (v1 > 0 ? "− " : "") + fmtF(v1, 1) + " m/s");
+  const r1 = ohmNetRate();              // gemessen: statistisch ≈ 0 bei U = 0
+  setVal("tOhmFlux", (r1 >= 0 ? "+" : "") + fmtF(r1, 0) + " e⁻/s", signCls(r1, 2));
+  setTxt("fOhmJ", sci(j1) + " A/m²");
+  setTxt("fOhmE", sci(E1) + " V/m");
+  setTxt("fOhmV", (v1 > 0 ? "−" : "") + fmtF(v1, 1) + " m/s");
+  setTxt("fOhmSigma", sci(SIGMA) + " S/m");
+
+  /* ===== Szenario 2: Diffusion / pn-Modi ===== */
+  const Wd = views.cvDiff.W, xb = Wd / 2;
+  let nL = 0, nR = 0;
+  for (const p of diff.parts) (p.x < xb ? nL++ : nR++);
+  const grad = (nR - nL) / (Wd / 2);    // ∇n (Sichtmaßstab, pro px)
+  const avg = diffNetAvg();             // kumulativ gemittelt seit Start (rauscharm)
+  const rate = diffNetRate();           // Gleitfenster (für Diagramm/Brutto)
+  const gr = diffGross();               // Bruttoflüsse je Richtung
+  if (diff.mode === "drift") {
+    setVal("tDiffE", "+1,0·10⁴ V/m");
+    setVal("tDiffFlux", (avg >= 0 ? "+" : "") + fmtF(avg, 1) + " Teilchen/s", "accent-d");
+  } else if (diff.mode === "komp") {
+    const vdiffEq = (nL > 0 && nR > 0) ? VT * Math.log(nL / nR) : 0;   // Boltzmann
+    const vdiff = vdiffEq * clamp((diff.cum.lr - diff.cum.rl) / 20, 0, 1);   // lädt sich auf
+    setVal("tDiffE", "V_diff ≈ " + fmtF(vdiff * 1000, 1) + " mV");
+    setVal("tDiffFlux", (rate >= 0 ? "+" : "") + fmtF(rate, 1) + " Teilchen/s", signCls(rate, 1.2));
+  } else {
+    /* Der Kern des Experiments: E = 0 UND trotzdem Nettostrom > 0 */
+    setVal("tDiffE", "0 V/m", "pos");
+    setVal("tDiffFlux", (avg >= 0 ? "+" : "") + fmtF(avg, 1) + " Teilchen/s",
+           avg > 0.5 ? "pos" : signCls(avg, 0.5));
+  }
+  setVal("tDiffN", nL + " · " + nR);
+  setVal("tDiffGrad", fmtF(grad, 2) + " px⁻¹");
+  if (diff.mode === "komp") {
+    /* Beide Teilströme werden getrennt sichtbar: Diffusion L→R und
+       Drift (Kreuzungen gegen die Diffusionsrichtung) R→L. */
+    setTxt("tDiffGross", "j_diff (L→R): " + fmtF(gr.lr, 1) + "/s · j_drift (R→L): " +
+           fmtF(gr.rl, 1) + "/s → j_net = " + (rate >= 0 ? "+" : "") + fmtF(rate, 1) + "/s");
+  } else {
+    setTxt("tDiffGross", "Bruttofluss: L→R " + fmtF(gr.lr, 0) + "/s · R→L " + fmtF(gr.rl, 0) +
+           "/s · seit Start Σ " + diff.cum.lr + " : " + diff.cum.rl);
+  }
+  setTxt("fDiffGrad", fmtF(grad, 2) + " px⁻¹ (sim)");
+  const fdm = document.getElementById("fDiffMode");
+  if (diff.mode === "drift") {
+    fdm.innerHTML = 'E = <span class="lv r">1,0·10⁴ V/m</span>, n konstant → reiner Driftstrom: ' +
+                    'j = σ·E = <span class="lv d">' + sci(SIGMA * 1e4) + ' A/m²</span>';
+  } else if (diff.mode === "komp") {
+    const vdiffEq = (nL > 0 && nR > 0) ? VT * Math.log(nL / nR) : 0;   // Boltzmann
+    const vdiff = vdiffEq * clamp((diff.cum.lr - diff.cum.rl) / 20, 0, 1);   // lädt sich auf
+    fdm.innerHTML = 'V_diff = V_T·ln(n_L/n_R) = <span class="lv d">' + fmtF(vdiff * 1000, 1) + ' mV</span> (baut sich auf) → ' +
+                    'j_diff + j_drift = <span class="lv s">' + (rate >= 0 ? "+" : "") + fmtF(rate, 1) +
+                    '/s</span> → 0 im Gleichgewicht: kein Nettostrom, obwohl beide Teilströme fließen.';
+  } else {
+    const jsim = -diff.Ds * grad;       // j = −qD∇n mit q = 1 (sim), ∇n < 0 → j > 0
+    fdm.innerHTML = 'E = <span class="lv r">0 V/m</span> → trotzdem Strom: ' +
+                    'j = −q·D·∇n = <span class="lv d">+' + fmtF(jsim, 2) +
+                    ' (sim)</span> – angetrieben vom Konzentrationsgradienten (Entropie).';
+  }
+
+  /* ===== Szenario 3: Supraleitung ===== */
+  const normal = supraIsNormal();
+  const I3 = supra.omega / supra.OMEGA0 * supra.I0;
+  setVal("tSupE", normal ? "≠ 0" : "0 V/m", normal ? "neg" : "pos");
+  setVal("tSupI", fmtF(Math.abs(I3), 1) + " mA", "accent-s");
+  setVal("tSupT", fmtF(supra.T, 0) + " K · T " + (supra.T <= curTc ? "< " : "> ") + "Tc");
+  setVal("tSupState", normal ? "normal (R > 0)" : "supraleitend (R = 0)", normal ? "neg" : "pos");
+  setTxt("fSupI", fmtF(Math.abs(I3), 1) + " mA");
+  setTxt("fSupT", fmtF(supra.T, 0) + " K");
+  const fss = document.getElementById("fSupState");
+  if (fss) { fss.textContent = normal ? "normal" : "supraleitend"; fss.className = "lv " + (normal ? "r" : "s"); }
+
+  /* ===== Szenario 4: Kondensator ===== */
+  setVal("tCondU", fmtF(cond.u, 2) + " V", "accent-k");
+  setVal("tCondI", (cond.i >= 0 ? "+" : "") + fmtF(cond.i, 2) + " µA", signCls(cond.i, 0.02));
+  setVal("tCondQ", fmtF(cond.C * Math.abs(cond.u), 2) + " µC");
+  setVal("tCondW", fmtF(0.5 * cond.C * cond.u * cond.u, 2) + " µJ");
+  setVal("tCondE", sci(cond.u / cond.D) + " V/m", "accent-k");
+  setTxt("fCondU", fmtF(cond.u, 2) + " V");
+  setTxt("fCondI", (cond.i >= 0 ? "+" : "") + fmtF(cond.i, 2) + " µA");
+  setTxt("fCondQ", fmtF(cond.C * Math.abs(cond.u), 2) + " µC");
+  setTxt("fCondE", sci(cond.u / cond.D) + " V/m");
+  /* Phasenstatus: unmissverständlich, wann die Quelle wirkt und wann
+     sie abgetrennt ist. */
+  {
+    const phEl = document.getElementById("tCondPhase");
+    if (phEl) phEl.innerHTML = cond.charging
+      ? '<span class="lv k">Phase: LADEN</span> – Quelle wirkt (uq = +Uq = ' + fmtF(cond.Uq, 1) +
+        ' V), Elektronen stauen sich auf der rechten Platte · i &gt; 0'
+      : '<span class="lv">Phase: ENTLADUNG</span> – Quelle abgetrennt (uq = 0), C gibt die Energie über R ab · i &lt; 0';
+  }
+
+  /* ===== Szenario 5: Spule ===== */
+  const uL = coil.L * coil.dI;                 // numerisch mV (1 H · mA/s)
+  const B5 = MU0 * coil.nD * coil.I;           // B in mT (i in mA eingesetzt)
+  setVal("tCoilI", fmtF(coil.I, 1) + " mA", "accent-p");
+  setVal("tCoilU", (uL >= 0 ? "+" : "") + fmtF(uL, 1) + " mV", signCls(uL, 0.3));
+  setVal("tCoilD", (coil.dI >= 0 ? "+" : "") + fmtF(coil.dI, 1) + " mA/s");
+  setVal("tCoilW", fmtF(0.5 * coil.L * coil.I * coil.I / 1000, 2) + " mJ");
+  setVal("tCoilB", fmtF(B5, 2) + " mT", "accent-p");
+  setTxt("fCoilD", (coil.dI >= 0 ? "+" : "") + fmtF(coil.dI, 1) + " mA/s");
+  setTxt("fCoilU", (uL >= 0 ? "+" : "") + fmtF(uL, 1) + " mV");
+  setTxt("fCoilW", fmtF(0.5 * coil.L * coil.I * coil.I / 1000, 2) + " mJ");
+  setTxt("fCoilB", fmtF(B5, 2) + " mT");
+}
+
+/* ==================================================================
+   HAUPTSCHLEIFE – ein Takt für alle drei Panels (synchronisiert)
+   ================================================================== */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);   // clamp: Tab-Wechsel abfangen
+  last = now;
+  if (sim.running) {
+    sim.t += dt;
+    ohmStep(dt, views.cvOhm.W, views.cvOhm.H);
+    diffStep(dt, views.cvDiff.W, views.cvDiff.H);
+    supraStep(dt);
+    condStep(dt);
+    coilStep(dt);
+  }
+  drawOhm(); drawDiff(); drawSupra(); drawCond(); drawCoil();
+  drawGraph("gOhm",   ohm.hist,   "#f0b429", { ref: ohm,   key: "vMax", signed: true,  min: 8, label: "gemessener Nettofluss am Messdraht (e⁻/s)" });
+  drawGraph("gDiff",  diff.hist,  "#22d3ee", { ref: diff,  key: "vMax", signed: true,  min: 5, label: "Nettofluss über die Grenze (Teilchen/s)" });
+  drawGraph("gSupra", supra.hist, "#3fb950", { ref: supra, key: "vMax", signed: false, min: 110, label: "Ringstrom I (mA)" });
+  drawGraph("gCond",  cond.hist,  "#bb86fc", { ref: cond,  key: "vMax", signed: true,  min: 4, label: "Strom i = C·du/dt (µA)" });
+  drawGraph("gCoil",  coil.hist,  "#f778ba", { ref: coil,  key: "vMax", signed: true,  min: 60, label: "Strom i (mA)" });
+  updateDashboards();
+  requestAnimationFrame(frame);
+}
+
+/* ==================================================================
+   STEUERUNG
+   ================================================================== */
+function bindSlider(id, outId, fn) {
+  const el = document.getElementById(id);
+  el.addEventListener("input", () => fn(parseFloat(el.value)));
+}
+bindSlider("sldU", "outU", v => { ohm.U = v; setTxt("outU", fmtF(v, 1) + " V"); });
+bindSlider("sldD", "outD", v => { diff.Ds = v; setTxt("outD", fmtF(v, 1)); });
+bindSlider("sldT", "outT", v => { supra.T = v; setTxt("outT", fmtF(v, 0) + " K"); });
+bindSlider("sldUq", "outUq", v => { cond.Uq = v; setTxt("outUq", fmtF(v, 1) + " V"); });
+bindSlider("sldTau", "outTau", v => { cond.R = v; setTxt("outTau", fmtF(v, 1) + " s"); });
+bindSlider("sldCi", "outCi", v => { coil.It = v; setTxt("outCi", fmtF(v, 0) + " mA"); });
+bindSlider("sldCt", "outCt", v => { coil.tau = v; setTxt("outCt", fmtF(v, 1) + " s"); });
+
+/* Materialauswahl (Panel 3): setzt Tc, die Tc-Marke am Temperatur-
+   Regler und den Info-Text zum gewählten Supraleiter */
+const selMat = document.getElementById("selMat");
+selMat.innerHTML = MATERIALS.map(m => '<option value="' + m.id + '">' + m.name + "</option>").join("");
+function applyMaterial(id) {
+  const m = MATERIALS.filter(x => x.id === id)[0] || MATERIALS[0];
+  curTc = m.tc;
+  const pct = (m.tc - 4) / 296 * 100;               // Position der Tc-Marke (Regler 4…300 K)
+  const mark = document.getElementById("tcMark"), lab = document.getElementById("tcLab");
+  mark.style.left = pct + "%";
+  lab.style.left = pct + "%";
+  lab.textContent = "Tc = " + fmtF(m.tc, m.tc < 10 ? 2 : 0) + " K";
+  document.getElementById("matInfo").innerHTML = m.info;
+}
+selMat.addEventListener("change", () => applyMaterial(selMat.value));
+applyMaterial("ybco");
+
+/* pn-Übergang-Modi */
+document.querySelectorAll("#segPn button").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("#segPn button").forEach(x => x.classList.toggle("on", x === b));
+    diff.mode = b.dataset.m;
+    const W = views.cvDiff.W, H = views.cvDiff.H;
+    if (diff.mode === "drift") diffSeedUniform(W, H);   // n = konstant → reine Feldwirkung
+    else diffSeed(W, H);                                // frische Stufe: hohe | niedrige Dichte
+  });
+});
+
+/* Supraleitung: Strom anstoßen + Normalleiter-Zwang */
+document.getElementById("btnStart").addEventListener("click", () => { supra.omega = supra.OMEGA0; });
+const btnNormal = document.getElementById("btnNormal");
+btnNormal.addEventListener("click", () => {
+  supra.forceNormal = !supra.forceNormal;
+  btnNormal.classList.toggle("on", supra.forceNormal);
+});
+
+/* Master-Steuerung */
+const btnPause = document.getElementById("btnPause");
+btnPause.addEventListener("click", () => {
+  sim.running = !sim.running;
+  btnPause.textContent = sim.running ? "⏸ Pause" : "▶ Weiter";
+});
+document.getElementById("btnReset").addEventListener("click", () => {
+  sim.t = 0;
+  ohmSeed(views.cvOhm.W, views.cvOhm.H);
+  diffSeed(views.cvDiff.W, views.cvDiff.H);
+  supra.omega = 0;
+  supra.hist = [];
+  cond.u = 0; cond.i = 0; cond.charging = true; cond.tPhase = sim.t; condSeed();
+  coil.I = 0; coil.dI = 0; coilSeed();
+});
+
+/* ==================================================================
+   INIT: Canvas-Größen, Seeds, Warm-up, Start
+   ================================================================== */
+function fitAll() {
+  ["cvOhm", "gOhm", "cvDiff", "gDiff", "cvSupra", "gSupra", "cvCond", "gCond", "cvCoil", "gCoil"].forEach(id => {
+    const cv = document.getElementById(id);
+    if (cv) views[id] = fitCanvas(cv);
+  });
+  /* Canvas-Größen-Reset löscht die Bitmap → sofort neu zeichnen */
+  drawOhm(); drawDiff(); drawSupra(); drawCond(); drawCoil();
+  drawGraph("gOhm",   ohm.hist,   "#f0b429", { ref: ohm,   key: "vMax", signed: true,  min: 8, label: "gemessener Nettofluss am Messdraht (e⁻/s)" });
+  drawGraph("gDiff",  diff.hist,  "#22d3ee", { ref: diff,  key: "vMax", signed: true,  min: 5, label: "Nettofluss über die Grenze (Teilchen/s)" });
+  drawGraph("gSupra", supra.hist, "#3fb950", { ref: supra, key: "vMax", signed: false, min: 110, label: "Ringstrom I (mA)" });
+  drawGraph("gCond",  cond.hist,  "#bb86fc", { ref: cond,  key: "vMax", signed: true,  min: 4, label: "Strom i = C·du/dt (µA)" });
+  drawGraph("gCoil",  coil.hist,  "#f778ba", { ref: coil,  key: "vMax", signed: true,  min: 60, label: "Strom i (mA)" });
+  if (ohm.parts.length) updateDashboards();
+}
+fitAll();
+ohmSeed(views.cvOhm.W, views.cvOhm.H);
+diffSeed(views.cvDiff.W, views.cvDiff.H);
+supraSeed();
+condSeed();
+coilSeed();
+
+/* ---------- Test-/Deeplink-Parameter (harmlose Zustands-Vorgaben):
+   ?mode=diffus|drift|komp  ·  ?u=0…10  ·  ?t=4…300  ·  ?start=1  ·  ?normal=1 */
+(function applyQuery() {
+  const qs = new URLSearchParams(location.search);
+  const qMode = qs.get("mode");
+  if (qMode && ["diffus", "drift", "komp"].indexOf(qMode) >= 0)
+    document.querySelector('#segPn button[data-m="' + qMode + '"]').click();
+  const qu = parseFloat(qs.get("u"));
+  if (!isNaN(qu)) {
+    ohm.U = clamp(qu, 0, 10);
+    document.getElementById("sldU").value = ohm.U;
+    document.getElementById("outU").textContent = fmtF(ohm.U, 1) + " V";
+  }
+  const qt = parseFloat(qs.get("t"));
+  if (!isNaN(qt)) {
+    supra.T = clamp(qt, 4, 300);
+    document.getElementById("sldT").value = supra.T;
+    document.getElementById("outT").textContent = fmtF(supra.T, 0) + " K";
+  }
+  if (qs.get("start")) document.getElementById("btnStart").click();
+  if (qs.get("normal")) document.getElementById("btnNormal").click();
+  const qmat = qs.get("mat");
+  if (qmat && selMat.querySelector('option[value="' + qmat + '"]')) { selMat.value = qmat; applyMaterial(qmat); }
+})();
+
+/* Warm-up: Diffusion und Ohm-Szenario schon ein Stück rechnen, damit
+   alle Anzeigen (insb. der Nettofluss bei E = 0!) ab dem ersten Frame
+   sinnvolle, stabile Werte zeigen. */
+for (let i = 0; i < 300; i++) {
+  sim.t += DT_REF;
+  ohmStep(DT_REF, views.cvOhm.W, views.cvOhm.H);
+  diffStep(DT_REF, views.cvDiff.W, views.cvDiff.H);
+  supraStep(DT_REF);
+}
+
+/* Kondensator & Spule starten nach dem Warm-up bewusst „frisch", damit
+   die Lade- und Anlauf-Transienten live sichtbar sind. */
+cond.u = 0; cond.i = 0; cond.charging = true; cond.tPhase = sim.t;
+coil.I = 0; coil.dI = 0;
+
+window.addEventListener("resize", fitAll);
+window.addEventListener("load", fitAll);
+
+/* ---------- Selbsttest-Hook (?selftest in der URL):
+   schreibt die Messwerte in Titel + Box, damit per headless-
+   Screenshot geprüft werden kann, dass Szenario 2 bei E = 0
+   tatsächlich Nettostrom zeigt. ---------- */
+window.__lt = { sim, ohm, diff, supra, diffNetRate, ohmNetRate };
+if (location.search.indexOf("selftest") >= 0) {
+  const div = document.createElement("div");
+  div.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:99;background:#000;" +
+    "color:#0f0;font:12px monospace;padding:6px 8px;border:1px solid #0f0;border-radius:6px;" +
+    "max-width:95vw;white-space:normal;word-break:break-all";
+  document.body.appendChild(div);
+  const report = () => {
+    const Wd = views.cvDiff.W;
+    let nL = 0, nR = 0;
+    for (const p of diff.parts) (p.x < Wd / 2 ? nL++ : nR++);
+    const rep = {
+      sz2_modus: diff.mode,
+      sz2_E: diff.mode === "drift" ? "1e4 V/m" : "0 V/m",
+      sz2_nettofluss_durchschnitt_pro_s: +diffNetAvg().toFixed(1),
+      sz2_sigma_L2R: diff.cum.lr, sz2_sigma_R2L: diff.cum.rl,
+      sz2_n_links: nL, sz2_n_rechts: nR,
+      sz1_U_V: ohm.U, sz1_nettofluss_pro_s: +ohmNetRate().toFixed(1),
+      sz3_I_mA: +(supra.omega / supra.OMEGA0 * supra.I0).toFixed(1),
+      sz3_material: selMat.value, sz3_Tc: curTc, sz3_status: supraIsNormal() ? "normal" : "supra",
+      sz4_phase: cond.charging ? "laden" : "entladung",
+      sz4_uc_V: +cond.u.toFixed(2), sz4_i_uA: +cond.i.toFixed(2),
+      sz4_E_Vm: +(cond.u / cond.D).toFixed(0),
+      sz5_i_mA: +coil.I.toFixed(1), sz5_uL_mV: +(coil.L * coil.dI).toFixed(1),
+      sz5_B_mT: +(MU0 * coil.nD * coil.I).toFixed(3),
+      simzeit_s: +sim.t.toFixed(1)
+    };
+    document.title = "SELFTEST " + JSON.stringify(rep);
+    div.textContent = document.title;
+  };
+  report();                  // sofort einmal befüllen
+  setInterval(report, 500);  // dann live weiter schreiben
+}
+
+requestAnimationFrame(t => { last = t; frame(t); });
+</script>
+<!-- sim-nav -->
+<style>
+.sn-bar{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
+  background:var(--panel,#141d33);border-top:1px solid var(--border,#26355a);
+  padding:.7rem 1.2rem;margin-top:2.5rem;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:.9rem;
+  color:var(--text,#e5ecf7)}
+a.sn-home{color:var(--accent,#f59e0b);font-weight:700;text-decoration:none;white-space:nowrap}
+a.sn-home:hover{text-decoration:underline}
+.sn-nums{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
+.sn-num{display:inline-flex;align-items:center;justify-content:center;min-width:1.9rem;height:1.9rem;
+  padding:0 .35rem;border-radius:999px;border:1px solid var(--border,#26355a);
+  color:var(--text,#e5ecf7);text-decoration:none;font-weight:600;font-size:.85rem}
+a.sn-num:hover{border-color:var(--accent,#f59e0b);color:var(--accent,#f59e0b)}
+span.sn-num{background:var(--accent,#f59e0b);color:#1a1206;border-color:var(--accent,#f59e0b);font-weight:800}
+.sn-sib{color:var(--muted,#93a4c3);font-size:.85rem;white-space:nowrap}
+.sn-sib a{color:var(--cyan,#22d3ee);text-decoration:none;font-weight:600}
+.sn-sib a:hover{text-decoration:underline}
+</style>
+<footer class="sn-bar">
+  <a class="sn-home" href="../index.html">← Startseite</a>
+  <nav class="sn-nums" aria-label="Simulationsnavigation">
+    <a class="sn-num" href="../01_Einfuehrung_Wechselstrom/" title="Wechselstromerzeugung">1</a>
+    <a class="sn-num" href="../02_Kennwerte_Sinusschwingung/" title="Kennwerte der Sinusschwingung">2</a>
+    <a class="sn-num" href="../03_Widerstand_Wechselstrom/" title="Ohmscher Widerstand im Wechselstromkreis">3</a>
+    <a class="sn-num" href="../04a_Kondensator_Wechselstrom/" title="Kondensator im Wechselstromkreis">04a</a>
+    <a class="sn-num" href="../04b_Spule_Wechselstrom/" title="Spule im Wechselstromkreis">04b</a>
+    <span class="sn-num" title="Exkurs: Strom ohne Spannung – Ladungstransport (aktive Simulation)">05</span>
+    <a class="sn-num" href="../06_Oszilloskop/" title="Exkurs: Digitales Speicheroszilloskop (DSO)">6</a>
+    <a class="sn-num" href="../07_Leistung_Wechselstrom/" title="Leistung im Wechselstromkreis">7</a>
+    <a class="sn-num" href="../08_RLC_Zeigerdiagramm/" title="Zeigerdiagramm RLC-Reihenschaltung">8</a>
+    <a class="sn-num" href="../09_Impedanz_Dreieck/" title="Impedanz-Dreieck (RLC)">9</a>
+    <a class="sn-num" href="../10_Motorkompensation/" title="Motorkompensation">10</a>
+    <a class="sn-num" href="../11_Schwingkreis_Resonanz/" title="RLC-Reihenschwingkreis">11</a>
+    <a class="sn-num" href="../12_Transformator/" title="Transformator">12</a>
+    <a class="sn-num" href="../13_Drehstrom/Sternschaltung/" title="Drehstrom – Sternschaltung">13</a>
+  </nav>
+</footer>
+<!-- /sim-nav -->
+</body>
+</html>

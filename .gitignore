@@ -1,2 +1,11 @@
 # Session-Export (kein Simulations-Bestandteil, nicht im öffentlichen Repo)
 01_Einfuehrung_Wechselstrom/Kimi-Datensatz_Wechselstrom-Session.zip
+
+# Erklaervideos (gehoeren auf Icedrive, nicht ins oeffentliche Repo)
+*.mp4
+*.webm
+*.mov
+Video/
+
+# Session-Marker
+kimi.txt

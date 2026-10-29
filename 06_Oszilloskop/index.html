@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DSO-Simulation – Digitales Speicheroszilloskop</title>
+<title>Exkurs: Digitales Speicheroszilloskop (DSO) – Simulation</title>
+<meta name="description" content="Exkurs: Digitales Speicheroszilloskop (DSO) – Abtastung, Nyquist-Abtasttheorem, Triggerung, AC/DC-Kopplung und Messungen interaktiv simuliert.">
 <style>
   /* ============ Grunddesign (Palette wie 04_Kondensator_Wechselstrom) ============ */
   :root {
@@ -31,6 +32,9 @@
   }
   header h1 { font-size: 17px; font-weight: 600; color: var(--yellow); margin-right: auto; }
   header .hint { color: var(--text-dim); font-size: 12px; }
+  .exkurs-chip { display: inline-block; background: var(--magenta); color: #160b22; border-radius: 999px;
+                 font-size: 11px; font-weight: 800; letter-spacing: .08em; padding: 2px 10px; margin-right: 8px;
+                 vertical-align: 2px; text-transform: uppercase; }
 
   button {
     background: var(--panel2); color: var(--text); border: 1px solid var(--border);
@@ -111,7 +115,7 @@
 <body>
 
 <header>
-  <h1 id="uiTitle">Digitales Speicheroszilloskop (DSO) – Simulation</h1>
+  <h1><span class="exkurs-chip">Exkurs</span><span id="uiTitle">Digitales Speicheroszilloskop (DSO) – Simulation</span></h1>
   <span class="hint" id="uiSpaceHint">Leertaste = Run/Stop</span>
   <button id="btnRun" class="active">■ Run</button>
   <button id="btnSingle">Single</button>
@@ -1352,13 +1356,14 @@ span.sn-num{background:var(--accent,#f59e0b);color:#1a1206;border-color:var(--ac
 </style>
 <footer class="sn-bar">
   <a class="sn-home" href="../index.html">← Startseite</a>
-  <nav class="sn-nums" aria-label="Simulationen 1 bis 13">
+  <nav class="sn-nums" aria-label="Simulationsnavigation">
     <a class="sn-num" href="../01_Einfuehrung_Wechselstrom/" title="Wechselstromerzeugung">1</a>
     <a class="sn-num" href="../02_Kennwerte_Sinusschwingung/" title="Kennwerte der Sinusschwingung">2</a>
     <a class="sn-num" href="../03_Widerstand_Wechselstrom/" title="Ohmscher Widerstand im Wechselstromkreis">3</a>
-    <a class="sn-num" href="../04_Kondensator_Wechselstrom/" title="Kondensator im Wechselstromkreis">4</a>
-    <a class="sn-num" href="../05_Spule_Wechselstrom/" title="Spule im Wechselstromkreis">5</a>
-    <span class="sn-num" title="Digitales Speicheroszilloskop (DSO) (aktive Simulation)">6</span>
+    <a class="sn-num" href="../04a_Kondensator_Wechselstrom/" title="Kondensator im Wechselstromkreis">04a</a>
+    <a class="sn-num" href="../04b_Spule_Wechselstrom/" title="Spule im Wechselstromkreis">04b</a>
+    <a class="sn-num" href="../05_Ladungstransports/" title="Exkurs: Strom ohne Spannung – Ladungstransport">05</a>
+    <span class="sn-num" title="Exkurs: Digitales Speicheroszilloskop (DSO) (aktive Simulation)">6</span>
     <a class="sn-num" href="../07_Leistung_Wechselstrom/" title="Leistung im Wechselstromkreis">7</a>
     <a class="sn-num" href="../08_RLC_Zeigerdiagramm/" title="Zeigerdiagramm RLC-Reihenschaltung">8</a>
     <a class="sn-num" href="../09_Impedanz_Dreieck/" title="Impedanz-Dreieck (RLC)">9</a>

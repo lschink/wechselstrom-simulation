@@ -94,6 +94,7 @@ Default vor jeder Szene: R = 100 Ω (Regler-Mitte), L = 100 mH (Mitte), C = 1 µ
 | Szene | f | Modus | Angezeigte Werte (Referenz) |
 |-------|-----|-------|------------------------------|
 | Default (kapazitiv) | 50 Hz | Reihe | X_L 31,5 Ω, X_C 3,18 kΩ, X −3,15 kΩ, Z 3,15 kΩ, I 72,9 mA, φ −88,2°, cos φ 0,032, P 531 mW, Q −16,7 var, S 16,8 VA, f₀ 504 Hz |
+| Standard (Preset) | 50 Hz | Reihe | Setzt R = 100 Ω, L = 100 mH, C = 1 µF, Û = 325 V und Reihenmodus zurück (Reset für alle Szenen) |
 | R hochdrehen | 50 Hz | Reihe | R = 1 kΩ → Z wächst, I sinkt; Dreieck wird flacher (X konstant) |
 | Stark induktiv (Preset) | ≈ 5 kHz | Reihe | X +3,13 kΩ, Z 3,13 kΩ, I ≈ 73 mA, φ ≈ +88,2°, Kathete blau/oben (Strom fast wie bei 50 Hz — nur die Richtung von X kippt) |
 | Resonanz (Preset) | ≈ 503 Hz | Reihe | X ≈ 0, Z = 100 Ω, I 2,3 A, φ 0°, P = S ≈ 530 W, Dreieck = Linie, Goldglühen |

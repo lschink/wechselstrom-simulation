@@ -15,22 +15,24 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 
-# (Nummer, Ordner, Titel) – Nummer 13 existiert zweimal (Stern/Dreieck)
+# (Badge, Ordner, Titel) – Badge 13 existiert zweimal (Stern/Dreieck),
+# Badge "05" (Ladungstransport) und "6" (Oszilloskop) sind Exkurse
 SIMS = [
-    (1,  "01_Einfuehrung_Wechselstrom",   "Wechselstromerzeugung"),
-    (2,  "02_Kennwerte_Sinusschwingung",  "Kennwerte der Sinusschwingung"),
-    (3,  "03_Widerstand_Wechselstrom",    "Ohmscher Widerstand im Wechselstromkreis"),
-    (4,  "04_Kondensator_Wechselstrom",   "Kondensator im Wechselstromkreis"),
-    (5,  "05_Spule_Wechselstrom",         "Spule im Wechselstromkreis"),
-    (6,  "06_Oszilloskop",                "Digitales Speicheroszilloskop (DSO)"),
-    (7,  "07_Leistung_Wechselstrom",      "Leistung im Wechselstromkreis"),
-    (8,  "08_RLC_Zeigerdiagramm",         "Zeigerdiagramm RLC-Reihenschaltung"),
-    (9,  "09_Impedanz_Dreieck",           "Impedanz-Dreieck (RLC)"),
-    (10, "10_Motorkompensation",          "Motorkompensation"),
-    (11, "11_Schwingkreis_Resonanz",      "RLC-Reihenschwingkreis"),
-    (12, "12_Transformator",              "Transformator"),
-    (13, "13_Drehstrom/Sternschaltung",   "Drehstrom – Sternschaltung"),
-    (13, "13_Drehstrom/Dreieckschaltung", "Drehstrom – Dreieckschaltung"),
+    ("1",  "01_Einfuehrung_Wechselstrom",   "Wechselstromerzeugung"),
+    ("2",  "02_Kennwerte_Sinusschwingung",  "Kennwerte der Sinusschwingung"),
+    ("3",  "03_Widerstand_Wechselstrom",    "Ohmscher Widerstand im Wechselstromkreis"),
+    ("04a", "04a_Kondensator_Wechselstrom", "Kondensator im Wechselstromkreis"),
+    ("04b", "04b_Spule_Wechselstrom",       "Spule im Wechselstromkreis"),
+    ("05", "05_Ladungstransports",          "Exkurs: Strom ohne Spannung – Ladungstransport"),
+    ("6",  "06_Oszilloskop",                "Exkurs: Digitales Speicheroszilloskop (DSO)"),
+    ("7",  "07_Leistung_Wechselstrom",      "Leistung im Wechselstromkreis"),
+    ("8",  "08_RLC_Zeigerdiagramm",         "Zeigerdiagramm RLC-Reihenschaltung"),
+    ("9",  "09_Impedanz_Dreieck",           "Impedanz-Dreieck (RLC)"),
+    ("10", "10_Motorkompensation",          "Motorkompensation"),
+    ("11", "11_Schwingkreis_Resonanz",      "RLC-Reihenschwingkreis"),
+    ("12", "12_Transformator",              "Transformator"),
+    ("13", "13_Drehstrom/Sternschaltung",   "Drehstrom – Sternschaltung"),
+    ("13", "13_Drehstrom/Dreieckschaltung", "Drehstrom – Dreieckschaltung"),
 ]
 
 # Verweis auf die jeweils andere Drehstrom-Schaltung
@@ -67,18 +69,18 @@ def prefix_for(folder: str) -> str:
 
 def nav_html(folder: str) -> str:
     pre = prefix_for(folder)
-    active = next(n for n, f, _ in SIMS if f == folder)
-    # pro Nummer nur ein Eintrag (13 -> Sternschaltung als Ziel)
+    active = next(b for b, f, _ in SIMS if f == folder)
+    # pro Badge nur ein Eintrag (13 -> Sternschaltung als Ziel)
     seen = set()
     items = []
-    for n, f, title in SIMS:
-        if n in seen:
+    for badge, f, title in SIMS:
+        if badge in seen:
             continue
-        seen.add(n)
-        if n == active:
-            items.append(f'<span class="sn-num" title="{title} (aktive Simulation)">{n}</span>')
+        seen.add(badge)
+        if badge == active:
+            items.append(f'<span class="sn-num" title="{title} (aktive Simulation)">{badge}</span>')
         else:
-            items.append(f'<a class="sn-num" href="{pre}{f}/" title="{title}">{n}</a>')
+            items.append(f'<a class="sn-num" href="{pre}{f}/" title="{title}">{badge}</a>')
     sibling = ""
     if folder in SIBLING:
         href, label = SIBLING[folder]
@@ -87,7 +89,7 @@ def nav_html(folder: str) -> str:
         "<!-- sim-nav -->\n" + STYLE + "\n"
         '<footer class="sn-bar">\n'
         f'  <a class="sn-home" href="{pre}index.html">← Startseite</a>\n'
-        '  <nav class="sn-nums" aria-label="Simulationen 1 bis 13">\n    '
+        '  <nav class="sn-nums" aria-label="Simulationsnavigation">\n    '
         + "\n    ".join(items) + "\n  </nav>"
         + sibling + "\n"
         "</footer>\n"

@@ -20,8 +20,9 @@ SIMS=(
   01_Einfuehrung_Wechselstrom
   02_Kennwerte_Sinusschwingung
   03_Widerstand_Wechselstrom
-  04_Kondensator_Wechselstrom
-  05_Spule_Wechselstrom
+  04a_Kondensator_Wechselstrom
+  04b_Spule_Wechselstrom
+  05_Ladungstransports
   06_Oszilloskop
   07_Leistung_Wechselstrom
   08_RLC_Zeigerdiagramm
