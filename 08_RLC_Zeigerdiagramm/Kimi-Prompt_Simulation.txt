@@ -1,5 +1,0 @@
- To resume this session: kimi -r session_87bb693d-de17-405b-ab52-e89498e79ff0
-
-Zeigerdiagramm (Frequenzbereich): Erschaffe ein Zeigerdiagramm für eine Reihenschaltung von RLC. 
-Die Parameter von RLC können mit Reglern eingestellt werden. 
-

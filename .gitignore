@@ -6,6 +6,31 @@
 *.webm
 *.mov
 Video/
+Videos/
+
+# Videoskripte & Erklaer-PDFs (nicht Teil der Simulationen)
+videoskript.md
+videoskript.pdf
+Video-Skript.md
+Video-Skript.pdf
+Videoskript.md
+Videoskript.pdf
+Erklaervideo_Skript.md
+erklaerung.md
+erklaerung.pdf
+erklaerung-messung.png
+erklaerung-szene.png
+1_Einfuehrung_Sim.pdf
+
+# Kimi-Prompts & Session-Doku (Entstehungsmaterial, nicht Teil der Simulationen)
+Kimi-Prompt_Simulation.txt
+KimiCode_Sessions_Doku.txt
+
+# Werkzeuge & Produktionsdateien (bleiben lokal, nicht im oeffentlichen Repo)
+add-navigation.py
+update-github.sh
+Videos/protokoll.txt
+videos-verbinden.sh
 
 # Session-Marker
 kimi.txt

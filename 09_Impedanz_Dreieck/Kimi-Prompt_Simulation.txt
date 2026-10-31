@@ -1,5 +1,0 @@
- To resume this session: kimi -r session_40dfe785-4793-4320-b354-321ca7f8c652
-
-
-Impedanz-Dreieck: Visualisiert Wirk-, Blind- und Scheinwiderstand
-
