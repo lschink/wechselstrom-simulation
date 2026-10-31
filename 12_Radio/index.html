@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radioempfang – Abstimmung, Güte Q &amp; Bandbreite B – Simulation</title>
+<style>
+  /* ============================================================
+     Farbschema / Basis-Layout (dunkles Design) – konsistent zur
+     RLC-Resonanz-Simulation
+     ============================================================ */
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel2: #1c2330;
+    --border: #30363d;
+    --text: #e6edf3;
+    --dim: #8b949e;
+    --r-col: #3fb950;   /* Widerstand  – grün  */
+    --l-col: #58a6ff;   /* Spule/blau  – Sender A */
+    --c-col: #e3b341;   /* Kondensator – gelb  */
+    --src-col: #f0883e; /* Quelle      – orange */
+    --i-col: #39c5cf;   /* Strom       – cyan  */
+    --res-col: #f778ba; /* Resonanz    – pink / Sender C */
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.5;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px;
+    padding: 14px 22px; border-bottom: 1px solid var(--border);
+    background: var(--panel); position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 1.15rem; font-weight: 600; }
+  header .sub { color: var(--dim); font-size: 0.8rem; }
+  #langBtn, #stopBtn, #audioBtn {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 0.85rem;
+  }
+  #langBtn:hover, #stopBtn:hover, #audioBtn:hover { border-color: var(--dim); }
+  #stopBtn.paused, #audioBtn.active { color: var(--res-col); border-color: var(--res-col); }
+  .hdrBtns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  main { max-width: 1400px; margin: 0 auto; padding: 18px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; margin-bottom: 18px;
+  }
+  .panel h2 {
+    font-size: 0.95rem; margin-bottom: 10px; color: var(--dim);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  canvas { display: block; width: 100%; border-radius: 6px; }
+  .canvasBox { background: var(--panel2); border-radius: 6px; padding: 6px; }
+
+  /* Grid für die beiden Diagramme */
+  .diagramGrid {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  }
+
+  /* ============================================================
+     Steuerung (Schieberegler)
+     ============================================================ */
+  .ctrlRow {
+    display: grid; grid-template-columns: 190px 1fr 110px;
+    align-items: center; gap: 12px; margin: 8px 0;
+  }
+  .ctrlRow label { font-size: 0.9rem; color: var(--text); }
+  .ctrlRow .val {
+    font-family: Consolas, "Courier New", monospace; font-size: 0.85rem;
+    text-align: right; color: var(--i-col);
+  }
+  input[type="range"] { width: 100%; accent-color: var(--src-col); cursor: pointer; }
+
+  /* ============================================================
+     Sender-Karten
+     ============================================================ */
+  .senderGrid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  .senderCard {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
+    transition: border-color .15s ease, opacity .15s ease;
+  }
+  .senderCard .sHead { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; }
+  .senderCard .sInfo { color: var(--dim); font-size: 0.8rem; }
+  .senderCard .sState { font-size: 0.82rem; font-weight: 600; min-height: 1.2em; }
+  .presetBtn {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 16px; cursor: pointer; font-size: 0.85rem;
+    align-self: flex-start;
+  }
+  .presetBtn:hover { border-color: var(--res-col); color: var(--res-col); }
+  .presetBtn.activeEx { border-color: var(--src-col); color: var(--src-col); }
+
+  /* ============================================================
+     Messwert-Anzeigen
+     ============================================================ */
+  .meterGrid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .meter {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .meter .name { font-size: 0.75rem; color: var(--dim); }
+  .meter .num {
+    font-family: Consolas, "Courier New", monospace; font-size: 1.05rem;
+  }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+
+  /* Instrumente unter dem Schaltplan: Momentanwerte */
+  .instGrid {
+    display: grid; gap: 10px; margin-top: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  .inst {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; font-family: Consolas, "Courier New", monospace; font-size: 0.85rem;
+  }
+  .inst .lbl { font-family: inherit; color: var(--dim); font-size: 0.72rem; }
+
+  /* Audio-Bereich */
+  .audioRow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  #audioState { font-size: 0.88rem; }
+  .audioHint { color: var(--dim); font-size: 0.82rem; margin-top: 10px; max-width: 90ch; }
+
+  /* Erklärbereich */
+  #explain p { margin: 0 0 12px; font-size: 0.92rem; color: #c9d1d9; }
+  #explain p:last-child { margin-bottom: 0; }
+  footer { color: var(--dim); font-size: 0.78rem; text-align: center; padding: 16px; }
+
+  @media (max-width: 560px) {
+    .ctrlRow { grid-template-columns: 1fr; gap: 4px; }
+    .ctrlRow .val { text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 data-de="Radioempfang: Abstimmung, Güte Q &amp; Bandbreite B" data-en="Radio reception: tuning, quality factor Q &amp; bandwidth B">Radioempfang: Abstimmung, Güte Q &amp; Bandbreite B</h1>
+    <div class="sub" data-de="Interaktive Simulation · Schwingkreis-Selektivität" data-en="Interactive simulation · tuned-circuit selectivity">Interaktive Simulation · Schwingkreis-Selektivität</div>
+  </div>
+  <div class="hdrBtns">
+    <button id="stopBtn" title="Leertaste">⏸ Stopp</button>
+    <button id="langBtn">EN</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ==================== Empfänger-Schaltplan ==================== -->
+  <section class="panel">
+    <h2 data-de="Empfänger-Schaltplan (animiert)" data-en="Receiver circuit (animated)">Empfänger-Schaltplan (animiert)</h2>
+    <div class="canvasBox"><canvas id="circuitCv"></canvas></div>
+    <div class="instGrid">
+      <div class="inst"><span class="lbl">u_ind(t) <span data-de="(Antenne, alle Sender überlagert)" data-en="(antenna, all stations superimposed)">(Antenne, alle Sender überlagert)</span></span><br><span id="instUind" style="color:var(--src-col)">0 V</span></div>
+      <div class="inst"><span class="lbl" data-de="Momentanwert i (Empfangskreis)" data-en="Instantaneous i (receiver loop)">Momentanwert i (Empfangskreis)</span><br><span id="instI" style="color:var(--i-col)">0 A</span></div>
+    </div>
+  </section>
+
+  <!-- ==================== Sender ==================== -->
+  <section class="panel">
+    <h2 data-de="Sender (Mittelwelle, AM)" data-en="Stations (medium wave, AM)">Sender (Mittelwelle, AM)</h2>
+    <div class="senderGrid">
+      <div class="senderCard" id="cardA">
+        <div class="sHead"><span class="dot" style="background:var(--l-col)"></span><b data-de="Sender A" data-en="Station A">Sender A</b></div>
+        <div class="sInfo" data-de="0,90 MHz · Ton 440 Hz" data-en="0.90 MHz · tone 440 Hz">0,90 MHz · Ton 440 Hz</div>
+        <div class="sState" id="stA"></div>
+        <button class="presetBtn" id="btnA"></button>
+      </div>
+      <div class="senderCard" id="cardB">
+        <div class="sHead"><span class="dot" style="background:var(--r-col)"></span><b data-de="Sender B" data-en="Station B">Sender B</b></div>
+        <div class="sInfo" data-de="1,00 MHz · Ton 550 Hz" data-en="1.00 MHz · tone 550 Hz">1,00 MHz · Ton 550 Hz</div>
+        <div class="sState" id="stB"></div>
+        <button class="presetBtn" id="btnB"></button>
+      </div>
+      <div class="senderCard" id="cardC">
+        <div class="sHead"><span class="dot" style="background:var(--res-col)"></span><b data-de="Sender C" data-en="Station C">Sender C</b></div>
+        <div class="sInfo" data-de="1,10 MHz · Ton 660 Hz" data-en="1.10 MHz · tone 660 Hz">1,10 MHz · Ton 660 Hz</div>
+        <div class="sState" id="stC"></div>
+        <button class="presetBtn" id="btnC"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Steuerung ==================== -->
+  <section class="panel">
+    <h2 data-de="Steuerung" data-en="Controls">Steuerung</h2>
+
+    <div class="ctrlRow">
+      <label data-de="C (Drehkondensator)" data-en="C (variable capacitor)">C (Drehkondensator)</label>
+      <input type="range" id="slC" min="0" max="1000" value="663">
+      <span class="val" id="vC">253 pF</span>
+    </div>
+    <div class="ctrlRow">
+      <label data-de="R (Kreisverluste)" data-en="R (circuit losses)">R (Kreisverluste)</label>
+      <input type="range" id="slR" min="0" max="1000" value="349">
+      <span class="val" id="vR">10 Ω</span>
+    </div>
+    <div style="font-size:0.8rem;color:var(--dim);margin-top:8px"
+         data-de="L = 100 µH (fest) · Empfänger: Serienresonanzkreis R-L-C, gespeist aus der Antenne"
+         data-en="L = 100 µH (fixed) · receiver: series resonant circuit R-L-C fed from the antenna">L = 100 µH (fest) · Empfänger: Serienresonanzkreis R-L-C, gespeist aus der Antenne</div>
+  </section>
+
+  <!-- ==================== Messwerte ==================== -->
+  <section class="panel">
+    <h2 data-de="Messwerte (live)" data-en="Measurements (live)">Messwerte (live)</h2>
+    <div class="meterGrid">
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--src-col)"></span>f₀ = 1/(2π√(LC))</div><div class="num" id="mF0">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--res-col)"></span><span data-de="Güte Q" data-en="Quality Q">Güte Q</span></div><div class="num" id="mQ">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--res-col)"></span><span data-de="Bandbreite B" data-en="Bandwidth B">Bandbreite B</span></div><div class="num" id="mB">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--dim)"></span><span data-de="f₁ (untere Grenze)" data-en="f₁ (lower cutoff)">f₁ (untere Grenze)</span></div><div class="num" id="mF1">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--dim)"></span><span data-de="f₂ (obere Grenze)" data-en="f₂ (upper cutoff)">f₂ (obere Grenze)</span></div><div class="num" id="mF2">–</div></div>
+      <div class="meter"><div class="name"><span class="dot" style="background:var(--i-col)"></span><span data-de="max. Empfangsstrom I(f)" data-en="max. received current I(f)">max. Empfangsstrom I(f)</span></div><div class="num" id="mI">–</div></div>
+    </div>
+  </section>
+
+  <!-- ==================== Diagramme ==================== -->
+  <section class="panel">
+    <h2 data-de="Diagramme" data-en="Diagrams">Diagramme</h2>
+    <div class="diagramGrid">
+      <div>
+        <div class="canvasBox"><canvas id="resoCv"></canvas></div>
+        <div style="font-size:0.78rem;color:var(--dim);margin-top:6px" id="resoLbl"></div>
+      </div>
+      <div>
+        <div class="canvasBox"><canvas id="scopeCv"></canvas></div>
+        <div style="font-size:0.78rem;color:var(--dim);margin-top:6px" id="scopeLbl"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Audio ==================== -->
+  <section class="panel">
+    <h2 data-de="Hörprobe (WebAudio)" data-en="Sound check (WebAudio)">Hörprobe (WebAudio)</h2>
+    <div class="audioRow">
+      <button id="audioBtn">🔊 Ton einschalten</button>
+      <span id="audioState"></span>
+    </div>
+    <p class="audioHint"
+       data-de="Startet erst nach Klick (Autoplay-Schutz des Browsers). Lautstärke jedes Senders ~ seinem Empfangsstrom I(f); hörbar sind nur Sender mit I &gt; I₀/√2, also innerhalb der Bandbreite B. Wiedergegeben werden die NF-Töne 440/550/660 Hz – im echten Radio liefert sie ein Demodulator (siehe Erklärung)."
+       data-en="Starts only after a click (browser autoplay policy). Each station's volume follows its received current I(f); only stations with I &gt; I₀/√2 are audible, i.e. those inside the bandwidth B. The audio tones 440/550/660 Hz are played back – in a real radio a demodulator provides them (see explanation).">Startet erst nach Klick (Autoplay-Schutz des Browsers). Lautstärke jedes Senders ~ seinem Empfangsstrom I(f); hörbar sind nur Sender mit I &gt; I₀/√2, also innerhalb der Bandbreite B. Wiedergegeben werden die NF-Töne 440/550/660 Hz – im echten Radio liefert sie ein Demodulator (siehe Erklärung).</p>
+  </section>
+
+  <!-- ==================== Erklärung ==================== -->
+  <section class="panel" id="explain">
+    <h2 data-de="Erklärung" data-en="Explanation">Erklärung</h2>
+    <p data-de="Die Antenne ist ein breitbandiger Einkoppler: Sie nimmt alle erreichbaren Sender gleichermaßen auf und koppelt sie als kleine Induktionsspannung u_ind (hier 100 µV je Sender) in den Empfänger ein. Die Trennschärfe liegt also nicht im Funkweg – zwischen Antenne und Kreis findet keine Selektion statt –, sondern ausschließlich im abgestimmten Empfangskreis dahinter."
+       data-en="The antenna is a broadband coupler: it picks up all reachable stations alike and couples them into the receiver as a small induced voltage u_ind (100 µV per station here). So selectivity is not a property of the radio path – no selection happens between antenna and circuit – but solely of the tuned receiver circuit behind it.">Die Antenne ist ein breitbandiger Einkoppler: Sie nimmt alle erreichbaren Sender gleichermaßen auf und koppelt sie als kleine Induktionsspannung u_ind (hier 100 µV je Sender) in den Empfänger ein. Die Trennschärfe liegt also nicht im Funkweg – zwischen Antenne und Kreis findet keine Selektion statt –, sondern ausschließlich im abgestimmten Empfangskreis dahinter.</p>
+    <p data-de="Der Empfänger ist ein Serienresonanzkreis (R-L-C). Mit dem Drehkondensator wird C und damit die Resonanzfrequenz f₀ = 1/(2π√(LC)) durchs Mittelwellenband gefahren – hier von ≈ 0,88 MHz (C = 330 pF) bis ≈ 1,30 MHz (C = 150 pF). Liegt f₀ genau auf der Trägerfrequenz eines Senders, ist der Scheinwiderstand Z = R minimal und der Empfangsstrom maximal: Der Kreis „antwortet" diesem Sender am stärksten."
+       data-en="The receiver is a series resonant circuit (R-L-C). Turning the variable capacitor changes C and thus sweeps the resonant frequency f₀ = 1/(2π√(LC)) across the medium-wave band – here from ≈ 0.88 MHz (C = 330 pF) to ≈ 1.30 MHz (C = 150 pF). When f₀ coincides with a station's carrier, the impedance Z = R is minimal and the received current maximal: the circuit 'answers' that station strongest.">Der Empfänger ist ein Serienresonanzkreis (R-L-C). Mit dem Drehkondensator wird C und damit die Resonanzfrequenz f₀ = 1/(2π√(LC)) durchs Mittelwellenband gefahren – hier von ≈ 0,88 MHz (C = 330 pF) bis ≈ 1,30 MHz (C = 150 pF). Liegt f₀ genau auf der Trägerfrequenz eines Senders, ist der Scheinwiderstand Z = R minimal und der Empfangsstrom maximal: Der Kreis „antwortet" diesem Sender am stärksten.</p>
+    <p data-de="Die Güte Q = (1/R)·√(L/C) legt die Bandbreite fest: B = f₀/Q ist der Frequenzbereich zwischen den Grenzfrequenzen f₁ und f₂, in dem der Empfangsstrom I(f) = u_ind/√(R² + (ωL − 1/ωC)²) mindestens I₀/√2 ≈ 70,7 % des Maximums I₀ = u_ind/R erreicht. Nur Signale innerhalb von B werden nennenswert durchgelassen – B ist die Trennschärfe des Empfängers."
+       data-en="The quality factor Q = (1/R)·√(L/C) sets the bandwidth: B = f₀/Q is the range between the cutoff frequencies f₁ and f₂ in which the received current I(f) = u_ind/√(R² + (ωL − 1/ωC)²) reaches at least I₀/√2 ≈ 70.7 % of the maximum I₀ = u_ind/R. Only signals inside B are passed appreciably – B is the selectivity of the receiver.">Die Güte Q = (1/R)·√(L/C) legt die Bandbreite fest: B = f₀/Q ist der Frequenzbereich zwischen den Grenzfrequenzen f₁ und f₂, in dem der Empfangsstrom I(f) = u_ind/√(R² + (ωL − 1/ωC)²) mindestens I₀/√2 ≈ 70,7 % des Maximums I₀ = u_ind/R erreicht. Nur Signale innerhalb von B werden nennenswert durchgelassen – B ist die Trennschärfe des Empfängers.</p>
+    <p data-de="Hohe Güte (kleines R) ergibt eine hohe, schmale Resonanzkurve: Die Bandbreite ist kleiner als der Senderabstand, nur ein Sender liegt in B – das Oszilloskop zeigt einen sauberen Schwingzug und der Lautsprecher einen einzelnen Ton. Kleine Güte (großes R) flacht und verbreitert die Kurve: Mehrere Sender landen gleichzeitig in B, ihre Träger überlagern sich im Zeitbereich zur Schwebung und man hört eine Mischung der NF-Töne."
+       data-en="High Q (small R) gives a tall, narrow resonance curve: the bandwidth is smaller than the station spacing, only one station lies in B – the scope shows a clean wave and the speaker a single tone. Low Q (large R) flattens and broadens the curve: several stations land in B at once, their carriers superimpose into a beat in the time domain, and a mixture of the audio tones is heard.">Hohe Güte (kleines R) ergibt eine hohe, schmale Resonanzkurve: Die Bandbreite ist kleiner als der Senderabstand, nur ein Sender liegt in B – das Oszilloskop zeigt einen sauberen Schwingzug und der Lautsprecher einen einzelnen Ton. Kleine Güte (großes R) flacht und verbreitert die Kurve: Mehrere Sender landen gleichzeitig in B, ihre Träger überlagern sich im Zeitbereich zur Schwebung und man hört eine Mischung der NF-Töne.</p>
+    <p data-de="Ein echter Radioempfänger ergänzt den Schwingkreis um Demodulation (Gleichrichtung des AM-Signals, Hüllkurvenfilter) und mehrere Verstärkerstufen – diese Teile sind hier bewusst weggelassen. Hörbar gemacht werden die Sender stattdessen direkt über ihre NF-Töne 440/550/660 Hz, deren Lautstärke dem jeweiligen Empfangsstrom I(f) folgt. Der Ton startet erst nach einem Klick (Autoplay-Schutz des Browsers)."
+       data-en="A real radio receiver adds demodulation (rectification of the AM signal, envelope filtering) and several amplifier stages to the tuned circuit – these parts are deliberately omitted here. Instead, stations are made audible directly via their audio tones 440/550/660 Hz, each volume following its received current I(f). Sound starts only after a click (browser autoplay policy).">Ein echter Radioempfänger ergänzt den Schwingkreis um Demodulation (Gleichrichtung des AM-Signals, Hüllkurvenfilter) und mehrere Verstärkerstufen – diese Teile sind hier bewusst weggelassen. Hörbar gemacht werden die Sender stattdessen direkt über ihre NF-Töne 440/550/660 Hz, deren Lautstärke dem jeweiligen Empfangsstrom I(f) folgt. Der Ton startet erst nach einem Klick (Autoplay-Schutz des Browsers).</p>
+  </section>
+
+</main>
+
+<footer>
+  Radioempfang-Simulation · Offline-fähig · Canvas 2D + WebAudio ·
+  <span data-de="keine externen Abhängigkeiten" data-en="no external dependencies">keine externen Abhängigkeiten</span>
+</footer>
+
+<script>
+"use strict";
+/* ================================================================
+   Radioempfang mit Schwingkreis-Abstimmung – gesamte Logik in
+   einer Datei. Alle Berechnungen in SI-Einheiten (H, F, Ω, Hz, V, A).
+
+   Physikmodell:
+   · Die Antenne koppelt jeden Sender gleichermaßen als kleine
+     Induktionsspannung U_IND breitbandig in den Serienresonanzkreis
+     ein – die Selektivität liegt im Kreis, nicht im Funkweg.
+   · f₀ = 1/(2π√(LC)),  Q = (1/R)·√(L/C),  B = f₀/Q,
+     Grenzfrequenzen f₁, f₂ bei I = I₀/√2 mit I₀ = U_IND/R.
+   · Empfangsstrom je Sender: I(f) = U_IND/√(R² + (ωL − 1/ωC)²).
+   · AM-Signal: (1 + m·sin(2πf_m t))·sin(2πf_t t), m = 0,8.
+   ================================================================ */
+
+/* ---------- 1. Globale Zustandsvariablen ---------- */
+const L    = 100e-6;   // Induktivität [H] (fest)
+const UIND = 100e-6;   // Induktionsspannung je Sender [V]
+const MOD  = 0.8;      // Modulationsgrad der AM-Signale
+let C = 253e-12;       // Kapazität [F] (Drehkondensator)
+let R = 10;            // Serienwiderstand [Ω] (Kreisverluste)
+let simT = 0;          // Simulationszeit [s]
+let lang = "de";       // aktive Sprache
+let running = true;    // Simulationsuhr läuft / pausiert (Stopp-Button)
+
+const TWO_PI = 2 * Math.PI;
+const C_MIN = 150e-12, C_MAX = 330e-12;  // f₀ ≈ 0,88 MHz … 1,30 MHz
+const R_MIN = 2, R_MAX = 200;            // Q ≈ 3 … 315 (bei L = 100 µH)
+const N_PER = 5;                         // Trägerperioden im Scope-Fenster
+const LOUD  = 0.22;                      // Maximal-Lautstärke je Sender
+
+/* Sender: Trägerfrequenz + NF-Ton (AM). Farben aus dem Schema. */
+const SENDERS = [
+  { id: "A", f: 0.9e6, fm: 440, cssVar: "--l-col" },   // blau
+  { id: "B", f: 1.0e6, fm: 550, cssVar: "--r-col" },   // grün
+  { id: "C", f: 1.1e6, fm: 660, cssVar: "--res-col" }  // pink
+];
+const senderOn = { A: true, B: true, C: true };
+
+/* Texte für dynamische UI-Anteile (Sprachumschaltung) */
+const T = {
+  stopOn:  { de: "⏸ Stopp", en: "⏸ Stop" },
+  stopOff: { de: "▶ Weiter", en: "▶ Resume" },
+  antenna: { de: "Antenne", en: "Antenna" },
+  resoTitle: { de: "Resonanzkurve I(f) des Empfangskreises",
+               en: "Receiver resonance curve I(f)" },
+  scopeTitle:{ de: "Oszilloskop: Empfangsstrom i(t)",
+               en: "Oscilloscope: received current i(t)" },
+  scopeHint: { de: "Fenster: 5 Trägerperioden des stärksten Senders · dünn farbig: Einzelbeiträge A/B/C · cyan: Summe i(t)",
+               en: "window: 5 carrier periods of the strongest station · thin coloured: contributions A/B/C · cyan: total i(t)" },
+  scopeClean:{ de: id => `sauberer Schwingzug – nur ${id} innerhalb B`,
+               en: id => `clean wave – only ${id} within B` },
+  scopeBeat: { de: l => `Schwebung – ${l} überlagern sich in B`,
+               en: l => `beating – ${l} superimposed in B` },
+  scopeNone: { de: "kein aktiver Sender innerhalb B – Kreisstrom ≈ 0",
+               en: "no active station within B – loop current ≈ 0" },
+  scopeOff:  { de: "alle Sender ausgeschaltet – keine Einkopplung",
+               en: "all stations off – nothing coupled in" },
+  resoCap:   { de: (b, f1, f2, r) => `B = ${b} · f₁ = ${f1} · f₂ = ${f2} · empfangen: ${r}`,
+               en: (b, f1, f2, r) => `B = ${b} · f₁ = ${f1} · f₂ = ${f2} · received: ${r}` },
+  noneRecv:  { de: "keiner", en: "none" },
+  stRecv:    { de: "● wird empfangen", en: "● received" },
+  stOut:     { de: "○ außerhalb B", en: "○ outside B" },
+  stOff:     { de: "○ ausgeschaltet", en: "○ switched off" },
+  sndBtnOn:  { de: "● Ein", en: "● On" },
+  sndBtnOff: { de: "○ Aus", en: "○ Off" },
+  audioOn:   { de: "🔊 Ton einschalten", en: "🔊 Enable sound" },
+  audioOff:  { de: "🔇 Ton ausschalten", en: "🔇 Disable sound" },
+  audioStateOff: { de: "Ton aus – Sender werden live nach Empfangsstrom abgemischt.",
+                   en: "Sound off – stations are mixed live according to received current." },
+  audioStateOn:  { de: l => `Hörbar: ${l}`, en: l => `Audible: ${l}` },
+  noAudible: { de: "kein Sender innerhalb B – nur Rauschen wäre zu hören",
+               en: "no station within B – only noise would be heard" }
+};
+
+/* ---------- 2. Hilfsfunktionen ---------- */
+
+/* Zahl mit SI-Präfix formatieren, z. B. 0.0047 -> "4.70 m" */
+function si(v, unit) {
+  if (!isFinite(v)) return "–";
+  const a = Math.abs(v);
+  if (unit === "Hz" && a < 1) return trim3(v) + " Hz";
+  const p = [[1e9,"G"],[1e6,"M"],[1e3,"k"],[1,""],[1e-3,"m"],[1e-6,"µ"],[1e-9,"n"],[1e-12,"p"]];
+  for (const [f, s] of p) {
+    if (a >= f) return trim3(v / f) + " " + s + unit;
+  }
+  return trim3(v / 1e-12) + " p" + unit;
+}
+/* 3 signifikante Stellen, trailing zeros entfernt */
+function trim3(x) {
+  let s = x.toPrecision(3);
+  if (s.includes(".")) s = s.replace(/\.?0+$/, "");
+  return s;
+}
+/* „Schöne" Skalen-Obergrenze (1/2/2.5/5×10^n) für Diagramme */
+function niceCeil(v) {
+  const e = Math.pow(10, Math.floor(Math.log10(v)));
+  const m = v / e;
+  const nice = m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10;
+  return nice * e;
+}
+/* Canvas für scharfe Darstellung auf HiDPI skalieren */
+function fitCanvas(cv, cssH) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cssH;
+  if (cv.width !== w * dpr || cv.height !== h * dpr) {
+    cv.width = w * dpr; cv.height = h * dpr;
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+function getCss(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+const $ = id => document.getElementById(id);
+/* Beschriftung nur bei Änderung austauschen (vermeidet DOM-Churn) */
+function setCap(id, txt) {
+  const el = $(id);
+  if (el.textContent !== txt) el.textContent = txt;
+}
+
+/* ---------- 3. Physik des Empfangskreises ---------- */
+function compute() {
+  const f0 = 1 / (TWO_PI * Math.sqrt(L * C));        // Resonanzfrequenz
+  const Q  = (1 / R) * Math.sqrt(L / C);             // Güte
+  const B  = f0 / Q;                                 // Bandbreite
+  // Grenzfrequenzen: |X_L − X_C| = R  ⇒  f₁·f₂ = f₀², f₂−f₁ = B
+  const k  = Math.sqrt(1 + 1 / (4 * Q * Q));
+  const f1 = f0 * (k - 1 / (2 * Q));
+  const f2 = f0 * (k + 1 / (2 * Q));
+  const I0 = UIND / R;                               // Strommaximum bei f₀
+  const byId = {};
+  for (const s of SENDERS) {
+    const w = TWO_PI * s.f;
+    const Z = Math.sqrt(R * R + (w * L - 1 / (w * C)) ** 2);
+    const I = UIND / Z;
+    byId[s.id] = { Z, I, inBand: I >= I0 / Math.SQRT2 };
+  }
+  return { f0, Q, B, f1, f2, I0, byId };
+}
+/* Momentanwert des Kreisstroms: Summe der AM-Einzelströme */
+function iTotal(c, t) {
+  let sum = 0;
+  for (const s of SENDERS) {
+    if (!senderOn[s.id]) continue;
+    const d = c.byId[s.id];
+    sum += d.I * (1 + MOD * Math.sin(TWO_PI * s.fm * t)) * Math.sin(TWO_PI * s.f * t);
+  }
+  return sum;
+}
+/* Momentanwert der Antennen-Induktionsspannung (alle Sender überlagert) */
+function uIndNow() {
+  let sum = 0;
+  for (const s of SENDERS) if (senderOn[s.id]) sum += Math.sin(TWO_PI * s.f * simT);
+  return UIND * sum;
+}
+/* Stärkster eingeschalteter Sender (für Scope-Fenster + Schwingungsbild) */
+function dominantSender(c) {
+  let best = null;
+  for (const s of SENDERS) {
+    if (!senderOn[s.id]) continue;
+    if (!best || c.byId[s.id].I > c.byId[best.id].I) best = s;
+  }
+  return best;
+}
+
+/* ---------- 4. DOM-Referenzen + Schieberegler ---------- */
+const circuitCv = $("circuitCv"), resoCv = $("resoCv"), scopeCv = $("scopeCv");
+
+/* Logarithmische Regler: Slider 0..1000 wird exponentiell abgebildet */
+$("slC").addEventListener("input", e => {
+  C = C_MIN * Math.pow(C_MAX / C_MIN, e.target.value / 1000);
+  updateLabels();
+});
+$("slR").addEventListener("input", e => {
+  R = R_MIN * Math.pow(R_MAX / R_MIN, e.target.value / 1000);
+  updateLabels();
+});
+
+/* ---------- 5. Stopp-Button (pausiert die Simulationsuhr) ---------- */
+function renderStopBtn() {
+  $("stopBtn").textContent = running ? T.stopOn[lang] : T.stopOff[lang];
+  $("stopBtn").classList.toggle("paused", !running);
+}
+$("stopBtn").addEventListener("click", () => { running = !running; renderStopBtn(); });
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" && !/^(INPUT|BUTTON|SELECT)$/.test(e.target.tagName)) {
+    e.preventDefault(); running = !running; renderStopBtn();
+  }
+});
+
+/* ---------- 6. Sender ein-/ausschalten ---------- */
+SENDERS.forEach(s => {
+  $("btn" + s.id).addEventListener("click", () => {
+    senderOn[s.id] = !senderOn[s.id];
+    updateSenders(); updateLabels(); updateAudioState(); updateAudioGains();
+  });
+});
+function updateSenders() {
+  const c = compute();
+  for (const s of SENDERS) {
+    const d = c.byId[s.id], on = senderOn[s.id];
+    const card = $("card" + s.id), st = $("st" + s.id), btn = $("btn" + s.id);
+    card.style.opacity = on ? "1" : ".5";
+    btn.textContent = on ? T.sndBtnOn[lang] : T.sndBtnOff[lang];
+    btn.classList.toggle("activeEx", on);
+    if (!on) {
+      st.textContent = T.stOff[lang]; st.style.color = "var(--dim)";
+      card.style.borderColor = "var(--border)";
+    } else if (d.inBand) {
+      st.textContent = T.stRecv[lang]; st.style.color = getCss(s.cssVar);
+      card.style.borderColor = getCss(s.cssVar);
+    } else {
+      st.textContent = T.stOut[lang]; st.style.color = "var(--dim)";
+      card.style.borderColor = "var(--border)";
+    }
+  }
+}
+
+/* ---------- 7. Anzeige der Regler-Werte + Messwerte ---------- */
+function updateLabels() {
+  const c = compute();
+  $("vC").textContent = si(C, "F");
+  $("vR").textContent = si(R, "Ω");
+  $("mF0").textContent = si(c.f0, "Hz");
+  $("mQ").textContent  = trim3(c.Q);
+  $("mB").textContent  = si(c.B, "Hz");
+  $("mF1").textContent = si(c.f1, "Hz");
+  $("mF2").textContent = si(c.f2, "Hz");
+  const best = dominantSender(c);
+  $("mI").textContent = best ? si(c.byId[best.id].I, "A") : "–";
+}
+
+/* ---------- 8. WebAudio: NF-Töne der empfangenen Sender ---------- */
+/* Die Träger (0,9–1,1 MHz) liegen weit oberhalb der Audiowiedergabe;
+   hörbar gemacht werden daher – wie von einem Demodulator geliefert –
+   die NF-Töne 440/550/660 Hz, abgemischt nach Empfangsstrom. */
+let audio = null;
+function startAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  const master = ctx.createGain();
+  master.gain.value = 0.9;
+  master.connect(ctx.destination);
+  const nodes = {};
+  for (const s of SENDERS) {
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = s.fm;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    osc.connect(g); g.connect(master); osc.start();
+    nodes[s.id] = g;
+  }
+  audio = { ctx, nodes };
+}
+function stopAudio() { audio.ctx.close(); audio = null; }
+/* Lautstärke ~ I(f); hörbar nur mit I > I₀/√2 (innerhalb B) */
+function updateAudioGains(immediate) {
+  if (!audio) return;
+  const c = compute();
+  const t = audio.ctx.currentTime;
+  for (const s of SENDERS) {
+    const d = c.byId[s.id];
+    const target = (senderOn[s.id] && d.inBand) ? LOUD * (d.I / c.I0) : 0;
+    const g = audio.nodes[s.id].gain;
+    if (immediate) g.setValueAtTime(target, t);
+    else g.setTargetAtTime(target, t, 0.05);
+  }
+}
+$("audioBtn").addEventListener("click", () => {
+  if (audio) stopAudio(); else { startAudio(); updateAudioGains(true); }
+  renderAudioBtn(); updateAudioState();
+});
+function renderAudioBtn() {
+  const b = $("audioBtn");
+  b.textContent = audio ? T.audioOff[lang] : T.audioOn[lang];
+  b.classList.toggle("active", !!audio);
+}
+function updateAudioState() {
+  const el = $("audioState");
+  if (!audio) {
+    el.textContent = T.audioStateOff[lang];
+    el.style.color = "var(--dim)";
+    return;
+  }
+  const c = compute();
+  const list = SENDERS.filter(s => senderOn[s.id] && c.byId[s.id].inBand)
+                      .map(s => `${s.id} (${s.fm} Hz)`);
+  el.textContent = list.length ? T.audioStateOn[lang](list.join(" · ")) : T.noAudible[lang];
+  el.style.color = list.length ? getCss("--r-col") : "var(--dim)";
+}
+
+/* ---------- 9. Sprachumschaltung DE/EN ---------- */
+$("langBtn").addEventListener("click", () => {
+  lang = lang === "de" ? "en" : "de";
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-de]").forEach(el => { el.textContent = el.dataset[lang]; });
+  $("langBtn").textContent = lang === "de" ? "EN" : "DE";
+  renderStopBtn(); renderAudioBtn(); updateSenders(); updateLabels();
+  updateAudioState();
+  setCap("scopeLbl", T.scopeHint[lang]);
+});
+
+/* ---------- 10. Empfänger-Schaltplan zeichnen ---------- */
+/* Layout-Konstanten (Basisgröße 900×470, wird skaliert) */
+const CW = 900, CH = 470;
+const TOP = 120, BOT = 350;                // y-Position der oberen/unteren Leitung
+const SRC = { x: 100, y: 235, r: 40 };     // Ersatzquelle u_ind links
+const AX = 44, AX_TOP = 170;               // Antennen-Mast
+const R_X1 = 200, R_X2 = 310;              // Widerstand oben links
+const L_X1 = 350, L_X2 = 470;              // Spule oben Mitte
+const C_X  = 530, C_GAP = 26;              // Kondensator oben rechts
+const RIGHT_X = 790;                       // rechte Vertikalleitung
+
+/* Punktliste des Strompfads (für die Elektronen-Animation) */
+function buildLoopPath() {
+  const pts = [
+    [SRC.x, SRC.y - SRC.r], [SRC.x, TOP],
+    [RIGHT_X, TOP], [RIGHT_X, BOT], [SRC.x, BOT], [SRC.x, SRC.y + SRC.r]
+  ];
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  }
+  return { pts, cum, len: cum[cum.length - 1] };
+}
+const LOOP = buildLoopPath();
+function pointAt(s) {
+  s = ((s % LOOP.len) + LOOP.len) % LOOP.len;
+  let i = 1;
+  while (i < LOOP.cum.length - 1 && LOOP.cum[i] < s) i++;
+  const t = (s - LOOP.cum[i - 1]) / (LOOP.cum[i] - LOOP.cum[i - 1]);
+  const a = LOOP.pts[i - 1], b = LOOP.pts[i];
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+}
+
+function drawCircuit(c) {
+  const { ctx, w, h } = fitCanvas(circuitCv, Math.max(300, circuitCv.clientWidth * CH / CW));
+  const s = Math.min(w / CW, h / CH);
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.translate((w - CW * s) / 2, (h - CH * s) / 2);
+  ctx.scale(s, s);
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  /* ---- Leitungen ---- */
+  ctx.strokeStyle = "#8b949e";
+  ctx.beginPath();
+  ctx.moveTo(SRC.x, SRC.y - SRC.r); ctx.lineTo(SRC.x, TOP);
+  ctx.lineTo(RIGHT_X, TOP);
+  ctx.moveTo(RIGHT_X, TOP); ctx.lineTo(RIGHT_X, BOT);
+  ctx.lineTo(SRC.x, BOT); ctx.lineTo(SRC.x, SRC.y + SRC.r);
+  ctx.stroke();
+
+  /* ---- Antenne: breitbandiger Einkoppler (Dipol-Symbol) ---- */
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(AX, SRC.y); ctx.lineTo(AX, AX_TOP); ctx.stroke();            // Mast
+  ctx.beginPath(); ctx.moveTo(AX, AX_TOP); ctx.lineTo(AX - 18, AX_TOP - 24); ctx.stroke();  // Arm links
+  ctx.beginPath(); ctx.moveTo(AX, AX_TOP); ctx.lineTo(AX + 18, AX_TOP - 24); ctx.stroke();  // Arm rechts
+  ctx.beginPath(); ctx.moveTo(AX, SRC.y); ctx.lineTo(SRC.x - SRC.r, SRC.y); ctx.stroke();   // Koppelzuleitung
+  ctx.fillStyle = "#8b949e";
+  ctx.font = "13px Consolas, monospace";
+  ctx.fillText(T.antenna[lang], AX, AX_TOP - 40);
+
+  /* ---- Ersatzquelle u_ind: alle Sender-Signale überlagert ----
+     Die Deformation des Kreisins folgt dem Momentanwert u_ind(t):
+     bei mehreren sendenden Stationen „zittert" das Bild wild
+     (breitbandige Einkopplung), bei einem Sender sieht man eine
+     saubere Schwingung. */
+  const dom = dominantSender(c);
+  const un = uIndNow() / (UIND * Math.max(1, SENDERS.filter(x => senderOn[x.id]).length));
+  ctx.strokeStyle = getCss("--src-col");
+  ctx.lineWidth = 2.2;
+  ctx.beginPath(); ctx.arc(SRC.x, SRC.y, SRC.r, 0, TWO_PI); ctx.stroke();
+  ctx.beginPath();
+  for (let i = 0; i <= 60; i++) {
+    const a = i / 60 * TWO_PI;
+    const rr = SRC.r * 0.58 * (1 + 0.22 * un * Math.sin(2 * a) + 0.1 * un * Math.sin(5 * a + 1.3));
+    const x = SRC.x + rr * Math.cos(a), y = SRC.y + rr * Math.sin(a);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.closePath(); ctx.stroke();
+  ctx.fillStyle = getCss("--src-col");
+  ctx.font = "600 20px Consolas, monospace";
+  ctx.fillText("u_ind", SRC.x, SRC.y - SRC.r - 14);
+  ctx.font = "14px Consolas, monospace";
+  ctx.fillText("≈ " + si(UIND, "V"), SRC.x, SRC.y + SRC.r + 20);
+
+  /* ---- Widerstand R (Rechteck) ---- */
+  ctx.strokeStyle = getCss("--r-col");
+  ctx.strokeRect(R_X1, TOP - 20, R_X2 - R_X1, 40);
+  ctx.fillStyle = getCss("--r-col");
+  ctx.font = "600 22px Consolas, monospace";
+  ctx.fillText("R", (R_X1 + R_X2) / 2, TOP);
+  ctx.font = "15px Consolas, monospace";
+  ctx.fillText(si(R, "Ω"), (R_X1 + R_X2) / 2, TOP + 34);
+  ctx.font = "600 22px Consolas, monospace";
+
+  /* ---- Spule L (vier Bögen) ---- */
+  ctx.strokeStyle = getCss("--l-col");
+  const arcR = (L_X2 - L_X1) / 8;
+  for (let i = 0; i < 4; i++) {
+    const cx = L_X1 + arcR + i * 2 * arcR;
+    ctx.beginPath(); ctx.arc(cx, TOP, arcR, Math.PI, 0); ctx.stroke();
+  }
+  ctx.fillStyle = getCss("--l-col");
+  ctx.fillText("L", (L_X1 + L_X2) / 2, TOP - 34);
+  ctx.font = "15px Consolas, monospace";
+  ctx.fillText(si(L, "H"), (L_X1 + L_X2) / 2, TOP + 34);
+  ctx.font = "600 22px Consolas, monospace";
+
+  /* ---- Kondensator C (Platten) ---- */
+  ctx.strokeStyle = getCss("--c-col");
+  ctx.beginPath();
+  ctx.moveTo(C_X, TOP - 26); ctx.lineTo(C_X, TOP + 26);
+  ctx.moveTo(C_X + C_GAP, TOP - 26); ctx.lineTo(C_X + C_GAP, TOP + 26);
+  ctx.stroke();
+  ctx.fillStyle = getCss("--c-col");
+  ctx.fillText("C", C_X + C_GAP / 2, TOP - 40);
+  ctx.font = "15px Consolas, monospace";
+  ctx.fillText(si(C, "F"), C_X + C_GAP / 2, TOP + 40);
+  ctx.font = "600 22px Consolas, monospace";
+
+  /* ---- Strommesser mit beweglichem Zeiger ---- */
+  const AMX = 445, AMY = BOT, AMR = 20;
+  ctx.strokeStyle = getCss("--i-col");
+  ctx.beginPath(); ctx.arc(AMX, AMY, AMR, 0, TWO_PI); ctx.stroke();
+  const envTot = SENDERS.reduce((a, x) => a + (senderOn[x.id] ? c.byId[x.id].I : 0), 0);
+  const ref = envTot > 0 ? envTot : 1;
+  const iNow = iTotal(c, simT);
+  const ang = -Math.PI / 2 + Math.max(-1, Math.min(1, iNow / ref)) * 0.9;
+  ctx.beginPath(); ctx.moveTo(AMX, AMY);
+  ctx.lineTo(AMX + (AMR - 5) * Math.cos(ang), AMY + (AMR - 5) * Math.sin(ang));
+  ctx.stroke();
+  ctx.fillStyle = getCss("--i-col");
+  ctx.font = "600 13px Consolas, monospace";
+  ctx.fillText("A", AMX, AMY + AMR + 14);
+  ctx.font = "600 22px Consolas, monospace";
+
+  /* ---- Elektronen: Verschiebungswelle entlang des Pfads ----
+     Phase läuft mit der Frequenz des stärksten empfangenen Senders;
+     Auslenkung ~ Gesamt-Empfangsstrom (normiert auf I₀). */
+  const wDom = TWO_PI * (dom ? dom.f : c.f0);
+  const amp = Math.min(26, 26 * envTot / c.I0);
+  const nEl = 46;
+  for (let i = 0; i < nEl; i++) {
+    const s0 = i / nEl * LOOP.len;
+    const d = amp * Math.sin(wDom * simT - TWO_PI * s0 / LOOP.len);
+    const [x, y] = pointAt(s0 + d);
+    const glow = 0.35 + 0.65 * Math.abs(Math.sin(wDom * simT));
+    ctx.fillStyle = `rgba(57,197,207,${glow})`;
+    ctx.beginPath(); ctx.arc(x, y, 3.2, 0, TWO_PI); ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/* ---------- 11. Resonanzkurve I(f) mit Sender-Markern ---------- */
+function drawResonance(c) {
+  const cssH = 230;
+  const { ctx, w, h } = fitCanvas(resoCv, cssH);
+  ctx.clearRect(0, 0, w, h);
+  const padL = 52, padR = 14, padT = 30, padB = 30;
+  const pw = w - padL - padR, ph = h - padT - padB;
+
+  const fMin = c.f0 * Math.pow(10, -1.5);
+  const fMax = c.f0 * Math.pow(10, 1.5);
+  const iDiv = niceCeil(c.I0 * 1.15 / 3);
+  const yMax = iDiv * 3;
+  const X = f => padL + (Math.log10(f) - Math.log10(fMin)) / (Math.log10(fMax) - Math.log10(fMin)) * pw;
+  const Y = i => padT + ph - i / yMax * ph;
+
+  /* Bandbreiten-Schattierung zwischen f₁ und f₂ */
+  const bx1 = Math.max(padL, X(Math.max(c.f1, fMin)));
+  const bx2 = Math.min(padL + pw, X(Math.min(c.f2, fMax)));
+  if (bx2 > bx1) {
+    ctx.fillStyle = "rgba(247,120,186,0.08)";
+    ctx.fillRect(bx1, padT, bx2 - bx1, ph);
+  }
+
+  /* Raster + logarithmische f-Achse */
+  ctx.strokeStyle = "#21262d"; ctx.lineWidth = 1; ctx.font = "11px Consolas, monospace";
+  for (let d = -2; d <= 2; d++) {
+    const f = c.f0 * Math.pow(10, d / 2);
+    if (f < fMin || f > fMax) continue;
+    ctx.beginPath(); ctx.moveTo(X(f), padT); ctx.lineTo(X(f), padT + ph); ctx.stroke();
+    ctx.fillStyle = "#8b949e"; ctx.textAlign = "center";
+    ctx.fillText(si(f, "Hz"), X(f), padT + ph + 16);
+  }
+  ctx.textAlign = "right";
+  for (let i = 0; i <= 3; i++) {
+    ctx.beginPath(); ctx.moveTo(padL, padT + ph - i * ph / 3); ctx.lineTo(padL + pw, padT + ph - i * ph / 3); ctx.stroke();
+    ctx.fillText(si(iDiv * i, "A"), padL - 5, padT + ph - i * ph / 3 + 4);
+  }
+
+  /* Kurve I(f) = U_IND / √(R² + (ωL − 1/ωC)²) */
+  ctx.strokeStyle = getCss("--i-col"); ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  let started = false;
+  for (let x = 0; x <= pw; x++) {
+    const f = Math.pow(10, Math.log10(fMin) + x / pw * (Math.log10(fMax) - Math.log10(fMin)));
+    const w = TWO_PI * f;
+    const I = UIND / Math.sqrt(R * R + (w * L - 1 / (w * C)) ** 2);
+    const y = Y(I);
+    started ? ctx.lineTo(padL + x, y) : ctx.moveTo(padL + x, y);
+    started = true;
+  }
+  ctx.stroke();
+
+  /* Markierungen: f₀ oben, f₁/f₂ unten */
+  ctx.lineWidth = 1.5;
+  const mark = (f, col, lbl, below) => {
+    if (f < fMin || f > fMax) return;
+    ctx.strokeStyle = col; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(X(f), padT); ctx.lineTo(X(f), padT + ph); ctx.stroke();
+    ctx.setLineDash([]);
+    if (!lbl) return;
+    ctx.fillStyle = col; ctx.textAlign = "center";
+    ctx.fillText(lbl, X(f), below ? padT + ph + 28 : padT - 8);
+  };
+  const tight = Math.abs(X(c.f2) - X(c.f1)) < 24;
+  mark(c.f1, "#8b949e", tight ? "" : "f₁", true);
+  mark(c.f0, getCss("--res-col"), "f₀", false);
+  mark(c.f2, "#8b949e", tight ? "" : "f₂", true);
+
+  /* Sender-Marker: Buchstabe oben im Plot (Kollisionsausweiche nach
+     unten), Punkt auf der Kurve; innerhalb B farbig hervorgehoben,
+     außerhalb grau, abgeschaltet ausgeblendet. */
+  const placed = [];
+  for (const s of SENDERS) {
+    if (s.f < fMin || s.f > fMax) continue;
+    const x = X(s.f);
+    const d = c.byId[s.id];
+    const on = senderOn[s.id];
+    const col = getCss(s.cssVar);
+    ctx.save();
+    /* gestrichelte Vertikale in Senderfarbe */
+    ctx.strokeStyle = col; ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 4]); ctx.globalAlpha = on ? 0.35 : 0.1;
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + ph); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    /* Punkt auf der Kurve */
+    const y = Y(d.I);
+    if (d.inBand && on) {
+      ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(x, y, 4.5, 0, TWO_PI); ctx.fill();
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.strokeStyle = on ? "#8b949e" : "#6e7681"; ctx.lineWidth = 1.4;
+      ctx.globalAlpha = on ? 0.9 : 0.25;
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, TWO_PI); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    /* Buchstabe oben im Plot */
+    ctx.fillStyle = (d.inBand && on) ? col : "#8b949e";
+    ctx.font = "700 12px Consolas, monospace"; ctx.textAlign = "center";
+    let ly = padT + 14;
+    while (placed.some(p => Math.abs(p.x - x) < 13 && p.y === ly)) ly += 13;
+    placed.push({ x, y: ly });
+    ctx.globalAlpha = on ? 1 : 0.25;
+    ctx.fillText(s.id, x, ly);
+    ctx.restore();
+  }
+
+  ctx.fillStyle = "#8b949e"; ctx.font = "12px Consolas, monospace"; ctx.textAlign = "left";
+  ctx.fillText(T.resoTitle[lang], padL, 18);
+}
+
+/* ---------- 12. Oszilloskop: Empfangsstrom i(t) ---------- */
+function drawScope(c) {
+  const cssH = 230;
+  const { ctx, w, h } = fitCanvas(scopeCv, cssH);
+  ctx.clearRect(0, 0, w, h);
+  const padL = 48, padR = 12, padT = 42, padB = 24;
+  const pw = w - padL - padR, ph = h - padT - padB;
+  const mid = padT + ph / 2;
+
+  /* Raster + Nulllinie */
+  ctx.strokeStyle = "#21262d"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 6; i++) {
+    ctx.beginPath(); ctx.moveTo(padL + i * pw / 6, padT); ctx.lineTo(padL + i * pw / 6, padT + ph); ctx.stroke();
+  }
+  for (let i = 0; i <= 4; i++) {
+    ctx.beginPath(); ctx.moveTo(padL, padT + i * ph / 4); ctx.lineTo(padL + pw, padT + i * ph / 4); ctx.stroke();
+  }
+  ctx.strokeStyle = "#30363d";
+  ctx.beginPath(); ctx.moveTo(padL, mid); ctx.lineTo(padL + pw, mid); ctx.stroke();
+
+  const act = SENDERS.filter(s => senderOn[s.id]);
+  ctx.font = "12px Consolas, monospace";
+
+  if (!act.length) {
+    ctx.fillStyle = "#8b949e"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(T.scopeOff[lang], padL + pw / 2, mid);
+    ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+    ctx.fillText(T.scopeTitle[lang], padL, 18);
+    return;
+  }
+
+  /* Fenster: 5 Trägerperioden des stärksten Senders, scrollend */
+  const dom = dominantSender(c);
+  const tWin = N_PER / dom.f;
+  const tEnd = simT;
+
+  /* Skalierung aus dem Fenster-Maximum (Schwebung bleibt sichtbar) */
+  let maxA = 1e-12;
+  for (let k = 0; k <= 600; k++) {
+    const v = Math.abs(iTotal(c, tEnd - tWin + k / 600 * tWin));
+    if (v > maxA) maxA = v;
+  }
+  const yAmp = ph / 2 * 0.85;
+  const Y = i => mid - i / maxA * yAmp;
+
+  /* Einzelbeiträge der eingeschalteten Sender (dünn, Senderfarbe) */
+  for (const s of act) {
+    const d = c.byId[s.id];
+    ctx.strokeStyle = getCss(s.cssVar); ctx.globalAlpha = 0.45; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let x = 0; x <= pw; x += 2) {
+      const t = tEnd - tWin + x / pw * tWin;
+      const i = d.I * (1 + MOD * Math.sin(TWO_PI * s.fm * t)) * Math.sin(TWO_PI * s.f * t);
+      const y = Y(i);
+      x ? ctx.lineTo(padL + x, y) : ctx.moveTo(padL + x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  /* Summenstrom i(t) – cyan */
+  ctx.strokeStyle = getCss("--i-col"); ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  for (let x = 0; x <= pw; x += 2) {
+    const t = tEnd - tWin + x / pw * tWin;
+    const y = Y(iTotal(c, t));
+    x ? ctx.lineTo(padL + x, y) : ctx.moveTo(padL + x, y);
+  }
+  ctx.stroke();
+
+  /* Momentanwert-Marker am rechten Rand */
+  ctx.strokeStyle = "#6e7681"; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(padL + pw, padT); ctx.lineTo(padL + pw, padT + ph); ctx.stroke();
+  ctx.setLineDash([]);
+
+  /* Beschriftung */
+  ctx.fillStyle = "#8b949e"; ctx.textAlign = "left";
+  ctx.fillText(T.scopeTitle[lang], padL, 18);
+  let lx = padL + 8;
+  for (const s of act) {
+    ctx.fillStyle = getCss(s.cssVar);
+    ctx.fillText(s.id, lx, padT + 14);
+    lx += 16;
+  }
+  ctx.fillStyle = getCss("--i-col");
+  ctx.fillText("Σ i(t)", lx + 6, padT + 14);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#8b949e";
+  ctx.fillText(`Δt = ${N_PER} T   (T = ${si(1 / dom.f, "s")})`, padL + pw, padT + 14);
+  /* Zustand: sauberer Schwingzug vs. Schwebung */
+  const inBand = act.filter(s => c.byId[s.id].inBand).map(s => s.id);
+  let msg, col;
+  if (!inBand.length)       { msg = T.scopeNone[lang];  col = "#8b949e"; }
+  else if (inBand.length === 1) { msg = T.scopeClean[lang](inBand[0]); col = getCss("--r-col"); }
+  else                      { msg = T.scopeBeat[lang](inBand.join(" + ")); col = getCss("--res-col"); }
+  ctx.fillStyle = col;
+  ctx.fillText(msg, padL + pw, padT + 30);
+}
+
+/* ---------- 13. Haupt-Schleife (ca. 60 FPS) ---------- */
+let lastTs = performance.now(), uiAcc = 0;
+function frame(ts) {
+  const dt = Math.min(0.05, (ts - lastTs) / 1000);   // s, gegen Tab-Rücksprung gedrosselt
+  lastTs = ts;
+  if (running) simT += dt;                           // Stopp-Button friert die Zeit ein
+  const c = compute();
+
+  drawCircuit(c);
+  drawResonance(c);
+  drawScope(c);
+
+  /* Momentanwerte + Bildunterschriften (20×/s) */
+  uiAcc += dt;
+  if (uiAcc > 0.05) {
+    uiAcc = 0;
+    $("instUind").textContent = si(uIndNow(), "V");
+    $("instI").textContent   = si(iTotal(c, simT), "A");
+    updateAudioGains();
+    const recv = SENDERS.filter(s => senderOn[s.id] && c.byId[s.id].inBand)
+                        .map(s => s.id).join("+") || T.noneRecv[lang];
+    setCap("resoLbl", T.resoCap[lang](si(c.B, "Hz"), si(c.f1, "Hz"), si(c.f2, "Hz"), recv));
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- 14. Start ---------- */
+$("slC").value = Math.log(C / C_MIN) / Math.log(C_MAX / C_MIN) * 1000;
+$("slR").value = Math.log(R / R_MIN) / Math.log(R_MAX / R_MIN) * 1000;
+updateLabels();
+updateSenders();
+renderStopBtn();
+renderAudioBtn();
+updateAudioState();
+setCap("scopeLbl", T.scopeHint[lang]);
+requestAnimationFrame(frame);
+</script>
+<!-- sim-nav -->
+<style>
+.sn-bar{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
+  background:var(--panel,#141d33);border-top:1px solid var(--border,#26355a);
+  padding:.7rem 1.2rem;margin-top:2.5rem;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:.9rem;
+  color:var(--text,#e5ecf7)}
+a.sn-home{color:var(--accent,#f59e0b);font-weight:700;text-decoration:none;white-space:nowrap}
+a.sn-home:hover{text-decoration:underline}
+.sn-nums{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
+.sn-num{display:inline-flex;align-items:center;justify-content:center;min-width:1.9rem;height:1.9rem;
+  padding:0 .35rem;border-radius:999px;border:1px solid var(--border,#26355a);
+  color:var(--text,#e5ecf7);text-decoration:none;font-weight:600;font-size:.85rem}
+a.sn-num:hover{border-color:var(--accent,#f59e0b);color:var(--accent,#f59e0b)}
+span.sn-num{background:var(--accent,#f59e0b);color:#1a1206;border-color:var(--accent,#f59e0b);font-weight:800}
+.sn-sib{color:var(--muted,#93a4c3);font-size:.85rem;white-space:nowrap}
+.sn-sib a{color:var(--cyan,#22d3ee);text-decoration:none;font-weight:600}
+.sn-sib a:hover{text-decoration:underline}
+</style>
+<footer class="sn-bar">
+  <a class="sn-home" href="../index.html">← Startseite</a>
+  <nav class="sn-nums" aria-label="Simulationsnavigation">
+    <a class="sn-num" href="../01_Einfuehrung_Wechselstrom/" title="Wechselstromerzeugung">1</a>
+    <a class="sn-num" href="../02_Kennwerte_Sinusschwingung/" title="Kennwerte der Sinusschwingung">2</a>
+    <a class="sn-num" href="../03_Widerstand_Wechselstrom/" title="Ohmscher Widerstand im Wechselstromkreis">3</a>
+    <a class="sn-num" href="../04a_Kondensator_Wechselstrom/" title="Kondensator im Wechselstromkreis">04a</a>
+    <a class="sn-num" href="../04b_Spule_Wechselstrom/" title="Spule im Wechselstromkreis">04b</a>
+    <a class="sn-num" href="../05_Ladungstransports/" title="Exkurs: Strom ohne Spannung – Ladungstransport">05</a>
+    <a class="sn-num" href="../06_Oszilloskop/" title="Exkurs: Digitales Speicheroszilloskop (DSO)">6</a>
+    <a class="sn-num" href="../07_Leistung_Wechselstrom/" title="Leistung im Wechselstromkreis">7</a>
+    <a class="sn-num" href="../08_RLC_Zeigerdiagramm/" title="Zeigerdiagramm RLC-Reihenschaltung">8</a>
+    <a class="sn-num" href="../09_Impedanz_Dreieck/" title="Impedanz-Dreieck (RLC)">9</a>
+    <a class="sn-num" href="../10_Motorkompensation/" title="Motorkompensation">10</a>
+    <a class="sn-num" href="../11_Schwingkreis_Resonanz/" title="RLC-Reihenschwingkreis">11</a>
+    <span class="sn-num" title="Radioempfang – Abstimmung, Güte & Bandbreite (aktive Simulation)">12</span>
+    <a class="sn-num" href="../13_Transformator/" title="Transformator">13</a>
+    <a class="sn-num" href="../14_Drehstrom/Sternschaltung/" title="Drehstrom – Sternschaltung">14</a>
+  </nav>
+</footer>
+<!-- /sim-nav -->
+</body>
+</html>
