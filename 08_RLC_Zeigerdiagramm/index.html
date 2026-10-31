@@ -56,6 +56,10 @@
   .presetbtns{display:grid;grid-template-columns:1fr;gap:.4rem}
   .presetbtns button{padding:.4rem .2rem;font-size:.85rem}
 
+  /* Vier Dreiecke */
+  .trirow{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-top:.5rem}
+  .trirow canvas{aspect-ratio:4/3}
+
   /* ---------- Formelzeile und Erklärung ---------- */
   .formulas{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
   .formula{background:var(--panel2);border:1px solid var(--border);border-radius:10px;
@@ -96,12 +100,26 @@
           <div class="chip"><div class="l">U<sub>R</sub></div><div class="v" id="vUR">–</div></div>
           <div class="chip"><div class="l">U<sub>L</sub></div><div class="v" id="vUL">–</div></div>
           <div class="chip"><div class="l">U<sub>C</sub></div><div class="v" id="vUC">–</div></div>
+          <div class="chip"><div class="l">P</div><div class="v" id="vP">–</div></div>
+          <div class="chip"><div class="l">Q</div><div class="v" id="vQ">–</div></div>
+          <div class="chip"><div class="l">S</div><div class="v" id="vS">–</div></div>
           <div class="chip"><div class="l">u(t)</div><div class="v" id="vUinst">–</div></div>
           <div class="chip"><div class="l">i(t)</div><div class="v" id="vIinst">–</div></div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- ============ Vier Dreiecke ============ -->
+  <section>
+    <h2 class="sec" data-i18n="secTriangles">Die vier Dreiecke – ähnlich, mit demselben Winkel φ</h2>
+    <div class="trirow">
+      <div class="canvas-wrap"><canvas id="triU"></canvas></div>
+      <div class="canvas-wrap"><canvas id="triZ"></canvas></div>
+      <div class="canvas-wrap"><canvas id="triP"></canvas></div>
+      <div class="canvas-wrap"><canvas id="triI"></canvas></div>
+    </div>
+  </section>
 
   <!-- ============ Steuerung ============ -->
   <section>
@@ -164,6 +182,9 @@
     <div class="formula">tan φ = (X<sub>L</sub> − X<sub>C</sub>) / R</div>
     <div class="formula">U = √(U<sub>R</sub>² + (U<sub>L</sub> − U<sub>C</sub>)²)</div>
     <div class="formula">f<sub>0</sub> = 1 / (2π·√(L·C))</div>
+    <div class="formula">P = S·cos φ = U<sub>R</sub>·I</div>
+    <div class="formula">Q = S·sin φ = (U<sub>L</sub> − U<sub>C</sub>)·I</div>
+    <div class="formula">S = U·I</div>
   </div>
 
   <!-- ============ Erklärung ============ -->
@@ -174,6 +195,7 @@
     <p data-i18n-html="exp3"></p>
     <p data-i18n-html="exp4"></p>
     <p data-i18n-html="exp5"></p>
+    <p data-i18n-html="exp6"></p>
   </article>
 </main>
 
@@ -215,6 +237,11 @@ const I18N = {
     pNet: "Netz 50 Hz", pOhm: "Fast ohmsch (φ ≈ −2°)", pCap: "Kapazitiv (φ ≈ −52°)",
     pInd: "Induktiv (φ ≈ +48°)", pRes: "Resonanz (Überhöhung)",
     presetsHint: "Setzt R, L, C, f und U auf typische Betriebspunkte – danach frei veränderbar. „Resonanz“ verwendet R = 20 Ω: U_L und U_C werden größer als die Quelle!",
+    /* Vier Dreiecke */
+    secTriangles: "Die vier Dreiecke – ähnlich, mit demselben Winkel φ",
+    triUTitle: "Spannungsdreieck", triZTitle: "Widerstandsdreieck",
+    triPTitle: "Leistungsdreieck", triITitle: "Stromdreieck",
+    triRefI: "Bezug: I", triRefU: "Bezug: U",
     tagInd: "(ind)", tagKap: "(kap)",
     formulas: "Formeln", explanation: "Erklärung",
     /* Zeigerdiagramm */
@@ -229,7 +256,8 @@ const I18N = {
     exp2: `<strong>Reihenschaltung – Strom als Bezug:</strong> Durch alle drei Bauelemente fließt derselbe Strom, deshalb zeichnet man den <strong>Stromzeiger I waagrecht</strong> als Bezugsgröße. Am Widerstand fällt <strong>U_R = R·I gleichphasig</strong> ab (parallel zu I). Die Spannung an der Spule <strong>eilt dem Strom um +90° voraus</strong> (U_L senkrecht nach oben), die am Kondensator <strong>hinkt um −90° hinterher</strong> (U_C senkrecht nach unten).`,
     exp3: `<strong>Zeigersumme und Spannungsdreieck:</strong> Die Quellenspannung ist die <strong>geometrische Summe</strong> U = U_R + U_L + U_C: Die Zeiger werden aneinandergehängt (Polygon im Diagramm), vom Ursprung zur Endspitze zeigt U. Weil U_L und U_C in <strong>entgegengesetzte Richtungen</strong> zeigen, löschen sie sich teilweise; übrig bleibt ein <strong>rechtwinkliges Spannungsdreieck</strong> mit den Katheten U_R und U_L − U_C sowie der Hypotenuse U. Damit: tan φ = (X_L − X_C)/R.`,
     exp4: `<strong>Resonanz:</strong> Bei <strong>f₀ = 1/(2π·√(L·C))</strong> ist X_L = X_C: U_L und U_C sind gleich groß und heben sich auf – es gilt U = U_R und φ = 0 (Spannungsresonanz). Achtung: Weil der Strom bei kleinem Z sehr groß wird, können <strong>U_L und U_C einzeln größer als die Quellenspannung U sein</strong> (Spannungsüberhöhung) – im Diagramm ragen ihre Zeiger weit über U hinaus.`,
-    exp5: `<strong>Abhängigkeit von der Frequenz:</strong> Unterhalb f₀ dominiert X_C – der Kreis ist <strong>kapazitiv</strong>, U zeigt unterhalb von I (φ < 0). Oberhalb f₀ dominiert X_L – der Kreis ist <strong>induktiv</strong>. Mit den Reglern R, L, C und f lässt sich jeder Betriebspunkt einstellen; die Taste <strong>f → f₀</strong> springt direkt in die Resonanz. Mit <strong>▶ Drehung</strong> rotieren die Zeiger in Zeitlupe, und die Projektion auf die senkrechte Achse liefert die Momentanwerte u(t) und i(t). <strong>Standardeinstellungen:</strong> Fünf Buttons in der Steuerung setzen typische Betriebspunkte – Netz, fast ohmsch, kapazitiv, induktiv und Resonanz.`
+    exp5: `<strong>Abhängigkeit von der Frequenz:</strong> Unterhalb f₀ dominiert X_C – der Kreis ist <strong>kapazitiv</strong>, U zeigt unterhalb von I (φ < 0). Oberhalb f₀ dominiert X_L – der Kreis ist <strong>induktiv</strong>. Mit den Reglern R, L, C und f lässt sich jeder Betriebspunkt einstellen; die Taste <strong>f → f₀</strong> springt direkt in die Resonanz. Mit <strong>▶ Drehung</strong> rotieren die Zeiger in Zeitlupe, und die Projektion auf die senkrechte Achse liefert die Momentanwerte u(t) und i(t). <strong>Standardeinstellungen:</strong> Fünf Buttons in der Steuerung setzen typische Betriebspunkte – Netz, fast ohmsch, kapazitiv, induktiv und Resonanz.`,
+    exp6: `<strong>Vier ähnliche Dreiecke:</strong> Spannungs-, Widerstands-, Leistungs- und Stromdreieck tragen <strong>denselben Winkel φ</strong> – sie sind zueinander ähnlich und unterscheiden sich nur im Maßstab: Das Widerstandsdreieck (R, X_L − X_C, Z) mit dem Faktor I multipliziert ergibt das Spannungsdreieck (U_R, U_L − U_C, U), dieses erneut mit I multipliziert das Leistungsdreieck. <strong>P = U_R·I</strong> ist die Wirkleistung (Wärme in R), <strong>Q = (U_L − U_C)·I</strong> die Blindleistung (zwischen Spule und Kondensator pendelnde Energie, negativ = kapazitiv) und <strong>S = U·I</strong> die Scheinleistung, nach der Quelle, Trafos und Leitungen bemessen werden. Das <strong>Stromdreieck</strong> zerlegt den Strom bezogen auf U in Wirkstrom I_W = I·cos φ (er erzeugt Wärme) und Blindstrom I_B = I·sin φ (er pendelt nur).`
   },
   en: {
     title: "Phasor Diagram – Series RLC Circuit",
@@ -254,6 +282,11 @@ const I18N = {
     pNet: "Grid 50 Hz", pOhm: "Near resistive (φ ≈ −2°)", pCap: "Capacitive (φ ≈ −52°)",
     pInd: "Inductive (φ ≈ +48°)", pRes: "Resonance (overvoltage)",
     presetsHint: "Sets R, L, C, f and U to typical operating points – tweak freely afterwards. \"Resonance\" uses R = 20 Ω: U_L and U_C exceed the source voltage!",
+    /* Four triangles */
+    secTriangles: "The four triangles – similar, sharing the same angle φ",
+    triUTitle: "Voltage triangle", triZTitle: "Impedance triangle",
+    triPTitle: "Power triangle", triITitle: "Current triangle",
+    triRefI: "Ref: I", triRefU: "Ref: U",
     tagInd: "(ind)", tagKap: "(cap)",
     formulas: "Formulas", explanation: "Explanation",
     zdTitle: "Phasor diagram – RMS values",
@@ -266,7 +299,8 @@ const I18N = {
     exp2: `<strong>Series circuit – current as reference:</strong> The same current flows through all three components, so the <strong>current phasor I is drawn horizontally</strong> as the reference. The resistor drops <strong>U_R = R·I in phase</strong> (parallel to I). The inductor voltage <strong>leads the current by +90°</strong> (U_L straight up), the capacitor voltage <strong>lags by −90°</strong> (U_C straight down).`,
     exp3: `<strong>Phasor sum and voltage triangle:</strong> The source voltage is the <strong>geometric sum</strong> U = U_R + U_L + U_C: chain the phasors tip-to-tail (the polygon), and the arrow from the origin to the final tip is U. Because U_L and U_C point in <strong>opposite directions</strong>, they partially cancel; what remains is a <strong>right-angled voltage triangle</strong> with legs U_R and U_L − U_C and hypotenuse U. Hence: tan φ = (X_L − X_C)/R.`,
     exp4: `<strong>Resonance:</strong> At <strong>f₀ = 1/(2π·√(L·C))</strong> we get X_L = X_C: U_L and U_C are equal and cancel – so U = U_R and φ = 0 (series resonance). Caution: since the current grows very large at small Z, <strong>U_L and U_C can individually exceed the source voltage U</strong> (voltage magnification) – in the diagram their phasors stick out far beyond U.`,
-    exp5: `<strong>Frequency dependence:</strong> Below f₀, X_C dominates – the circuit is <strong>capacitive</strong> and U points below I (φ < 0). Above f₀, X_L dominates – the circuit is <strong>inductive</strong>. The sliders R, L, C and f set any operating point; the <strong>f → f₀</strong> button jumps straight to resonance. With <strong>▶ Rotate</strong> the phasors spin in slow motion, and their projection onto the vertical axis yields the instantaneous values u(t) and i(t). <strong>Default presets:</strong> Five buttons in the controls set typical operating points – grid, near resistive, capacitive, inductive and resonance.`
+    exp5: `<strong>Frequency dependence:</strong> Below f₀, X_C dominates – the circuit is <strong>capacitive</strong> and U points below I (φ < 0). Above f₀, X_L dominates – the circuit is <strong>inductive</strong>. The sliders R, L, C and f set any operating point; the <strong>f → f₀</strong> button jumps straight to resonance. With <strong>▶ Rotate</strong> the phasors spin in slow motion, and their projection onto the vertical axis yields the instantaneous values u(t) and i(t). <strong>Default presets:</strong> Five buttons in the controls set typical operating points – grid, near resistive, capacitive, inductive and resonance.`,
+    exp6: `<strong>Four similar triangles:</strong> The voltage, impedance, power and current triangles all carry <strong>the same angle φ</strong> – they are similar to each other and differ only in scale: multiplying the impedance triangle (R, X_L − X_C, Z) by I gives the voltage triangle (U_R, U_L − U_C, U), and multiplying once more by I gives the power triangle. <strong>P = U_R·I</strong> is the active power (heat in R), <strong>Q = (U_L − U_C)·I</strong> the reactive power (energy sloshing between coil and capacitor, negative = capacitive) and <strong>S = U·I</strong> the apparent power that sources, transformers and cables must be rated for. The <strong>current triangle</strong> resolves the current with respect to U into active current I_W = I·cos φ (creates heat) and reactive current I_B = I·sin φ (just sloshes back and forth).`
   }
 };
 let lang = "de";
@@ -289,6 +323,12 @@ const f0  = () => 1 / (2 * Math.PI * Math.sqrt(state.LmH / 1000 * state.CuF / 1e
 const theta = () => 2 * Math.PI * state.f * state.t;                // Drehwinkel (Zeitlupe)
 const uInst = () => Math.SQRT2 * state.U * Math.sin(theta() + phi());
 const iInst = () => Math.SQRT2 * I() * Math.sin(theta());
+// Dreiecke: Leistungen und Stromzerlegung (alle ähnlich, gleicher Winkel φ)
+const PW = () => UR() * I();                 // Wirkleistung [W]
+const QB = () => (UL() - UC()) * I();        // Blindleistung [var], + induktiv
+const SA = () => state.U * I();              // Scheinleistung [VA]
+const IWc = () => I() * Math.cos(phi());     // Wirkstrom [A]
+const IBc = () => I() * Math.sin(phi());     // Blindstrom [A]
 
 /* ---------------- 3. DOM und Canvas-Hilfen ---------------- */
 const $ = id => document.getElementById(id);
@@ -597,9 +637,97 @@ function drawCircuit(){
   txt(x0, midY + sr + fs * 1.1, `U = ${fmt(state.U, 0)} V`, colU, true);
 }
 
+/* ---------------- 5b. Die vier Dreiecke (alle ähnlich, gleicher Winkel φ) ----------------
+   Einheitliche Farben: Wirkanteil grün, Blindanteil orange, Gesamt (Hypotenuse) cyan. */
+const cWirk = "#4ade80", cBlind = "#fb923c", cGes = "#22d3ee";
+// re: waagrechte Kathete, im: senkrechte Kathete (vorzeichenbehaftet, + = oben/induktiv)
+function drawTri(cv, title, re, im, reTx, imTx, hypTx, refTx){
+  const [w, h] = fitCanvas(cv);
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#0a1120"; ctx.fillRect(0, 0, w, h);
+  const fs = Math.max(10, Math.min(w, h) * 0.085);
+
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#e5ecf7"; ctx.font = `bold ${fs * 0.92}px system-ui`;
+  ctx.fillText(title, 12, 12 + fs * 0.5);
+  ctx.fillStyle = "#93a4c3"; ctx.font = `${fs * 0.62}px system-ui`;
+  ctx.textAlign = "right";
+  ctx.fillText(refTx, w - 12, 12 + fs * 0.5);
+
+  // Skalierung füllt die Box – dadurch wirken alle vier Dreiecke deckungsgleich (Ähnlichkeit)
+  const a = Math.abs(re), b = Math.abs(im);
+  const sc = Math.min(w * 0.72 / Math.max(a, 1e-9), h * 0.54 / Math.max(b, 1e-9));
+  const x0 = w * 0.15, y0 = h * 0.68;
+  const tipx = x0 + a * sc, tipy = y0 - im * sc;
+  const aL = a * sc, bL = Math.abs(tipy - y0), stub = 14;
+
+  // Seiten (entartete Katheten als gestrichelter Stummel, z. B. Q ≈ 0 an der Resonanz)
+  if (aL > 6) arrow2d(ctx, x0, y0, tipx, y0, cWirk, 3, 8);
+  else { ctx.setLineDash([4, 3]); arrow2d(ctx, x0, y0, x0 + stub, y0, cWirk, 2, 6); ctx.setLineDash([]); }
+  const sx = aL > 6 ? tipx : x0 + stub;                       // x der Senkrechten
+  if (bL > 6) arrow2d(ctx, tipx, y0, tipx, tipy, cBlind, 3, 8);
+  else { ctx.setLineDash([4, 3]); arrow2d(ctx, sx, y0, sx, y0 + (im >= 0 ? -stub : stub), cBlind, 2, 6); ctx.setLineDash([]); }
+  const hx = aL > 6 ? tipx : x0 + stub, hy = bL > 6 ? tipy : y0 + (im >= 0 ? -stub : stub);
+  arrow2d(ctx, x0, y0, hx, hy, cGes, 3, 8);
+
+  // rechter Winkel an der Katheten-Ecke
+  if (aL > 6 && bL > 6){
+    const sy = im >= 0 ? -1 : 1;
+    ctx.strokeStyle = "rgba(147,164,195,.9)"; ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(tipx - 9, y0); ctx.lineTo(tipx - 9, y0 + 9 * sy); ctx.lineTo(tipx, y0 + 9 * sy);
+    ctx.stroke();
+  }
+
+  // φ-Bogen am Ursprung
+  const ang = Math.atan2(hy - y0, hx - x0);
+  if (Math.abs(ang) > 0.01){
+    const r = Math.min(26, Math.max(11, aL * 0.28));
+    ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ang < 0) ctx.arc(x0, y0, r, 0, ang, true);
+    else         ctx.arc(x0, y0, r, 0, ang, false);
+    ctx.stroke();
+    const am = ang / 2, lr = r + 13;
+    ctx.fillStyle = "#f59e0b"; ctx.font = `italic bold ${fs * 0.9}px Georgia`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("φ", x0 + Math.cos(am) * lr, y0 + Math.sin(am) * lr);
+  }
+
+  // Seitenbeschriftungen
+  ctx.font = `bold ${fs * 0.72}px system-ui`;
+  ctx.fillStyle = cWirk; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  ctx.fillText(reTx, x0 + Math.max(aL, stub) / 2, y0 + fs * 1.05);
+  ctx.fillStyle = cBlind;
+  if (bL > 6){ ctx.textAlign = "right"; ctx.fillText(imTx, tipx - 7, (y0 + tipy) / 2 + fs * 0.25); }
+  else { ctx.textAlign = "right"; ctx.fillText(imTx, sx - 7, im >= 0 ? y0 - stub - 4 : y0 + stub + fs * 0.85); }
+  const dl = Math.hypot(hx - x0, hy - y0) || 1;
+  ctx.fillStyle = cGes; ctx.textAlign = "center";
+  ctx.fillText(hypTx, (x0 + hx) / 2 + (hy - y0) / dl * fs * 1.6,
+               (y0 + hy) / 2 - (hx - x0) / dl * fs * 1.6 + fs * 0.3);
+}
+
+function drawTriangles(){
+  drawTri($("triU"), T("triUTitle"), UR(), UL() - UC(),
+    `${T("lblUR")} = ${fmt0(UR())} V`, `U_L − U_C = ${fmt0(UL() - UC())} V`,
+    `U = ${fmt0(state.U)} V`, T("triRefI"));
+  drawTri($("triZ"), T("triZTitle"), state.R, X(),
+    `R = ${fmt0(state.R)} Ω`, `X_L − X_C = ${fmt0(X())} Ω`,
+    `Z = ${fmt0(Z())} Ω`, T("triRefI"));
+  drawTri($("triP"), T("triPTitle"), PW(), QB(),
+    `P = ${fmt0(PW())} W`, `Q = ${fmt0(QB())} var`,
+    `S = ${fmt0(SA())} VA`, T("triRefI"));
+  drawTri($("triI"), T("triITitle"), IWc(), IBc(),
+    `IW = ${fmt(IWc(), 2)} A`, `IB = ${fmt(IBc(), 2)} A`,
+    `I = ${fmt(I(), 2)} A`, T("triRefU"));
+}
+
 /* ---------------- 6. Messwerte ---------------- */
 // Frequenzanzeige: mehr Nachkommastellen im unteren Bereich
 const fmtFreq = x => fmt(x, x < 10 ? 2 : x < 100 ? 1 : 0);
+// Ganzzahlig ohne unschönes "−0" (Werte nahe 0, z. B. Q an der Resonanz)
+const fmt0 = x => { const s = fmt(x, 0); return /^[−-]0$/.test(s) ? "0" : s; };
 function updateReadouts(){
   const phDeg = phi() * 180 / Math.PI;
   const tag = X() > 1e-9 ? " " + T("tagInd") : X() < -1e-9 ? " " + T("tagKap") : "";
@@ -616,6 +744,9 @@ function updateReadouts(){
   const u = uInst(), i = iInst();
   $("vUinst").textContent = (u >= 0 ? "+" : "") + fmt(u, 1) + " V";
   $("vIinst").textContent = (i >= 0 ? "+" : "") + fmt(i, 3) + " A";
+  $("vP").textContent = fmt(PW(), 0) + " W";
+  $("vQ").textContent = fmt0(QB()) + " var";
+  $("vS").textContent = fmt(SA(), 0) + " VA";
 }
 
 /* ---------------- 7. Hauptschleife (≈60 FPS) ---------------- */
@@ -624,7 +755,7 @@ function frame(now){
   const dt = Math.min((now - last) / 1000, 0.05);   // bei Tab-Wechsel clampen
   last = now;
   if (state.rot) state.t += dt * TIMESCALE;         // Zeitlupe
-  drawScene(); drawCircuit(); updateReadouts();
+  drawScene(); drawCircuit(); drawTriangles(); updateReadouts();
   requestAnimationFrame(frame);
 }
 

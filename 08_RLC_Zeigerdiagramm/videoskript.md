@@ -114,6 +114,7 @@ Legende pro Szene: **Bild** = was auf dem Bildschirm zu sehen ist · **Sprecher:
 - **Regler-Positionen (f logarithmisch):** 0,4 Hz ≈ Position 163 · 0,5 Hz ≈ 189 · 15 Hz ≈ 588 · 50 Hz ≈ 730 · 71 Hz (f₀ mit L = 100 mH, C = 50 µF) ≈ 771 · 200 Hz ≈ 892.
 - **Zwischen den Szenen zurücksetzen:** R = 100 Ω, L = 100 mH, C = 50 µF, f ≈ Position 730, U = 230 V – sonst tragen die Werte der vorherigen Szene über.
 - **Voreinstellungs-Buttons:** Die fünf Buttons „Standardeinstellungen" setzen die Szenen-Werte mit einem Klick: Netz 50 Hz (Standard) · Fast ohmsch · Kapazitiv (Szene 3) · Induktiv (Szene 5) · Resonanz (Szene 6, R = 20 Ω).
+- **Vier-Dreiecke-Abschnitt:** Der Bereich unter der Bühne (Spannungs-, Widerstands-, Leistungs-, Stromdreieck) eignet sich für eine Vertiefungs-Einblendung nach Szene 6: alle vier Dreiecke sind ähnlich und tragen denselben Winkel φ – bei der Resonanz-Voreinstellung kollabieren sie zu einer Linie (Q ≈ 0, φ ≈ 0).
 - **Resonanz-Demo in Szene 6:** Erst den f → f₀-Klick ausführen (U_L = U_C = 103 V), DANN R auf 20 Ω drehen – der Kontrast 103 V → 514 V ist der dramaturgische Höhepunkt. Das Diagramm zoomt automatisch heraus; kurz einplanen.
 - **Ruhige Bilder:** Für Szene 7 Frequenz unter 1 Hz wählen (0,3–0,5 Hz); bei 50 Hz ist die Drehung zu schnell. „❚❚ Stopp" friert die Phase exakt ein – ideal für Punktlandungen.
 - **Autoskalierung:** Die Pfeil-Längen sind auf den größten Wert normiert; bei kleinem R oder extremer Frequenz springt die Skala (Skalenwert oben links im Diagramm) – im Video kurz kommentieren.

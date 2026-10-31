@@ -52,7 +52,7 @@
   .row1 > div{display:grid; gap:14px; align-content:start}
   .row1 > .panel{align-self:start}   /* kein Aufweiten über die Inhaltshöhe hinaus */
   canvas{display:block; width:100%; background:#0b0f14; border-radius:8px}
-  #cvScene{aspect-ratio:720/460}
+  #cvScene{aspect-ratio:760/520}
   #cvPhasor{aspect-ratio:1/1}
   #cvScope{aspect-ratio:1000/560}
   #cvSankey{aspect-ratio:1000/420}
@@ -145,7 +145,9 @@
           <div class="mrow"><div class="mlab" data-i18n-html="mU"></div><div class="mval" id="mU">–</div></div>
           <div class="mrow"><div class="mlab" data-i18n-html="mIM"></div><div class="mval" id="mIM">–</div></div>
           <div class="mrow"><div class="mlab" data-i18n-html="mIC"></div><div class="mval" id="mIC">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mI1"></div><div class="mval" id="mI1">–</div></div>
           <div class="mrow"><div class="mlab" data-i18n-html="mI2"></div><div class="mval" id="mI2">–</div></div>
+          <div class="mrow"><div class="mlab" data-i18n-html="mDI"></div><div class="mval" id="mDI">–</div></div>
           <div class="mrow"><div class="mlab" data-i18n-html="mCos1"></div><div class="mval" id="mCos1">–</div></div>
           <div class="mrow"><div class="mlab" data-i18n-html="mCos2"></div><div class="mval" id="mCos2">–</div></div>
           <div class="mrow"><div class="mlab" data-i18n-html="mP"></div><div class="mval" id="mP">–</div></div>
@@ -174,6 +176,8 @@
         <span class="chip"><span class="dot" style="background:var(--i)"></span><span data-i18n="lgIM">i_M(t) Motorstrom</span></span>
         <span class="chip"><span class="dot" style="background:var(--ic)"></span><span data-i18n="lgIC">i_C(t) Kondensatorstrom</span></span>
         <span class="chip"><span class="dot" style="background:var(--p)"></span><span data-i18n="lgI2">i_2(t) Netzstrom</span></span>
+        <span class="chip"><span class="dot" style="background:var(--i)"></span><span data-i18n="lgPM">p_M(t) = u·i_M Motorleistung</span></span>
+        <span class="chip"><span class="dot" style="background:var(--p)"></span><span data-i18n="lgP2">p_2(t) = u·i_2 Netzleistung</span></span>
         <span class="chip" data-i18n="scopeHint">i_C eilt u um 90° voraus</span>
       </div>
     </div>
@@ -253,11 +257,13 @@ de:{
   tSub:"Blindleistungskompensation eines Asynchronmotors – Leistungsfaktorkorrektur mit Parallelkondensator",
   tScene:"Stromkreis", tPhasor:"Zeigerdiagramm", tScope:"Oszilloskop",
   tMeas:"Messwerte", tCtrl:"Steuerung", tExplain:"Erklärung", tSankey:"Energiefluss",
-  lgU:"u(t) Spannung", lgIM:"i_M(t) Motorstrom", lgIC:"i_C(t) Kondensatorstrom", lgI2:"i_2(t) Netzstrom",
+  lgU:"u(t) Spannung", lgIM:"i_M(t) Motorstrom (= i_1)", lgIC:"i_C(t) Kondensatorstrom", lgI2:"i_2(t) Netzstrom (aktuell)",
+  lgPM:"p_M(t) = u·i_M Motorleistung", lgP2:"p_2(t) = u·i_2 Netzleistung – Pendelung mit 2f",
   scopeHint:"i_C eilt u um 90° voraus, i_M hinkt um φ₁ nach",
-  mU:"U<sub>eff</sub> (Netz, fest)", mIM:"I<sub>M</sub> Motorstrom",
-  mIC:"I<sub>C</sub> Kondensatorstrom", mI2:"I<sub>2</sub> Netzstrom",
-  mCos1:"cos φ<sub>1</sub> vorher", mCos2:"cos φ<sub>2</sub> nachher",
+  mU:"U<sub>eff</sub> (Netz, fest)", mIM:"I<sub>M</sub> Motorstrom (konstant)",
+  mIC:"I<sub>C</sub> Kondensatorstrom", mI1:"I<sub>1</sub> ohne Kompensation (Vergleich)",
+  mI2:"I<sub>2</sub> Netzstrom (aktuell)", mDI:"ΔI = I<sub>1</sub> − I<sub>2</sub> Reduktion",
+  mCos1:"cos φ<sub>1</sub> (Vergleich)", mCos2:"cos φ<sub>2</sub> (aktuell)",
   mP:"P = U·I<sub>W</sub> Wirkleistung", mQ1:"Q<sub>1</sub> Blindleistung vorher",
   mQC:"Q<sub>C</sub> Kompensation", mQ2:"Q<sub>2</sub> Blindleistung nachher",
   cP:"Motor-Wirkleistung P", cCos:"Motor-Leistungsfaktor cos φ₁", cCap:"Kondensator-Kapazität C",
@@ -275,24 +281,27 @@ de:{
     +'<span class="chip"><span class="dot" style="background:var(--i)"></span>I_M Motorstrom</span>'
     +'<span class="chip"><span class="dot" style="background:var(--ic)"></span>I_C Kondensator</span>'
     +'<span class="chip"><span class="dot" style="background:var(--i2)"></span>I₂ Netzstrom</span><span class="chip"><span class="dot" style="background:#f0b429"></span>E-Feld</span><span class="chip"><span class="dot" style="background:#79c0ff"></span>B-Feld</span></span><br>'
-    +'<strong>Stromzangen messen live:</strong> I₁ ist der Referenzwert ohne Kompensation, I₂ der tatsächliche Netzstrom. Motor und Kondensator liegen in zwei parallelen Zweigen an derselben Spannung. '
+    +'<strong>Stromzangen messen live:</strong> I₁ (gestrichelte Zange) ist der Vergleichswert ohne Kompensation, I₂ der tatsächliche Netzstrom – mit offenem Schalter gilt I₂ = I₁. Motor und Kondensator liegen in zwei parallelen Zweigen an derselben Spannung. '
     +'<strong>Klick auf den Schalter S</strong> (oder den großen Button unten) schaltet den Kondensator ein/aus: '
     +'Der Motorstrom I_M bleibt immer unverändert, der Kondensatorstrom I_C fließt phasenverschoben dem Blindanteil des Motors entgegen – '
     +'im Netzstrom heben sich die Blindanteile teilweise auf und I₂ wird dünner. In den Platten pendelt die Ladung mit dem '
     +'E-Feld, um den Motor pulsieren die B-Feldlinien mit dem Magnetisierungsstrom.',
-  phasorCaption:"U ist die feste horizontale Referenz (ω-Pfeil = Drehrichtung). I_W in Phase mit U (grün), I_B 90° dahinter (blau), "
-    +"I_C 90° davor (cyan). I₁ = I_W + I_B (amber) ist der unkompensierte Netzstrom; I₂ = I_W + (I_B − I_C) (orange) kippt "
-    +"beim Zuschalten des Kondensators Richtung U-Achse und wird kürzer. Zeigerlängen maßstäblich (Auto-Skalierung).",
+  phasorCaption:"Beide Zweige teilen sich dieselbe Spannung – U ist die feste horizontale Referenz (ω-Pfeil = Drehrichtung). I_W in Phase mit U (grün), I_B 90° dahinter (blau), "
+    +"I_C 90° davor (cyan). Das ist die Stromebene der Parallelschaltung: nacheilende Ströme zeigen nach unten, voreilende nach oben "
+    +"(im Impedanzdiagramm der Reihenschaltung steht +jX_L entsprechend nach oben). "
+    +"I₁ = I_W + I_B (amber) ist nur der Vergleichszeiger ohne Kompensation — gestrichelt, sobald der "
+    +"Kondensator eingeschaltet ist; I₂ = I_W + (I_B − I_C) (orange) ist der tatsächliche Netzstrom und kippt beim Zuschalten "
+    +"Richtung U-Achse und wird kürzer. Ohne Kondensator gilt I₂ = I₁. Zeigerlängen maßstäblich (Auto-Skalierung).",
   skNote:"Vereinfachtes Sankey-Diagramm: Balkenbreiten ∝ Stromstärke, jeweils auf den eigenen Maximalwert normiert "
     +"(Skalen je Balken unterschiedlich), Motorverluste angenähert. Ohne Kondensator liefert das Netz die volle Blindleistung — "
     +"mit Kondensator wird sie lokal zwischen Kondensator und Motor ausgetauscht und das Netz entlastet.",
-  cosBoxT:"Leistungsfaktor", cos1L:"cos φ₁ ohne C", cos2L:"cos φ₂ mit C",
+  cosBoxT:"Leistungsfaktor", cos1L:"cos φ₁ (Vergleich)", cos2L:"cos φ₂ (aktuell)",
   reliefL:"Netzentlastung", reliefNote:"des Netzstroms", reliefN2:"gegenüber ohne Kondensator",
   stOff:"unkompensiert", stPart:"teilkompensiert", stFull:"vollkompensiert", stOver:"überkompensiert (kapazitiv)",
   srcL:"Netzquelle", srcU:"230 V · 50 Hz", motorL:"Asynchronmotor",
   capL:"Kondensator", swL:"S", speedU:"min⁻¹", tempU:"°C",
   i1l:"I₁", i1s:"ohne Komp.", i2l:"I₂", iml:"I_M", icl:"I_C",
-  pU:"U", pIW:"I_W", pIB:"I_B", pIC:"I_C", pI1:"I₁", pI2:"I₂",
+  pU:"U", pURef:"Referenz", pIW:"I_W", pIB:"I_B", pIC:"I_C", pI1:"I₁", pI2:"I₂",
   pCapNote:"φ₂ < 0 – kapazitiv!",
   skNetz:"Netz", skNetzS:"230 V · 50 Hz", skMotor:"Motor", skMotorS:"Asynchronmotor",
   skCap:"Kondensator", skHeat:"Wärme", skHeatS:"Verluste",
@@ -340,11 +349,13 @@ en:{
   tSub:"Reactive-power compensation of an induction motor – power factor correction with a parallel capacitor",
   tScene:"Circuit", tPhasor:"Phasor diagram", tScope:"Oscilloscope",
   tMeas:"Measurements", tCtrl:"Controls", tExplain:"Explanation", tSankey:"Energy flow",
-  lgU:"u(t) voltage", lgIM:"i_M(t) motor current", lgIC:"i_C(t) capacitor current", lgI2:"i_2(t) grid current",
+  lgU:"u(t) voltage", lgIM:"i_M(t) motor current (= i_1)", lgIC:"i_C(t) capacitor current", lgI2:"i_2(t) grid current (actual)",
+  lgPM:"p_M(t) = u·i_M motor power", lgP2:"p_2(t) = u·i_2 grid power – ripple at 2f",
   scopeHint:"i_C leads u by 90°, i_M lags by φ₁",
-  mU:"U<sub>rms</sub> (grid, fixed)", mIM:"I<sub>M</sub> motor current",
-  mIC:"I<sub>C</sub> capacitor current", mI2:"I<sub>2</sub> grid current",
-  mCos1:"cos φ<sub>1</sub> before", mCos2:"cos φ<sub>2</sub> after",
+  mU:"U<sub>rms</sub> (grid, fixed)", mIM:"I<sub>M</sub> motor current (constant)",
+  mIC:"I<sub>C</sub> capacitor current", mI1:"I<sub>1</sub> w/o compensation (reference)",
+  mI2:"I<sub>2</sub> grid current (actual)", mDI:"ΔI = I<sub>1</sub> − I<sub>2</sub> reduction",
+  mCos1:"cos φ<sub>1</sub> (reference)", mCos2:"cos φ<sub>2</sub> (actual)",
   mP:"P = U·I<sub>W</sub> real power", mQ1:"Q<sub>1</sub> reactive before",
   mQC:"Q<sub>C</sub> compensation", mQ2:"Q<sub>2</sub> reactive after",
   cP:"Motor real power P", cCos:"Motor power factor cos φ₁", cCap:"Capacitor capacitance C",
@@ -362,24 +373,27 @@ en:{
     +'<span class="chip"><span class="dot" style="background:var(--i)"></span>I_M motor current</span>'
     +'<span class="chip"><span class="dot" style="background:var(--ic)"></span>I_C capacitor</span>'
     +'<span class="chip"><span class="dot" style="background:var(--i2)"></span>I₂ grid current</span><span class="chip"><span class="dot" style="background:#f0b429"></span>E field</span><span class="chip"><span class="dot" style="background:#79c0ff"></span>B field</span></span><br>'
-    +'<strong>Current clamps measure live:</strong> I₁ is the reference without compensation, I₂ the actual grid current. Motor and capacitor sit in two parallel branches at the same voltage. '
+    +'<strong>Current clamps measure live:</strong> I₁ (dashed clamp) is the comparison value without compensation, I₂ the actual grid current — with the switch open, I₂ = I₁. Motor and capacitor sit in two parallel branches at the same voltage. '
     +'<strong>Click the switch S</strong> (or the large button below) to toggle the capacitor: '
     +'The motor current I_M never changes; the capacitor current I_C flows phase-shifted against the reactive part of the motor '
     +'current – in the grid current the reactive parts partly cancel and I₂ gets thinner. Charge sloshes with the E field between '
     +'the plates, and the B-field lines around the motor pulse with the magnetising current.',
-  phasorCaption:"U is the fixed horizontal reference (ω arrow = rotation direction). I_W in phase with U (green), I_B 90° behind (blue), "
-    +"I_C 90° ahead (cyan). I₁ = I_W + I_B (amber) is the uncompensated grid current; I₂ = I_W + (I_B − I_C) (orange) tilts "
-    +"toward the U axis and shortens when the capacitor is switched on. Phasor lengths to scale (auto-scaling).",
+  phasorCaption:"Both branches share the same voltage – U is the fixed horizontal reference (ω arrow = rotation direction). I_W in phase with U (green), I_B 90° behind (blue), "
+    +"I_C 90° ahead (cyan). This is the current plane of the parallel circuit: lagging currents point down, leading currents "
+    +"point up (in the impedance diagram of the series circuit, +jX_L points up accordingly). "
+    +"I₁ = I_W + I_B (amber) is only the comparison phasor without compensation — drawn dashed once the "
+    +"capacitor is switched in; I₂ = I_W + (I_B − I_C) (orange) is the actual grid current: it tilts toward the U axis and "
+    +"shortens when the capacitor is switched on. With the capacitor open, I₂ = I₁. Phasor lengths to scale (auto-scaling).",
   skNote:"Simplified Sankey diagram: band widths ∝ current, each normalised to its own maximum "
     +"(scales differ per band), motor losses approximated. Without the capacitor the grid supplies all reactive power — "
     +"with the capacitor it is exchanged locally between capacitor and motor and the grid is relieved.",
-  cosBoxT:"Power factor", cos1L:"cos φ₁ without C", cos2L:"cos φ₂ with C",
+  cosBoxT:"Power factor", cos1L:"cos φ₁ (reference)", cos2L:"cos φ₂ (actual)",
   reliefL:"Grid relief", reliefNote:"of the grid current", reliefN2:"vs. without capacitor",
   stOff:"uncompensated", stPart:"partially compensated", stFull:"fully compensated", stOver:"overcompensated (capacitive)",
   srcL:"Grid source", srcU:"230 V · 50 Hz", motorL:"Induction motor",
   capL:"Capacitor", swL:"S", speedU:"rpm", tempU:"°C",
   i1l:"I₁", i1s:"no comp.", i2l:"I₂", iml:"I_M", icl:"I_C",
-  pU:"U", pIW:"I_W", pIB:"I_B", pIC:"I_C", pI1:"I₁", pI2:"I₂",
+  pU:"U", pURef:"reference", pIW:"I_W", pIB:"I_B", pIC:"I_C", pI1:"I₁", pI2:"I₂",
   pCapNote:"φ₂ < 0 – capacitive!",
   skNetz:"Grid", skNetzS:"230 V · 50 Hz", skMotor:"Motor", skMotorS:"induction motor",
   skCap:"Capacitor", skHeat:"Heat", skHeatS:"losses",
@@ -437,7 +451,7 @@ const state = {
 };
 /* Abgeleitete Größen (recompute() + geglättete Anzeigewerte im loop) */
 const M = { IW:0, phi1:0, IB:0, IM:0, ICt:0, ICd:0, I2:0, phi2:0, cos2:0, P:0, Q1:0, QC:0, Q2:0 };
-let swDisp = 0, clickFlash = 0, phSc = 1, sc2p = 1, sc3p = 1;
+let swDisp = 0, clickFlash = 0, phSc = 1, sc2p = 1, sc3p = 1, sc4p = 1;
 
 function recompute(){
   M.IW   = state.P/UN;                        // Wirkstrom
@@ -465,6 +479,7 @@ function fmtNum(x, sig=3){
 function fmtSI(v, unit, sig=3){
   if(v===0) return "0 "+unit;
   const a=Math.abs(v);
+  if(a<1e-12) return "0 "+unit;          // Schutz gegen exponentiell ausklingende Restwerte („wachsende Nullen“)
   const U=[[1e9,"G"],[1e6,"M"],[1e3,"k"],[1,""],[1e-3,"m"],[1e-6,"µ"],[1e-9,"n"],[1e-12,"p"]];
   for(const [f,p] of U) if(a>=f) return fmtNum(v/f,sig)+" "+p+unit;
   return fmtNum(v/1e-12,sig)+" p"+unit;
@@ -499,22 +514,19 @@ function txtHalo(ctx,txt,x,y,col="#e6edf3",align="center",font="600 12px system-
   ctx.strokeText(txt,x,y); ctx.fillStyle=col; ctx.fillText(txt,x,y);
 }
 
-/* ---------- 5. Hauptszene (Design 720×460, wird skaliert gezeichnet) ----------
-   Klassische Parallelschaltung: Obere/untere Schiene, dazwischen zwei
-   Vertikalzweige – links der Motor, rechts Kondensator mit Schalter S.
-   I₁ misst in der Zuleitung (Referenz ohne Kompensation), I₂ in der
-   Rückleitung (Netzstrom live). Beide Zweige sind Verbraucher an derselben
-   Spannung: Ihr Strom fließt von der oberen zur unteren Schiene; die
-   Kompensation wirkt allein über die Phasenlage (I_C eilt 90° voraus und
-   hebt im Zeigerbild den Blindanteil I_B des Motors auf).              */
+/* ---------- 5. Hauptszene (Design 760×520, wird skaliert gezeichnet) ----------
+   Schaltbild wie im Lehrbuch: Quelle G links im Vertikalzweig, Zuleitung mit
+   R_L, danach zwei parallele Zweige zwischen den Schienen – Motor (R_M + L_M)
+   und Kondensator mit Schalter S. I₁ (Zuleitung) ist der Vergleichswert ohne
+   Kompensation, I₂ in der Rückleitung der tatsächliche Netzstrom.            */
 const SEGS = [
-  {pts:[[110,170],[110,330]],                 cur:()=>M.I2,  col:"#79c0ff"}, // durch die Quelle (hinter Symbol)
-  {pts:[[110,170],[280,170]],                 cur:()=>M.I2,  col:"#79c0ff"}, // Zuleitung (Netzstrom live)
-  {pts:[[280,170],[280,330]],                 cur:()=>M.IM,  col:"#79c0ff"}, // Motorzweig, abwärts
-  {pts:[[280,170],[440,170]],                 cur:()=>M.ICd, col:"#79c0ff"}, // Schiene oben: Anteil I_C
-  {pts:[[440,170],[440,232],[520,232],[520,286],[440,286],[440,330]], cur:()=>M.ICd, col:"#7ee7ff"}, // Kondensatorzweig
-  {pts:[[440,330],[280,330]],                 cur:()=>M.ICd, col:"#79c0ff"}, // Schiene unten: Rückfluss I_C
-  {pts:[[280,330],[110,330]],                 cur:()=>M.I2,  col:"#79c0ff"}  // Rückleitung (Netzstrom live)
+  {pts:[[80,410],[80,120]],                   cur:()=>M.I2,  col:"#79c0ff"}, // durch die Quelle: unten rein, oben raus (hinter Symbol)
+  {pts:[[80,120],[255,120]],                  cur:()=>M.I2,  col:"#79c0ff"}, // Zuleitung durch R_L (Netzstrom live)
+  {pts:[[255,120],[400,120]],                 cur:()=>M.I2,  col:"#79c0ff"}, // obere Schiene bis Motorzweig
+  {pts:[[400,120],[545,120]],                 cur:()=>M.ICd, col:"#79c0ff"}, // Schiene Motor→C: nur noch Anteil I_C
+  {pts:[[400,120],[400,410]],                 cur:()=>M.IM,  col:"#79c0ff"}, // Motorzweig (R_M + L_M), abwärts
+  {pts:[[545,120],[545,226],[545,248],[545,296],[545,334],[545,410]], cur:()=>M.ICd, col:"#7ee7ff"}, // Kondensatorzweig
+  {pts:[[545,410],[80,410]],                  cur:()=>M.I2,  col:"#79c0ff"}  // untere Schiene (Rückleitung)
 ];
 for(const s of SEGS){                       // Bogenlängen der Polylinien vorberechnen
   s.cum=[0]; s.len=0;
@@ -551,11 +563,13 @@ function drawSegs(ctx){
     }
   }
 }
-/* Stromzange: Ring um die Leitung + Bezeichnung + Live-Wert */
-function clamp(ctx,x,y,lab,val,col,labPos="top"){
+/* Stromzange: Ring um die Leitung + Bezeichnung + Live-Wert.
+   dash=true → gestrichelte „Gedachte“-Zange für Vergleichswerte (I₁ ohne Kompensation) */
+function clamp(ctx,x,y,lab,val,col,labPos="top",dash=false){
   ctx.strokeStyle=col; ctx.lineWidth=4.5; ctx.globalAlpha=.9;
+  if(dash) ctx.setLineDash([5,4]);
   ctx.beginPath(); ctx.arc(x,y,11,0,7); ctx.stroke();
-  ctx.globalAlpha=1;
+  ctx.setLineDash([]); ctx.globalAlpha=1;
   ctx.textAlign="center"; ctx.textBaseline="middle";
   ctx.font="italic 700 13px system-ui"; ctx.fillStyle=col;
   if(labPos==="top"){ ctx.fillText(lab,x,y-26); ctx.font="600 10.5px ui-monospace,monospace"; ctx.fillText(val,x,y+26); }
@@ -580,165 +594,184 @@ function dotPlus(c,x,y,a){
 function drawScene(cv){
   const {ctx,W,H}=fit(cv);
   ctx.clearRect(0,0,W,H);
-  const s=Math.min(W/720,H/460);
+  const s=Math.min(W/760,H/520);
   ctx.save();
-  ctx.translate((W-720*s)/2,(H-460*s)/2); ctx.scale(s,s);
+  ctx.translate((W-760*s)/2,(H-520*s)/2); ctx.scale(s,s);
   const T=I18N[lang];
 
-  /* --- Leitungen: Schienen + zwei parallele Zweige (Motor | Kondensator) --- */
+  /* --- Leitungen: Schienen, Quelle, zwei parallele Zweige (Motor | C) --- */
   ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=3; ctx.lineCap="round"; ctx.lineJoin="round";
   ctx.beginPath();
-  ctx.moveTo(110,170); ctx.lineTo(505,170);          // obere Schiene
-  ctx.moveTo(110,330); ctx.lineTo(505,330);          // untere Schiene
-  ctx.moveTo(110,170); ctx.lineTo(110,330);          // links: Quelle
-  ctx.moveTo(280,170); ctx.lineTo(280,330);          // Zweig 1: Motor
-  ctx.moveTo(440,170); ctx.lineTo(440,232); ctx.lineTo(463,232);   // Zweig 2: runter, dann…
-  ctx.moveTo(489,232); ctx.lineTo(520,232); ctx.lineTo(520,286);   // …horizontal durch die Platten…
-  ctx.lineTo(440,286); ctx.lineTo(440,288);                        // …zurück zum Schalterbein (Lücke S: 288…318)
-  ctx.moveTo(440,318); ctx.lineTo(440,330);                        // unterer Kontakt weiter zur Schiene
+  ctx.moveTo(80,120); ctx.lineTo(545,120);           // obere Schiene (Zuleitung ab Quelle)
+  ctx.moveTo(80,410); ctx.lineTo(545,410);           // untere Schiene
+  ctx.moveTo(80,120); ctx.lineTo(80,410);            // links: Quelle G
+  ctx.moveTo(400,120); ctx.lineTo(400,410);          // Zweig 1: Motor (R_M + L_M)
+  ctx.moveTo(545,120); ctx.lineTo(545,226);          // Zweig 2: runter zur oberen Platte
+  ctx.moveTo(545,248); ctx.lineTo(545,296);          // untere Platte → Schalter (Lücke S: 296…326)
+  ctx.moveTo(545,334); ctx.lineTo(545,410);          // Schalter → untere Schiene
   ctx.stroke();
-  /* Knotenpunkte an den Zweig-Enden */
+  /* Knotenpunkte: nach R_L und an den Zweig-Enden */
   ctx.fillStyle="#c9d1d9";
-  for(const [x,y] of [[280,170],[280,330],[440,170],[440,330]]){ ctx.beginPath(); ctx.arc(x,y,4.5,0,7); ctx.fill(); }
+  for(const [x,y] of [[255,120],[400,120],[400,410],[545,120],[545,410]]){ ctx.beginPath(); ctx.arc(x,y,4.5,0,7); ctx.fill(); }
 
   /* --- Kondensatorzweig „leuchtet auf“, wenn Strom fließt --- */
   const glow=Math.min(1, M.ICd/40);
   if(glow>0.02){
-    ctx.strokeStyle=`rgba(57,214,207,${0.10+0.30*glow})`; ctx.lineWidth=10; ctx.lineCap="round"; ctx.lineJoin="round";
+    ctx.strokeStyle=`rgba(57,214,207,${0.10+0.30*glow})`; ctx.lineWidth=10; ctx.lineCap="round";
     ctx.beginPath();
-    ctx.moveTo(440,175); ctx.lineTo(440,232); ctx.lineTo(520,232); ctx.lineTo(520,286); ctx.lineTo(440,286); ctx.lineTo(440,325);
+    ctx.moveTo(545,126); ctx.lineTo(545,296); ctx.moveTo(545,334); ctx.lineTo(545,404);
     ctx.stroke();
   }
 
   drawSegs(ctx);
 
-  /* --- Kondensator: vertikale Platten im waagrechten Abschnitt ---
+  /* --- Zuleitung: R_L (Leitungswiderstand) als Rechteck auf dem Draht --- */
+  ctx.fillStyle="#c9d1d9"; ctx.strokeStyle="#30363d"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect(140,111,60,18,3); ctx.fill(); ctx.stroke();
+  ctx.font="italic 700 15px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillStyle="#e6edf3"; ctx.fillText("R_L", 170, 91);
+  /* Strompfeil I (rot, konventionelle Richtung) auf der Zuleitung hinter dem Knoten */
+  ctx.strokeStyle="#ff5c5c"; ctx.fillStyle="#ff5c5c"; ctx.lineWidth=2.4;
+  ctx.beginPath(); ctx.moveTo(292,120); ctx.lineTo(340,120); ctx.stroke();
+  arrowHead(ctx,340,120,0,9);
+  ctx.fillText("I", 316, 100);
+
+  /* --- Motor-Ersatzschaltbild: R_M + L_M im Mittelzweig --- */
+  ctx.fillStyle="#c9d1d9";
+  ctx.beginPath(); ctx.roundRect(378,155,44,45,3); ctx.fill();
+  ctx.font="italic 700 15px system-ui"; ctx.textAlign="left"; ctx.fillStyle="#e6edf3";
+  ctx.fillText("R_M", 436, 177);
+  /* Spule L_M: fünf Halbbögen (Wicklungssymbol) auf der Zweigleitung */
+  ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=2.6;
+  ctx.beginPath();
+  for(let k=0;k<5;k++){ const y=212+k*18; ctx.moveTo(400,y); ctx.arc(400,y+9,9,-Math.PI/2,Math.PI/2); }
+  ctx.stroke();
+  ctx.font="italic 700 15px system-ui"; ctx.textAlign="left"; ctx.fillStyle="#e6edf3";
+  ctx.fillText("L_M", 436, 257);
+  /* Strompfeil I_M (rot) links neben dem Motorzweig, zeigt abwärts */
+  ctx.strokeStyle="#ff5c5c"; ctx.fillStyle="#ff5c5c"; ctx.lineWidth=2.4;
+  ctx.beginPath(); ctx.moveTo(362,158); ctx.lineTo(362,198); ctx.stroke();
+  arrowHead(ctx,362,198,Math.PI/2,9);
+  ctx.font="italic 700 14px system-ui"; ctx.textAlign="right";
+  ctx.fillText("I_M", 350, 178);
+  /* B-Feld des Drehfelds um die Wicklung: pulsierende, gestrichelte Ellipse */
+  const bAmp=Math.min(1, M.IB/40), bPulse=Math.abs(Math.cos(state.phi));
+  ctx.strokeStyle="#79c0ff"; ctx.lineWidth=1.6;
+  ctx.globalAlpha=(0.18+0.55*bPulse)*(0.3+0.7*bAmp);
+  ctx.setLineDash([7,9]); ctx.lineDashOffset=-state.phi*18;   // Strichfluss = rotierende Wirkung
+  ctx.beginPath(); ctx.ellipse(400,257,68*(0.97+0.06*bPulse),56*(0.97+0.06*bPulse),0,0,7); ctx.stroke();
+  ctx.setLineDash([]); ctx.lineDashOffset=0;
+  ctx.globalAlpha=1;
+  ctx.font="italic 700 16px system-ui"; ctx.textAlign="center";
+  ctx.globalAlpha=0.35+0.6*bPulse; ctx.fillStyle="#79c0ff";
+  ctx.fillText("B", 318, 238);
+  ctx.globalAlpha=1;
+  /* Typen-Bezeichnung über dem Zweig */
+  ctx.font="600 12px system-ui"; ctx.fillStyle="#8b949e";
+  ctx.fillText(T.motorL, 400, 84);
+
+  /* --- Spannungspfeil U über dem Parallelblock (beide Zweige) --- */
+  ctx.strokeStyle="#58a6ff"; ctx.fillStyle="#58a6ff"; ctx.lineWidth=2.2;
+  ctx.beginPath(); ctx.moveTo(486,142); ctx.lineTo(486,388); ctx.stroke();
+  arrowHead(ctx,486,142,-Math.PI/2,9); arrowHead(ctx,486,388,Math.PI/2,9);
+  ctx.font="italic 700 16px system-ui"; ctx.textAlign="left";
+  ctx.fillText("U", 498, 265);
+
+  /* --- Kondensator: waagrechte Platten im rechten Vertikalzweig ---
      u_C = Û·sin(φ): Ladung pendelt mit der Netzspannung, das E-Feld wechselt
      jede Halbwelle die Richtung (Verschiebungsstrom, kein Durchgang). */
   /* Mit offenem Schalter liegt keine Spannung an den Platten: sn = u_C/Û · S */
   const sn=Math.sin(state.phi)*swDisp;
-  ctx.fillStyle="#c9d1d9";                            // Platten (senkrecht zum waagrechten Draht)
-  ctx.fillRect(462,206,6,52);
-  ctx.fillRect(484,206,6,52);
-  /* Polaritäts-Badges über den Platten */
-  ctx.font="700 15px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=3.4; ctx.lineCap="round";
+  ctx.beginPath(); ctx.moveTo(519,226); ctx.lineTo(571,226);
+  ctx.moveTo(519,248); ctx.lineTo(571,248); ctx.stroke();
+  /* Polaritäts-Badges rechts neben den Platten */
+  ctx.font="700 14px system-ui"; ctx.textAlign="left"; ctx.textBaseline="middle";
   ctx.globalAlpha=0.25+0.75*Math.abs(sn);
-  ctx.fillStyle="#ff6b6b";
-  ctx.fillText(sn>=0?"+":"−", 465, 192);
-  ctx.fillStyle="#79c0ff";
-  ctx.fillText(sn>=0?"−":"+", 487, 192);
+  ctx.fillStyle="#ff6b6b"; ctx.fillText(sn>=0?"+":"−", 579, 226);
+  ctx.fillStyle="#79c0ff"; ctx.fillText(sn>=0?"−":"+", 579, 248);
   ctx.globalAlpha=1;
   /* Ladung auf den Innenflächen: + auf der einen Platte, − auf der anderen */
-  const nE=Math.round(5*Math.abs(sn));
+  const nE=Math.round(6*Math.abs(sn));
   for(let k=0;k<nE;k++){
-    const y=232+(k-(nE-1)/2)*10;
-    if(sn>=0){ dotPlus(ctx,470,y,0.9); dotMinus(ctx,482,y); }
-    else     { dotMinus(ctx,470,y); dotPlus(ctx,482,y,0.9); }
+    const x=527+k*8;
+    if(sn>=0){ dotPlus(ctx,x,231,0.9); dotMinus(ctx,x,243); }
+    else     { dotMinus(ctx,x,231); dotPlus(ctx,x,243,0.9); }
   }
   /* E-Feld im Plattenzwischenraum: von + nach −, Stärke ∝ u_C */
   ctx.strokeStyle="#f0b429"; ctx.fillStyle="#f0b429"; ctx.lineWidth=2;
   ctx.globalAlpha=0.3+0.65*Math.abs(sn);
-  for(const y of [218,232,246]){
-    const right=sn>=0, x1=right?469:481, x2=right?480:470;
-    ctx.beginPath(); ctx.moveTo(x1,y); ctx.lineTo(x2,y); ctx.stroke();
-    arrowHead(ctx,x2,y,right?0:Math.PI,7);
+  for(const x of [530,545,560]){
+    const down=sn>=0, y1=down?233:241, y2=down?241:233;
+    ctx.beginPath(); ctx.moveTo(x,y1); ctx.lineTo(x,y2); ctx.stroke();
+    arrowHead(ctx,x,y2,down?Math.PI/2:-Math.PI/2,7);
   }
   ctx.globalAlpha=1;
   ctx.font="italic 700 14px system-ui"; ctx.textAlign="center";
-  ctx.fillStyle="#f0b429"; ctx.fillText("E", 476, 266);
-  /* Typen-Bezeichnung C unter dem Zweig */
+  ctx.fillStyle="#f0b429"; ctx.fillText("E", 506, 210);
+  /* Typen-Bezeichnung C neben den Platten */
   ctx.font="italic 700 15px system-ui"; ctx.textAlign="right"; ctx.fillStyle="#39d6cf";
-  ctx.fillText("C", 424, 356);
+  ctx.fillText("C", 509, 264);
   ctx.font="600 11.5px ui-monospace,monospace"; ctx.textAlign="left"; ctx.fillStyle="#8b949e";
-  ctx.fillText("= "+fmtC(state.C), 430, 356);
+  ctx.fillText("= "+fmtC(state.C), 559, 264);
   ctx.font="600 12px system-ui"; ctx.textAlign="center";
-  ctx.fillText(T.capL, 440, 378);
+  ctx.fillText(T.capL, 545, 448);
 
   /* --- Schalter S (klickbar), mechanischer Hebel --- */
-  const hx=440, hy=320;                        // Drehpunkt unten
-  const tipX=440+30*(1-swDisp), tipY=292+4*(1-swDisp);     // offen: rechts geneigt
+  const hx=545, hy=330;                        // Drehpunkt unten
+  const tipX=545+30*(1-swDisp), tipY=304+4*(1-swDisp);     // offen: rechts geneigt
   ctx.strokeStyle="#e6edf3"; ctx.lineWidth=4; ctx.lineCap="round";
   ctx.beginPath(); ctx.moveTo(hx,hy); ctx.lineTo(tipX,tipY); ctx.stroke();
   ctx.fillStyle="#e6edf3";
   ctx.beginPath(); ctx.arc(tipX,tipY,5,0,7); ctx.fill();   // Hebelgriff
   ctx.fillStyle="#c9d1d9";
-  ctx.beginPath(); ctx.arc(440,290,3.5,0,7); ctx.fill();   // oberer Kontakt
-  ctx.beginPath(); ctx.arc(440,316,3.5,0,7); ctx.fill();   // unterer Kontakt
+  ctx.beginPath(); ctx.arc(545,300,3.5,0,7); ctx.fill();   // oberer Kontakt
+  ctx.beginPath(); ctx.arc(545,326,3.5,0,7); ctx.fill();   // unterer Kontakt
   ctx.beginPath(); ctx.arc(hx,hy,4,0,7); ctx.stroke();
-  if(swDisp>0.6){ ctx.fillStyle="#39d6cf"; ctx.beginPath(); ctx.arc(440,303,3,0,7); ctx.fill(); } // geschlossen: Verbindung
+  if(swDisp>0.6){ ctx.fillStyle="#39d6cf"; ctx.beginPath(); ctx.arc(545,313,3,0,7); ctx.fill(); } // geschlossen: Verbindung
   ctx.font="italic 700 14px system-ui"; ctx.textAlign="left"; ctx.fillStyle="#8b949e";
-  ctx.fillText(T.swL, 478, 308);
+  ctx.fillText(T.swL, 587, 311);
   /* Klick-Blitz als mechanisches Feedback */
   if(clickFlash>0){
     ctx.strokeStyle=`rgba(230,237,243,${clickFlash})`; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(440,303,8+(1-clickFlash)*22,0,7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(545,313,8+(1-clickFlash)*22,0,7); ctx.stroke();
   }
 
-  /* --- AC-Netzquelle (links an den Schienen, Elektronen hinter Symbol) --- */
+  /* --- Netzquelle G (links im vertikalen Leiter, Elektronen hinter Symbol) --- */
   ctx.fillStyle="#0b0f14";
-  ctx.beginPath(); ctx.arc(110,250,38,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(80,265,30,0,7); ctx.fill();
   ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=3; ctx.stroke();
-  ctx.lineWidth=2; ctx.beginPath();
-  for(let x=86;x<=134;x+=2){
-    const y=250-9*Math.sin((x-86)/48*2*Math.PI*1.15);
-    x===86?ctx.moveTo(x,y):ctx.lineTo(x,y);
-  }
-  ctx.stroke();
-  ctx.font="600 12px system-ui"; ctx.textAlign="center"; ctx.fillStyle="#8b949e";
-  ctx.fillText(T.srcL, 110, 372);
-  ctx.fillText(T.srcU, 110, 388);
+  ctx.font="700 24px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillStyle="#e6edf3"; ctx.fillText("G", 80, 266);
+  ctx.font="600 12px system-ui"; ctx.fillStyle="#8b949e";
+  ctx.fillText(T.srcL, 80, 437);
+  ctx.fillText(T.srcU, 80, 453);
 
-  /* --- Motor: B-Feld-Linien (Drehfeld), Kreis mit M, drehende Welle --- */
-  /* Feldstärke pulsiert mit dem Magnetisierungsstrom i_B ∝ −cos(ωt) */
-  const bAmp=Math.min(1, M.IB/40), bPulse=Math.abs(Math.cos(state.phi));
-  ctx.strokeStyle="#79c0ff"; ctx.lineWidth=1.6;
-  ctx.globalAlpha=(0.18+0.55*bPulse)*(0.3+0.7*bAmp);
-  ctx.setLineDash([7,9]); ctx.lineDashOffset=-state.phi*18;   // Strichfluss = rotierende Wirkung
-  ctx.beginPath(); ctx.ellipse(280,266,88*(0.97+0.06*bPulse),62*(0.97+0.06*bPulse),0,0,7); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.beginPath(); ctx.ellipse(280,266,72,50,0,0,7); ctx.stroke();
-  ctx.globalAlpha=1;
-  ctx.font="italic 700 16px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.globalAlpha=0.35+0.6*bPulse; ctx.fillStyle="#79c0ff";
-  ctx.fillText("B", 378, 252);
-  ctx.globalAlpha=1;
-  const aShaft=state.phi*1.6;                  // sichtbare Wellendrehzahl (Zeitlupe)
-  ctx.strokeStyle="#c9d1d9"; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.moveTo(335,266); ctx.lineTo(365,266); ctx.stroke();   // Welle
-  ctx.fillStyle="#0b0f14";
-  ctx.beginPath(); ctx.arc(280,266,55,0,7); ctx.fill();
-  ctx.strokeStyle="#c9d1d9"; ctx.stroke();
-  ctx.font="700 30px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.fillStyle="#e6edf3"; ctx.fillText("M", 272, 267);
-  /* drehendes Wellenende */
-  ctx.strokeStyle="#8b949e"; ctx.lineWidth=2.5;
-  ctx.beginPath(); ctx.arc(378,266,12,0,7); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(378,266); ctx.lineTo(378+11*Math.cos(aShaft),266+11*Math.sin(aShaft)); ctx.stroke();
-  ctx.beginPath(); ctx.arc(378,266,2.5,0,7); ctx.fillStyle="#8b949e"; ctx.fill();
+  /* --- Motor-Kennwerte unter dem Zweig: Drehzahl + thermische Anzeige --- */
   const nS=1500*(1-(0.015+0.05*state.P/50000));            // Drehzahl ~ mit Last leicht fallend
-  ctx.font="600 11.5px ui-monospace,monospace"; ctx.fillStyle="#8b949e";
-  ctx.fillText("n ≈ "+Math.round(nS/5)*5+" "+T.speedU, 280, 360);
-  ctx.font="600 12px system-ui"; ctx.fillText(T.motorL, 280, 128);
-  /* thermische Anzeige neben der Drehzahl: Balken ∝ Temperatur */
+  ctx.font="600 11.5px ui-monospace,monospace"; ctx.textAlign="center"; ctx.fillStyle="#8b949e";
+  ctx.fillText("n ≈ "+Math.round(nS/5)*5+" "+T.speedU, 400, 433);
+  /* thermische Anzeige: Balken ∝ Temperatur */
   const temp=30+58*Math.pow(M.IM/225,1.5);
   const tCol=temp<55?"#3fb950":temp<75?"#f0b429":"#ff6b6b";
   ctx.fillStyle="#21262d"; ctx.strokeStyle="#30363d"; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.roundRect(238,378,44,8,3); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.roundRect(334,444,44,8,3); ctx.fill(); ctx.stroke();
   ctx.fillStyle=tCol;
-  ctx.beginPath(); ctx.roundRect(238,378,44*Math.min(1,temp/100),8,3); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(334,444,44*Math.min(1,temp/100),8,3); ctx.fill();
   ctx.font="600 11px ui-monospace,monospace"; ctx.textAlign="left";
-  ctx.fillStyle=tCol; ctx.fillText("θ ≈ "+Math.round(temp)+" "+T.tempU, 290, 382);
+  ctx.fillStyle=tCol; ctx.fillText("θ ≈ "+Math.round(temp)+" "+T.tempU, 386, 448);
+  ctx.textAlign="center";
 
   /* --- Stromzangen --- */
-  clamp(ctx,180,170,T.i1l,fmtSI(M.IM,"A",2),"#f0b429","top");          // I₁ Referenz (Zuleitung)
+  clamp(ctx,215,120,T.i1l,fmtSI(M.IM,"A",2),"#f0b429","top",M.ICd>0.05);  // I₁ Vergleichswert – gestrichelt, wenn kompensiert
   ctx.font="600 9.5px system-ui"; ctx.textAlign="center"; ctx.fillStyle="#8b949e";
-  ctx.fillText(T.i1s, 180, 211);
-  clamp(ctx,280,196,T.iml,fmtSI(M.IM,"A",2),"#58a6ff","right");        // I_M (Motorzweig)
-  clamp(ctx,440,205,T.icl,state.sw?fmtSI(M.ICd,"A",2):"0 A","#39d6cf","left"); // I_C (Kondensatorzweig)
-  clamp(ctx,180,330,T.i2l,fmtSI(M.I2,"A",2),"#fb8500","bottom");       // I₂ Netzstrom live (Rückleitung)
+  ctx.fillText(T.i1s, 215, 163);
+  clamp(ctx,400,136,T.iml,fmtSI(M.IM,"A",2),"#58a6ff","right");        // I_M (Motorzweig)
+  clamp(ctx,545,170,T.icl,state.sw?fmtSI(M.ICd,"A",2):"0 A","#39d6cf","left"); // I_C (Kondensatorzweig)
+  clamp(ctx,250,410,T.i2l,fmtSI(M.I2,"A",2),"#fb8500","bottom");       // I₂ Netzstrom live (Rückleitung)
 
-  /* --- Statusbox rechts: cos φ & Netzentlastung --- */
-  const bx=536, by=118, bw=168, bh=200;
+  /* --- Statusbox rechts oben: cos φ & Netzentlastung --- */
+  const bx=590, by=14, bw=158, bh=192;
   ctx.fillStyle="#0b0f14"; ctx.strokeStyle="#30363d"; ctx.lineWidth=1;
   ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,10); ctx.fill(); ctx.stroke();
   ctx.textAlign="left"; ctx.textBaseline="middle";
@@ -790,13 +823,14 @@ function drawPhasor(cv){
   ctx.beginPath(); ctx.moveTo(-R,0); ctx.lineTo(R,0); ctx.moveTo(0,-R); ctx.lineTo(0,R); ctx.stroke();
   ctx.setLineDash([]);
 
-  /* ω-Drehpfeil im Uhrzeigersinn, Strichfluss animiert → Rotation sichtbar */
+  /* ω-Drehpfeil gegen den Uhrzeigersinn (Normkonvention): In Drehrichtung
+     gesehen liegen nacheilende Zeiger (z. B. I_B) HINTER U. */
   const a1=-1.35, a2=-0.35, rr=R+20;
   ctx.strokeStyle="#8b949e"; ctx.fillStyle="#8b949e"; ctx.lineWidth=1.6;
   ctx.setLineDash([6,7]); ctx.lineDashOffset=-state.phi*26;
-  ctx.beginPath(); ctx.arc(0,0,rr,a1,a2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,rr,a2,a1,true); ctx.stroke();
   ctx.setLineDash([]); ctx.lineDashOffset=0;
-  arrowHead(ctx,rr*Math.cos(a2),rr*Math.sin(a2),a2+Math.PI/2,8);
+  arrowHead(ctx,rr*Math.cos(a1),rr*Math.sin(a1),a1-Math.PI/2,8);
   ctx.font="italic 13px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
   ctx.fillText("ω",(rr+14)*Math.cos((a1+a2)/2),(rr+14)*Math.sin((a1+a2)/2));
 
@@ -816,11 +850,13 @@ function drawPhasor(cv){
   ctx.moveTo(0,(xc-xb)); ctx.lineTo(t2x,t2y);
   ctx.stroke(); ctx.setLineDash([]);
 
-  /* Zeiger zeichnen (dx/dy = Label-Versatz gegen Überlappung) */
-  const zeiger=(len,ang,col,name,val,dx,dy)=>{
+  /* Zeiger zeichnen (dx/dy = Label-Versatz gegen Überlappung; ghost = Vergleichszeiger) */
+  const zeiger=(len,ang,col,name,val,dx,dy,ghost)=>{
     const tx=len*Math.cos(ang), ty=len*Math.sin(ang);
     ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=3;
+    if(ghost){ ctx.globalAlpha=.55; ctx.setLineDash([7,5]); }
     ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(tx,ty); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha=1;
     arrowHead(ctx,tx,ty,ang,11);
     ctx.beginPath(); ctx.arc(tx,ty,4,0,7); ctx.fill();
     const lx=tx+(dx??20*Math.cos(ang)), ly=ty+(dy??20*Math.sin(ang));
@@ -830,12 +866,20 @@ function drawPhasor(cv){
     ctx.fillText(val, lx, ly+13);
     ctx.fillStyle=col;
   };
-  zeiger(UL,0,"#ff5c5c",T.pU,fmtSI(UN,"V",2),24,-14);              // U Referenz (Label oben)
+  zeiger(UL,0,"#ff5c5c",T.pU,fmtSI(UN,"V",2)+" · "+T.pURef,-8,-26);  // U = gemeinsame Referenz beider Zweige
   zeiger(xb,Math.PI/2,"#58a6ff",T.pIB,fmtSI(M.IB,"A",2));         // I_B (90° dahinter = unten)
   zeiger(xc,-Math.PI/2,"#39d6cf",T.pIC,fmtSI(M.ICd,"A",2));       // I_C (90° davor = oben)
   zeiger(xw,0,"#3fb950",T.pIW,fmtSI(M.IW,"A",2),24,14);           // I_W in Phase mit U (Label unten)
-  zeiger(M.IM*sc,M.phi1,"#f0b429",T.pI1,fmtSI(M.IM,"A",2));       // I₁ unkompensiert
-  zeiger(M.I2*sc,M.phi2,"#fb8500",T.pI2,fmtSI(M.I2,"A",2));       // I₂ kompensiert
+  /* I₁ (amber) = Vergleichszeiger ohne Kompensation → bei aktivem Kondensator
+     gestrichelt; I₂ (orange) = tatsächlicher Netzstrom. Ohne Kompensation
+     fallen beide zusammen und werden als einziger Zeiger „I₁ = I₂“ gezeichnet. */
+  const comp=M.ICd>0.05;
+  if(comp){
+    zeiger(M.IM*sc,M.phi1,"#f0b429",T.pI1,fmtSI(M.IM,"A",2),undefined,undefined,true);
+    zeiger(M.I2*sc,M.phi2,"#fb8500",T.pI2,fmtSI(M.I2,"A",2));
+  } else {
+    zeiger(M.IM*sc,M.phi1,"#f0b429","I₁ = I₂",fmtSI(M.IM,"A",2));
+  }
 
   /* φ-Bögen zwischen U-Achse und I₁ / I₂ */
   ctx.font="italic 700 13px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
@@ -845,7 +889,7 @@ function drawPhasor(cv){
     ctx.fillStyle="#f0b429";
     ctx.fillText("φ₁", 46*Math.cos(M.phi1/2), 46*Math.sin(M.phi1/2));
   }
-  if(Math.abs(M.phi2)>0.06){
+  if(comp&&Math.abs(M.phi2)>0.06){
     ctx.strokeStyle="#fb8500";
     ctx.beginPath(); ctx.arc(0,0,62,0,M.phi2); ctx.stroke();
     ctx.fillStyle="#fb8500";
@@ -862,15 +906,17 @@ function drawPhasor(cv){
   ctx.restore();
 }
 
-/* ---------- 7. Oszilloskop: 3 Spuren mit getrennten Nulllinien ----------
+/* ---------- 7. Oszilloskop: 4 Spuren mit getrennten Nulllinien ----------
    Spur 1: u(t) rot · Spur 2: i_M(t) blau + i_2(t) grün (Direktvergleich)
-   Spur 3: i_C(t) cyan. Fenster = 2 Perioden, rechte Kante = jetzt.        */
+   Spur 3: i_C(t) cyan · Spur 4: p_M(t) = u·i_M blau + p_2(t) = u·i_2 grün:
+   gleicher Mittelwert P̄, aber die 2f-Pendelung im Netz klingt ab.
+   Fenster = 2 Perioden, rechte Kante = jetzt.                            */
 function drawScope(cv){
   const {ctx,W,H}=fit(cv);
   ctx.clearRect(0,0,W,H);
   const L=50,R=118,Tp=26,B=86;
-  const plotW=W-L-R, laneH=(H-Tp-B)/3;
-  const mid=[0,1,2].map(k=>Tp+laneH*(k+0.5));
+  const plotW=W-L-R, laneH=(H-Tp-B)/4;
+  const mid=[0,1,2,3].map(k=>Tp+laneH*(k+0.5));
   const amp=laneH*0.40, phi=state.phi;
   const T=I18N[lang];
 
@@ -886,8 +932,8 @@ function drawScope(cv){
   ctx.textBaseline="middle";
 
   /* Nulllinien + Spur-Bezeichner */
-  const lanes=[{tag:"u",col:"#ff5c5c"},{tag:"i_M · i_2",col:"#58a6ff"},{tag:"i_C",col:"#39d6cf"}];
-  for(let k=0;k<3;k++){
+  const lanes=[{tag:"u",col:"#ff5c5c"},{tag:"i_M · i_2",col:"#58a6ff"},{tag:"i_C",col:"#39d6cf"},{tag:"p_M · p_2",col:"#58a6ff"}];
+  for(let k=0;k<4;k++){
     ctx.setLineDash([3,4]); ctx.strokeStyle="#484f58"; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(L,mid[k]); ctx.lineTo(L+plotW,mid[k]); ctx.stroke();
     ctx.setLineDash([]);
@@ -898,8 +944,9 @@ function drawScope(cv){
   /* Amplituden-Skalierungen (weich geglättet) */
   const p2=Math.max(Math.SQRT2*M.IM, Math.SQRT2*M.I2, 0.4);
   const p3=Math.max(Math.SQRT2*M.ICt, Math.SQRT2*M.ICd, 0.3);
-  sc2p+=(p2-sc2p)*0.1; sc3p+=(p3-sc3p)*0.1;
-  const A2=sc2p, A3=Math.max(sc3p, 0.3);
+  const p4=Math.max(325*Math.SQRT2*Math.max(M.IM,M.I2)*1.15, 800);
+  sc2p+=(p2-sc2p)*0.1; sc3p+=(p3-sc3p)*0.1; sc4p+=(p4-sc4p)*0.1;
+  const A2=sc2p, A3=Math.max(sc3p, 0.3), A4=sc4p;
   const IMp=Math.SQRT2*M.IM, I2p=Math.SQRT2*M.I2, ICp=Math.SQRT2*M.ICd;
 
   /* Kurven: θ(x) = phi − (1−x/plotW)·4π  (rechte Kante = aktuelle Phase) */
@@ -924,6 +971,37 @@ function drawScope(cv){
     ctx.font="11px system-ui"; ctx.textAlign="center"; ctx.fillStyle="#8b949e";
     ctx.fillText("i_C = 0 – "+T.swOff, L+plotW/2, mid[2]-16);
   }
+
+  /* Spur 4: Momentanleistungen p = u·i (Mittelwert P̄ = U·I_W für beide gleich) */
+  curve(mid[3], th=>325*IMp*Math.sin(th)*Math.sin(th-M.phi1), A4, "#58a6ff");
+  curve(mid[3], th=>325*I2p*Math.sin(th)*Math.sin(th-M.phi2), A4, "#3fb950");
+  /* gestrichelte Mittelwert-Linie P̄ */
+  ctx.setLineDash([4,4]); ctx.strokeStyle="#8b949e"; ctx.lineWidth=1.2;
+  const yP=mid[3]-M.P/A4*amp;
+  ctx.beginPath(); ctx.moveTo(L,yP); ctx.lineTo(L+plotW,yP); ctx.stroke();
+  ctx.setLineDash([]);
+
+  /* Min/Max-Markierung der Leistungsspur: Führungslinien + Wertlesung am rechten Rand.
+     Extrema exakt: p = (Û·Î/2)·(cos φ − cos(2ωt−φ)) → p_max/min = (Û·Î/2)·(cos φ ± 1) */
+  const yOfP=p=>mid[3]-p/A4*amp, hUp=325/2;
+  const pMmax=hUp*IMp*(Math.cos(M.phi1)+1), pMmin=hUp*IMp*(Math.cos(M.phi1)-1);
+  const p2max=hUp*I2p*(Math.cos(M.phi2)+1), p2min=hUp*I2p*(Math.cos(M.phi2)-1);
+  for(const [p,col] of [[pMmax,"#58a6ff"],[pMmin,"#58a6ff"],[p2max,"#3fb950"],[p2min,"#3fb950"]]){
+    ctx.setLineDash([3,4]); ctx.strokeStyle=col; ctx.globalAlpha=.45; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(L,yOfP(p)); ctx.lineTo(L+plotW,yOfP(p)); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha=1;
+  }
+  /* Wert-Labels: doppelte Einträge bei deckungsgleichen Kurven entfernen, dann
+     mit Mindestabstand 12 px untereinander entzerren */
+  const mkLabs=(a,b)=>{const s=[a,b].sort((x,y)=>x.y-y.y)
+    .filter((l,i,arr)=>i===arr.length-1||l.t!==arr[i+1].t);
+    for(let i=1;i<s.length;i++) if(s[i].y-s[i-1].y<12) s[i].y=s[i-1].y+12; return s;};
+  const labsMax=mkLabs({y:yOfP(pMmax),col:"#58a6ff",t:fmtSI(pMmax,"W",3)},
+                       {y:yOfP(p2max),col:"#3fb950",t:fmtSI(p2max,"W",3)});
+  const labsMin=mkLabs({y:yOfP(pMmin),col:"#58a6ff",t:fmtSI(pMmin,"W",3)},
+                       {y:yOfP(p2min),col:"#3fb950",t:fmtSI(p2min,"W",3)});
+  for(const [list,dy] of [[labsMax,-6],[labsMin,6]])
+    for(const l of list) txtHalo(ctx,l.t,L+plotW-6,l.y+dy,l.col,"right","600 10px ui-monospace,monospace");
 
   /* Spitzen-Markierungen: u-Peak als Referenz bei ~45 % Fensterbreite */
   const k=Math.round((phi-(1-0.45)*4*Math.PI-Math.PI/2)/(2*Math.PI));
@@ -972,7 +1050,9 @@ function drawScope(cv){
   const dots=[[mid[0]-325/325*amp*Math.sin(phi),"#ff5c5c"],
               [mid[1]-IMp/A2*amp*Math.sin(phi-M.phi1),"#58a6ff"],
               [mid[1]-I2p/A2*amp*Math.sin(phi-M.phi2),"#3fb950"],
-              [mid[2]-ICp/A3*amp*Math.sin(phi+Math.PI/2),"#39d6cf"]];
+              [mid[2]-ICp/A3*amp*Math.sin(phi+Math.PI/2),"#39d6cf"],
+              [mid[3]-325*IMp/A4*amp*Math.sin(phi)*Math.sin(phi-M.phi1),"#58a6ff"],
+              [mid[3]-325*I2p/A4*amp*Math.sin(phi)*Math.sin(phi-M.phi2),"#3fb950"]];
   for(const [yy,c] of dots){ ctx.fillStyle=c; ctx.beginPath(); ctx.arc(xC2,yy,4,0,7); ctx.fill(); }
 
   /* Amplituden-Lesungen rechts */
@@ -981,6 +1061,9 @@ function drawScope(cv){
   ctx.fillStyle="#58a6ff"; ctx.fillText("Î_M = "+fmtSI(IMp,"A",3), L+plotW+10, mid[1]-amp+10);
   ctx.fillStyle="#3fb950"; ctx.fillText("Î_2 = "+fmtSI(I2p,"A",3), L+plotW+10, mid[1]-amp+26);
   ctx.fillStyle="#39d6cf"; ctx.fillText("Î_C = "+fmtSI(ICp,"A",3), L+plotW+10, mid[2]-amp+10);
+  ctx.fillStyle="#58a6ff"; ctx.fillText("p_M = u·i_M", L+plotW+10, mid[3]-amp+10);
+  ctx.fillStyle="#3fb950"; ctx.fillText("p_2 = u·i_2", L+plotW+10, mid[3]-amp+24);
+  ctx.fillStyle="#8b949e"; ctx.fillText("P̄ = "+fmtSI(M.P,"W",3), L+plotW+10, mid[3]-amp+38);
 }
 
 /* ---------- 8. Energiefluss (vereinfachtes Sankey, Design 1000×420) ----------
@@ -1056,7 +1139,11 @@ function updatePanel(){
   el("mU").innerHTML=fmtSI(UN,"V",3);
   el("mIM").innerHTML=fmtSI(M.IM,"A");
   el("mIC").innerHTML=state.sw?fmtSI(M.ICd,"A"):"0 A";
+  /* I₁ ist die Referenz ohne Kompensation (= Motorstrom), I₂ der tatsächliche Netzstrom */
+  el("mI1").innerHTML=fmtSI(M.IM,"A");
   el("mI2").innerHTML=fmtSI(M.I2,"A");
+  const dI=M.IM-M.I2;
+  el("mDI").innerHTML=Math.abs(dI)<0.05?"0 A":(dI>0?"− ":"+ ")+fmtSI(Math.abs(dI),"A");
   el("mCos1").innerHTML=fmtNum(state.cos1,2);
   el("mCos2").innerHTML=fmtNum(M.cos2,2)+(M.phi2<-0.02?' <small>kapazitiv</small>':"");
   el("mP").innerHTML=fmtSI(M.P,"W");
@@ -1147,9 +1234,9 @@ window.addEventListener("keydown",e=>{           // Leertaste = Start/Stopp
 const cvScene=el("cvScene"), tip=el("tip");
 function scenePos(e){
   const r=cvScene.getBoundingClientRect();
-  return [(e.clientX-r.left)/r.width*720, (e.clientY-r.top)/r.height*460];
+  return [(e.clientX-r.left)/r.width*760, (e.clientY-r.top)/r.height*520];
 }
-const overSwitch=p=>p[0]>400&&p[0]<500&&p[1]>268&&p[1]<330;
+const overSwitch=p=>p[0]>505&&p[0]<620&&p[1]>278&&p[1]<350;
 cvScene.addEventListener("pointerdown",e=>{ const p=scenePos(e); if(overSwitch(p)) toggleSwitch(); });
 cvScene.addEventListener("pointermove",e=>{
   const p=scenePos(e);
@@ -1178,6 +1265,7 @@ function loop(now){
   /* Weiche Nachführung der Anzeige-Werte → Schalter „kippt“ mechanisch,
      Elektronen/Sankey/Zeiger laufen sanft in den neuen Zustand */
   M.ICd += (M.ICt-M.ICd)*Math.min(1,dt*9);
+  if(M.ICt===0&&M.ICd<0.002) M.ICd=0;   // Ausklingen sauber abstellen → zeigt „0 A“ statt endlos schrumpfender Restwerte
   swDisp += ((state.sw?1:0)-swDisp)*Math.min(1,dt*13);
   clickFlash=Math.max(0,clickFlash-dt*2.6);
   derived();
@@ -1199,6 +1287,7 @@ recompute(); derived();
 phSc=138/Math.max(M.IM,M.ICd,1);
 sc2p=Math.max(Math.SQRT2*M.IM, Math.SQRT2*M.I2, 0.4);
 sc3p=Math.max(Math.SQRT2*M.ICt, 0.3);
+sc4p=Math.max(325*Math.SQRT2*Math.max(M.IM,M.I2)*1.15, 800);
 requestAnimationFrame(loop);
 </script>
 <!-- sim-nav -->
